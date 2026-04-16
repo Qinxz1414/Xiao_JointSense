@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - JointSense</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2196F3;
+            --primary-dark: #1976D2;
+            --bg-light: #F5F5F5;
+            --text-dark: #212121;
+            --text-light: #757575;
+            --white: #FFFFFF;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.8;
+            color: var(--text-dark);
+            background: var(--bg-light);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--white);
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .lang-switch {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .lang-btn {
+            padding: 10px 24px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            background: transparent;
+            color: var(--white);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .lang-btn:hover,
+        .lang-btn.active {
+            background: var(--white);
+            color: var(--primary);
+            border-color: var(--white);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .policy-content {
+            background: var(--white);
+            padding: 50px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .policy-section {
+            margin-bottom: 40px;
+        }
+
+        .policy-section h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--bg-light);
+        }
+
+        .policy-section p {
+            margin-bottom: 16px;
+            color: var(--text-dark);
+        }
+
+        .policy-section ul {
+            margin-left: 24px;
+            margin-bottom: 16px;
+        }
+
+        .policy-section li {
+            margin-bottom: 10px;
+        }
+
+        .disclaimer {
+            background: #FFF3E0;
+            border-left: 4px solid #FF9800;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+
+        .disclaimer h3 {
+            color: #E65100;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .zh-content, .en-content {
+            display: none;
+        }
+
+        .zh-content.active, .en-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .policy-content {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+
+            .lang-switch {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .lang-btn {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>JointSense</h1>
+        <p id="header-subtitle">炎症因子检测 · 隐私政策</p>
+        <div class="lang-switch">
+            <button class="lang-btn active" onclick="switchLang('zh')">中文</button>
+            <button class="lang-btn" onclick="switchLang('en')">English</button>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="policy-content">
+            <div class="zh-content active">
+                <section class="policy-section">
+                    <h2>1. 简介</h2>
+                    <p>JointSense（以下简称"本应用"）非常重视用户的隐私和个人信息保护。本隐私政策旨在向您说明本应用如何收集、使用、存储和保护您的个人信息。</p>
+                    <p>请您在使用本应用前，仔细阅读并了解本隐私政策。如果您不同意本隐私政策的任何内容，请立即停止使用本应用。</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>2. 我们收集的信息</h2>
+                    <h3>2.1 您主动提供的信息</h3>
+                    <ul>
+                        <li><strong>测试数据</strong>：您进行炎症因子检测时输入的检测项目名称和测试会话信息</li>
+                        <li><strong>反馈信息</strong>：您主动向我们提供的反馈和建议</li>
+                    </ul>
+                    <h3>2.2 您拍摄/选择的图像</h3>
+                    <ul>
+                        <li><strong>反应舱图像</strong>：您使用本应用拍摄或从相册选择的芯片反应舱图像</li>
+                        <li>本应用不会自动拍摄或上传您设备上的其他图像</li>
+                    </ul>
+                    <h3>2.3 设备信息</h3>
+                    <ul>
+                        <li><strong>相机权限</strong>：本应用需要使用相机权限来拍摄芯片反应舱图像</li>
+                        <li><strong>存储权限</strong>：用于保存和读取您选择的图像文件</li>
+                    </ul>
+                    <h3>2.4 检测结果数据</h3>
+                    <ul>
+                        <li>炎症因子检测结果（IL-6、TNF-α、IL-1β浓度值）</li>
+                        <li>RGB颜色分析数据</li>
+                        <li>检测时间戳</li>
+                    </ul>
+                </section>
+
+                <section class="policy-section">
+                    <h2>3. 我们如何使用信息</h2>
+                    <h3>3.1 图像处理</h3>
+                    <p>您拍摄或选择的图像仅在本地设备上进行处理。图像数据不会被上传到任何服务器或第三方云服务。</p>
+                    <h3>3.2 检测分析</h3>
+                    <p>使用本地算法对图像进行炎症因子浓度分析，生成包含RGB颜色值和浓度数据的检测报告。</p>
+                    <h3>3.3 数据存储</h3>
+                    <p>所有检测结果和历史记录仅保存在您的设备本地存储中。您可以随时查看、导出或删除这些数据。</p>
+                    <h3>3.4 数据备份</h3>
+                    <p>本应用使用 Android 自动备份功能。备份数据存储在您的 Google 云端账户中，仅包含应用设置和偏好设置，不包括您的检测图像和结果数据。</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>4. 第三方服务</h2>
+                    <p>本应用<strong>不包含</strong>任何第三方广告、分析或追踪服务。</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>5. 数据安全</h2>
+                    <p>我们采用以下安全措施保护您的数据：</p>
+                    <ul>
+                        <li>所有数据处理均在您的设备本地完成</li>
+                        <li>应用采用行业标准的加密措施保护数据传输</li>
+                        <li>定期更新应用以修复安全漏洞</li>
+                    </ul>
+                </section>
+
+                <section class="policy-section">
+                    <h2>6. 您的权利</h2>
+                    <h3>6.1 访问权</h3>
+                    <p>您可以随时在本应用中查看您的检测历史记录。</p>
+                    <h3>6.2 删除权</h3>
+                    <ul>
+                        <li>您可以随时删除设备上的检测数据和历史记录</li>
+                        <li>卸载应用将自动删除设备上的所有本地数据</li>
+                    </ul>
+                    <h3>6.3 数据导出</h3>
+                    <p>您可以查看检测结果的详细数据。</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>7. 儿童隐私</h2>
+                    <p>本应用不面向13岁以下儿童，也不收集儿童的个人信息。</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>8. 隐私政策更新</h2>
+                    <p>我们可能会不时更新本隐私政策。更新后的隐私政策将在本页面发布，建议您定期查阅。</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>9. 联系我们</h2>
+                    <p>如果您对本隐私政策有任何疑问或建议，请通过以下方式联系我们：</p>
+                    <ul>
+                        <li><strong>应用名称</strong>：JointSense</li>
+                        <li><strong>版本</strong>：1.0</li>
+                        <li><strong>联系方式</strong>：请通过应用内反馈功能联系我们</li>
+                    </ul>
+                </section>
+
+                <section class="policy-section">
+                    <div class="disclaimer">
+                        <h3>10. 免责声明</h3>
+                        <p>本应用仅作为炎症因子检测的辅助筛查工具，检测结果仅供参考，不能替代专业医疗诊断。如有任何健康疑虑，请咨询医疗专业人员。</p>
+                    </div>
+                </section>
+            </div>
+
+            <div class="en-content">
+                <section class="policy-section">
+                    <h2>1. Introduction</h2>
+                    <p>JointSense ("the App") is committed to protecting your privacy and personal information. This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our application.</p>
+                    <p>Please read this Privacy Policy carefully before using the App. If you do not agree with any part of this Privacy Policy, please stop using the App immediately.</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>2. Information We Collect</h2>
+                    <h3>2.1 Information You Provide</h3>
+                    <ul>
+                        <li><strong>Test Data</strong>: Test item names and session information you input when performing inflammatory factor tests</li>
+                        <li><strong>Feedback</strong>: Feedback and suggestions you voluntarily provide to us</li>
+                    </ul>
+                    <h3>2.2 Images You Capture/Select</h3>
+                    <ul>
+                        <li><strong>Reaction Chamber Images</strong>: Images of chip reaction chambers you capture or select from your gallery</li>
+                        <li>The App does not automatically capture or upload any other images from your device</li>
+                    </ul>
+                    <h3>2.3 Device Information</h3>
+                    <ul>
+                        <li><strong>Camera Permission</strong>: Required to capture chip reaction chamber images</li>
+                        <li><strong>Storage Permission</strong>: Used to save and read image files you select</li>
+                    </ul>
+                    <h3>2.4 Test Result Data</h3>
+                    <ul>
+                        <li>Inflammatory factor test results (IL-6, TNF-α, IL-1β concentration values)</li>
+                        <li>RGB color analysis data</li>
+                        <li>Test timestamps</li>
+                    </ul>
+                </section>
+
+                <section class="policy-section">
+                    <h2>3. How We Use Information</h2>
+                    <h3>3.1 Image Processing</h3>
+                    <p>Images you capture or select are processed only on your local device. Image data is never uploaded to any servers or third-party cloud services.</p>
+                    <h3>3.2 Detection Analysis</h3>
+                    <p>Local algorithms are used to analyze inflammatory factor concentrations from images. Detection reports containing RGB color values and concentration data are generated.</p>
+                    <h3>3.3 Data Storage</h3>
+                    <p>All test results and history are stored only locally on your device. You can view, export, or delete this data at any time.</p>
+                    <h3>3.4 Data Backup</h3>
+                    <p>The App uses Android Auto Backup feature. Backup data is stored in your Google Cloud account, including only app settings and preferences. Backup does NOT include your detection images and result data.</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>4. Third-Party Services</h2>
+                    <p>This App does <strong>NOT</strong> contain any third-party advertisements, analytics, or tracking services.</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>5. Data Security</h2>
+                    <p>We implement the following security measures to protect your data:</p>
+                    <ul>
+                        <li>All data processing is performed locally on your device</li>
+                        <li>Industry-standard encryption measures are used to protect data transmission</li>
+                        <li>Regular app updates to fix security vulnerabilities</li>
+                    </ul>
+                </section>
+
+                <section class="policy-section">
+                    <h2>6. Your Rights</h2>
+                    <h3>6.1 Right of Access</h3>
+                    <p>You can view your test history at any time within the App.</p>
+                    <h3>6.2 Right of Deletion</h3>
+                    <ul>
+                        <li>You can delete detection data and history from your device at any time</li>
+                        <li>Uninstalling the App will automatically delete all local data on the device</li>
+                    </ul>
+                    <h3>6.3 Data Export</h3>
+                    <p>You can view detailed detection result data.</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>7. Children's Privacy</h2>
+                    <p>This App is not intended for children under 13 years of age and does not knowingly collect personal information from children.</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>8. Changes to This Privacy Policy</h2>
+                    <p>We may update this Privacy Policy from time to time. Any updates will be posted on this page. We recommend that you review this Privacy Policy periodically.</p>
+                </section>
+
+                <section class="policy-section">
+                    <h2>9. Contact Us</h2>
+                    <p>If you have any questions or suggestions about this Privacy Policy, please contact us through:</p>
+                    <ul>
+                        <li><strong>App Name</strong>: JointSense</li>
+                        <li><strong>Version</strong>: 1.0</li>
+                        <li><strong>Contact</strong>: Please contact us through the in-app feedback feature</li>
+                    </ul>
+                </section>
+
+                <section class="policy-section">
+                    <div class="disclaimer">
+                        <h3>10. Disclaimer</h3>
+                        <p>This App serves only as an auxiliary screening tool for inflammatory factor detection. Test results are for reference only and cannot replace professional medical diagnosis. Please consult a healthcare professional for any health concerns.</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 JointSense. All rights reserved. | 最后更新：2026年4月16日</p>
+    </footer>
+
+    <script>
+        function switchLang(lang) {
+            const zhContent = document.querySelector('.zh-content');
+            const enContent = document.querySelector('.en-content');
+            const headerSubtitle = document.getElementById('header-subtitle');
+            const buttons = document.querySelectorAll('.lang-btn');
+
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            if (lang === 'zh') {
+                zhContent.classList.add('active');
+                enContent.classList.remove('active');
+                headerSubtitle.textContent = '炎症因子检测 · 隐私政策';
+                buttons[0].classList.add('active');
+            } else {
+                enContent.classList.add('active');
+                zhContent.classList.remove('active');
+                headerSubtitle.textContent = 'Inflammatory Factor Detection · Privacy Policy';
+                buttons[1].classList.add('active');
+            }
+        }
+    </script>
+</body>
+</html>
