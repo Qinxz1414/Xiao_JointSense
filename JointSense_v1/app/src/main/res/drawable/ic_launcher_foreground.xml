@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- ============================================ -->
+    <!-- JointSense Microfluidic Chip Icon            -->
+    <!-- White chip icon on transparent background    -->
+    <!-- Safe zone: 18-90 (72x72 center area)         -->
+    <!-- ============================================ -->
+
+    <!-- Chip body outline (rounded rectangle) -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M30,30 L78,30 Q82,30 82,34 L82,74 Q82,78 78,78 L30,78 Q26,78 26,74 L26,34 Q26,30 30,30 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5" />
+
+    <!-- Internal vertical channels -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M43,30 L43,78"
+        android:strokeColor="#80FFFFFF"
+        android:strokeWidth="1.2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M65,30 L65,78"
+        android:strokeColor="#80FFFFFF"
+        android:strokeWidth="1.2" />
+
+    <!-- Internal horizontal channels -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M26,46 L82,46"
+        android:strokeColor="#80FFFFFF"
+        android:strokeWidth="1.2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M26,62 L82,62"
+        android:strokeColor="#80FFFFFF"
+        android:strokeWidth="1.2" />
+
+    <!-- Reaction chambers at channel intersections (4 corners) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,46 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,46 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,62 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,62 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 z" />
+
+    <!-- Center detection chamber (larger, with crosshair) -->
+    <!-- Outer glow circle -->
+    <path
+        android:fillColor="#40FFFFFF"
+        android:pathData="M47,54 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 z" />
+    <!-- Inner ring -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5" />
+    <!-- Crosshair vertical -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,49.5 L54,58.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1" />
+    <!-- Crosshair horizontal -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M49.5,54 L58.5,54"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1" />
+
+    <!-- Top port connections -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M43,22 L43,30"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M65,22 L65,30"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <!-- Top port circles -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M41,22 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M63,22 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+
+    <!-- Bottom port connections -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M43,78 L43,86"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M65,78 L65,86"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <!-- Bottom port circles -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M41,86 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M63,86 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+
+    <!-- Left port connections -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M18,46 L26,46"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M18,62 L26,62"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <!-- Left port circles -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,46 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,62 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+
+    <!-- Right port connections -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M82,46 L90,46"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M82,62 L90,62"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2" />
+    <!-- Right port circles -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M88,46 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M88,62 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 z" />
+
+</vector>
