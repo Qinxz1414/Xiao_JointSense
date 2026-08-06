@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -72,19 +73,30 @@ fun ImageCropView(
         // Track which part is being dragged
         var dragMode by remember { mutableStateOf(DragMode.NONE) }
 
-        val cornerTouchRadius = with(LocalDensity.current) { 24.dp.toPx() }
+        // Always-readable latest rect: pointerInput keys below do NOT
+        // include cropRect (restarting the gesture on every change would
+        // cancel drags), so the handlers must read through this state.
+        val latestCropRect = rememberUpdatedState(cropRect)
+
+        val cornerTouchRadius = with(LocalDensity.current) { 28.dp.toPx() }
 
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(bitmap, scaleX, scaleY) {
+                .pointerInput(bitmap, scaleX, scaleY, offsetX, offsetY) {
+                    // Rect accumulated locally during one gesture so each
+                    // per-event delta is applied on top of the previous
+                    // one, independent of recomposition timing.
+                    var activeRect = Rect(0, 0, 0, 0)
+
                     detectDragGestures(
                         onDragStart = { offset ->
-                            // Determine drag mode based on touch position
-                            val screenLeft = cropRect.left * scaleX + offsetX
-                            val screenTop = cropRect.top * scaleY + offsetY
-                            val screenRight = cropRect.right * scaleX + offsetX
-                            val screenBottom = cropRect.bottom * scaleY + offsetY
+                            val rect = latestCropRect.value
+                            activeRect = rect
+                            val screenLeft = rect.left * scaleX + offsetX
+                            val screenTop = rect.top * scaleY + offsetY
+                            val screenRight = rect.right * scaleX + offsetX
+                            val screenBottom = rect.bottom * scaleY + offsetY
 
                             dragMode = when {
                                 isNearPoint(offset, screenLeft, screenTop, cornerTouchRadius) -> DragMode.TOP_LEFT
@@ -97,49 +109,51 @@ fun ImageCropView(
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
+                            if (dragMode == DragMode.NONE) return@onDrag
                             val dx = (dragAmount.x / scaleX).roundToInt()
                             val dy = (dragAmount.y / scaleY).roundToInt()
 
                             val newRect = when (dragMode) {
                                 DragMode.MOVE -> {
-                                    val newLeft = (cropRect.left + dx).coerceIn(0, bitmap.width - cropRect.width())
-                                    val newTop = (cropRect.top + dy).coerceIn(0, bitmap.height - cropRect.height())
-                                    Rect(newLeft, newTop, newLeft + cropRect.width(), newTop + cropRect.height())
+                                    val newLeft = (activeRect.left + dx).coerceIn(0, bitmap.width - activeRect.width())
+                                    val newTop = (activeRect.top + dy).coerceIn(0, bitmap.height - activeRect.height())
+                                    Rect(newLeft, newTop, newLeft + activeRect.width(), newTop + activeRect.height())
                                 }
                                 DragMode.TOP_LEFT -> {
                                     Rect(
-                                        (cropRect.left + dx).coerceIn(0, cropRect.right - 50),
-                                        (cropRect.top + dy).coerceIn(0, cropRect.bottom - 50),
-                                        cropRect.right,
-                                        cropRect.bottom
+                                        (activeRect.left + dx).coerceIn(0, activeRect.right - 50),
+                                        (activeRect.top + dy).coerceIn(0, activeRect.bottom - 50),
+                                        activeRect.right,
+                                        activeRect.bottom
                                     )
                                 }
                                 DragMode.TOP_RIGHT -> {
                                     Rect(
-                                        cropRect.left,
-                                        (cropRect.top + dy).coerceIn(0, cropRect.bottom - 50),
-                                        (cropRect.right + dx).coerceIn(cropRect.left + 50, bitmap.width),
-                                        cropRect.bottom
+                                        activeRect.left,
+                                        (activeRect.top + dy).coerceIn(0, activeRect.bottom - 50),
+                                        (activeRect.right + dx).coerceIn(activeRect.left + 50, bitmap.width),
+                                        activeRect.bottom
                                     )
                                 }
                                 DragMode.BOTTOM_LEFT -> {
                                     Rect(
-                                        (cropRect.left + dx).coerceIn(0, cropRect.right - 50),
-                                        cropRect.top,
-                                        cropRect.right,
-                                        (cropRect.bottom + dy).coerceIn(cropRect.top + 50, bitmap.height)
+                                        (activeRect.left + dx).coerceIn(0, activeRect.right - 50),
+                                        activeRect.top,
+                                        activeRect.right,
+                                        (activeRect.bottom + dy).coerceIn(activeRect.top + 50, bitmap.height)
                                     )
                                 }
                                 DragMode.BOTTOM_RIGHT -> {
                                     Rect(
-                                        cropRect.left,
-                                        cropRect.top,
-                                        (cropRect.right + dx).coerceIn(cropRect.left + 50, bitmap.width),
-                                        (cropRect.bottom + dy).coerceIn(cropRect.top + 50, bitmap.height)
+                                        activeRect.left,
+                                        activeRect.top,
+                                        (activeRect.right + dx).coerceIn(activeRect.left + 50, bitmap.width),
+                                        (activeRect.bottom + dy).coerceIn(activeRect.top + 50, bitmap.height)
                                     )
                                 }
-                                DragMode.NONE -> cropRect
+                                DragMode.NONE -> activeRect
                             }
+                            activeRect = newRect
                             onCropRectChanged(newRect)
                         },
                         onDragEnd = {
