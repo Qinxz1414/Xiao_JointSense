@@ -11,18 +11,24 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -144,33 +150,64 @@ fun JointSenseApp(
             }
         }
     } else {
-        // Tab scaffold
-        Scaffold(
-            bottomBar = {
-                MainBottomBar(
-                    activeTab = viewModel.activeTab,
-                    onTab = { tab -> viewModel.selectTab(tab) },
-                    onTest = { viewModel.createNewSession() }
-                )
+        // Tab scaffold with a floating center camera action drawn on
+        // top of everything so it is never clipped by the bar/content.
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                bottomBar = {
+                    MainBottomBar(
+                        activeTab = viewModel.activeTab,
+                        onTab = { tab -> viewModel.selectTab(tab) }
+                    )
+                }
+            ) { paddingValues ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        // Extra room so scrolled-to-end content clears
+                        // the floating camera button (~30dp protrusion).
+                        .padding(bottom = 32.dp)
+                        .background(BgLight)
+                ) {
+                    when (viewModel.activeTab) {
+                        MainTab.HOME -> HomeScreen(
+                            viewModel = viewModel,
+                            onTestNow = { viewModel.createNewSession() },
+                            onOpenReport = { viewModel.selectTab(MainTab.REPORT) }
+                        )
+                        MainTab.TRENDS -> TrendsScreen(viewModel = viewModel)
+                        MainTab.REPORT -> ReportScreen(viewModel = viewModel)
+                        MainTab.PROFILE -> ProfileScreen(
+                            viewModel = viewModel,
+                            onOpenHistory = { viewModel.navigateToFlow(FlowScreen.HISTORY) }
+                        )
+                    }
+                }
             }
-        ) { paddingValues ->
+
+            // Floating camera button: sits above the bar's top edge,
+            // centered, with a white ring so it reads against content.
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .background(BgLight)
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = 42.dp)
             ) {
-                when (viewModel.activeTab) {
-                    MainTab.HOME -> HomeScreen(
-                        viewModel = viewModel,
-                        onTestNow = { viewModel.createNewSession() },
-                        onOpenReport = { viewModel.selectTab(MainTab.REPORT) }
-                    )
-                    MainTab.TRENDS -> TrendsScreen(viewModel = viewModel)
-                    MainTab.REPORT -> ReportScreen(viewModel = viewModel)
-                    MainTab.PROFILE -> ProfileScreen(
-                        viewModel = viewModel,
-                        onOpenHistory = { viewModel.navigateToFlow(FlowScreen.HISTORY) }
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .border(4.dp, BgWhite, CircleShape)
+                        .clip(CircleShape)
+                        .background(PrimaryAccent)
+                        .clickable { viewModel.createNewSession() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "New test",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
@@ -185,77 +222,70 @@ fun JointSenseApp(
 @Composable
 private fun MainBottomBar(
     activeTab: MainTab,
-    onTab: (MainTab) -> Unit,
-    onTest: () -> Unit
+    onTab: (MainTab) -> Unit
 ) {
     Surface(
         color = BgWhite,
         shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BarTab(
-                icon = Icons.Default.Home,
-                label = "Home",
-                selected = activeTab == MainTab.HOME,
-                onClick = { onTab(MainTab.HOME) }
-            )
-            BarTab(
-                icon = Icons.Default.ShowChart,
-                label = "Trends",
-                selected = activeTab == MainTab.TRENDS,
-                onClick = { onTab(MainTab.TRENDS) }
-            )
-
-            // Center raised test action
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(68.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                BarTab(
+                    icon = Icons.Default.Home,
+                    label = "Home",
+                    selected = activeTab == MainTab.HOME,
+                    onClick = { onTab(MainTab.HOME) }
+                )
+                BarTab(
+                    icon = Icons.Default.ShowChart,
+                    label = "Trends",
+                    selected = activeTab == MainTab.TRENDS,
+                    onClick = { onTab(MainTab.TRENDS) }
+                )
+
+                // Center cell: label only; the camera circle floats
+                // above the bar as a separate overlay.
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .offset(y = (-14).dp)
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryAccent)
-                            .clickable { onTest() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = "New test",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
                     Text(
                         text = "Test",
                         fontSize = 10.sp,
-                        color = TextSecondary,
-                        modifier = Modifier.offset(y = (-10).dp)
+                        color = PrimaryAccent,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
+
+                BarTab(
+                    icon = Icons.Default.Description,
+                    label = "Report",
+                    selected = activeTab == MainTab.REPORT,
+                    onClick = { onTab(MainTab.REPORT) }
+                )
+                BarTab(
+                    icon = Icons.Default.Person,
+                    label = "Profile",
+                    selected = activeTab == MainTab.PROFILE,
+                    onClick = { onTab(MainTab.PROFILE) }
+                )
             }
 
-            BarTab(
-                icon = Icons.Default.Description,
-                label = "Report",
-                selected = activeTab == MainTab.REPORT,
-                onClick = { onTab(MainTab.REPORT) }
-            )
-            BarTab(
-                icon = Icons.Default.Person,
-                label = "Profile",
-                selected = activeTab == MainTab.PROFILE,
-                onClick = { onTab(MainTab.PROFILE) }
+            // Keep the bar background edge-to-edge but lift the tabs
+            // above the system gesture / navigation area.
+            Spacer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsBottomHeight(WindowInsets.navigationBars)
             )
         }
     }

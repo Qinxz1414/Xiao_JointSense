@@ -375,7 +375,7 @@ fun ReportScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(46.dp),
+                                    .height(48.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = PrimaryAccent
@@ -387,7 +387,7 @@ fun ReportScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("PDF Report", fontSize = 14.sp)
+                                Text("PDF Report", fontSize = 14.sp, maxLines = 1)
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             OutlinedButton(
@@ -400,7 +400,7 @@ fun ReportScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(46.dp),
+                                    .height(48.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(
@@ -411,8 +411,9 @@ fun ReportScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    "Share Summary",
+                                    "Share",
                                     fontSize = 14.sp,
+                                    maxLines = 1,
                                     color = PrimaryAccent
                                 )
                             }

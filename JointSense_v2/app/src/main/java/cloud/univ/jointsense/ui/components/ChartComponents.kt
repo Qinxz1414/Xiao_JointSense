@@ -220,7 +220,10 @@ fun GaugeChart(
 ) {
     Canvas(modifier = modifier) {
         val strokeWidth = size.height * 0.28f
-        val radius = size.width / 2f - strokeWidth / 2f
+        // Radius must respect BOTH dimensions: a stroked semicircle of
+        // radius R needs R + strokeWidth of vertical room, otherwise the
+        // arc paints outside the canvas onto neighbouring content.
+        val radius = minOf(size.width / 2f, size.height) - strokeWidth
         val center = Offset(size.width / 2f, size.height - strokeWidth / 2f)
 
         // Segment spans follow the grade boundaries: 0.25/0.25/0.25/0.15/0.10
