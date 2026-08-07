@@ -58,6 +58,18 @@ class JointSenseNavigationTest {
     }
 
     @Test
+    fun openingHomeClearsTheRealNavigationHistory() {
+        composeRule.onNodeWithTag("go:trends").performClick()
+        composeRule.onNodeWithTag("go:report").performClick()
+        composeRule.onNodeWithTag("go:home").performClick()
+        composeRule.onNodeWithTag("screen:home").assertIsDisplayed()
+
+        pressActivityBack()
+
+        check(composeRule.activity.isFinishing)
+    }
+
+    @Test
     fun cropBackReturnsToImageSelect() {
         composeRule.onNodeWithTag("go:measurement-from-home").performClick()
         composeRule.onNodeWithTag("screen:image-select").assertIsDisplayed()
@@ -91,6 +103,23 @@ class JointSenseNavigationTest {
         composeRule.onNodeWithTag("go:history").performClick()
         composeRule.onNodeWithTag("go:historical-result").performClick()
         composeRule.onNodeWithTag("screen:result:historical-result-id").assertIsDisplayed()
+
+        pressActivityBack()
+
+        composeRule.onNodeWithTag("screen:history").assertIsDisplayed()
+        check(!composeRule.activity.isFinishing)
+    }
+
+    @Test
+    fun historicalResultContinuationReturnsToHistoryAfterTheNewResult() {
+        composeRule.onNodeWithTag("go:profile").performClick()
+        composeRule.onNodeWithTag("go:history").performClick()
+        composeRule.onNodeWithTag("go:historical-result").performClick()
+        composeRule.onNodeWithTag("continue:historical-result").performClick()
+        composeRule.onNodeWithTag("screen:image-select").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("complete:continued-result").performClick()
+        composeRule.onNodeWithTag("screen:result:continued-result-id").assertIsDisplayed()
 
         pressActivityBack()
 
@@ -141,7 +170,12 @@ class JointSenseNavigationTest {
                     }
                 }
 
-                ReportRoute -> ScreenMarker("report")
+                ReportRoute -> {
+                    ScreenMarker("report")
+                    NavButton("go:home") {
+                        actions.openTopLevel(TopLevelDestination.HOME)
+                    }
+                }
                 ProfileRoute -> {
                     ScreenMarker("profile")
                     NavButton("go:history", actions::openHistory)
@@ -155,6 +189,9 @@ class JointSenseNavigationTest {
                 ImageSelectRoute -> {
                     ScreenMarker("image-select")
                     NavButton("go:crop", actions::openCrop)
+                    NavButton("complete:continued-result") {
+                        actions.openResult("continued-result-id")
+                    }
                 }
 
                 CropRoute -> {
@@ -167,7 +204,14 @@ class JointSenseNavigationTest {
                     NavButton("go:result") { actions.openResult("real-result-id") }
                 }
 
-                is ResultRoute -> ScreenMarker("result:${route.resultId}")
+                is ResultRoute -> {
+                    ScreenMarker("result:${route.resultId}")
+                    if (route.resultId == "historical-result-id") {
+                        NavButton("continue:historical-result") {
+                            actions.continueMeasurementFromResult(TopLevelDestination.PROFILE)
+                        }
+                    }
+                }
                 CalibrationSelectRoute -> ScreenMarker("calibration-select")
                 CalibrationCropRoute -> ScreenMarker("calibration-crop")
                 CalibrationAssignRoute -> ScreenMarker("calibration-assign")

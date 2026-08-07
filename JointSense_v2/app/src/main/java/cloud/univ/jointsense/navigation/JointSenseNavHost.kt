@@ -211,13 +211,23 @@ fun JointSenseNavHost(
                                 candidate.results.any { it.id == route.resultId }
                             }
                         val result = session?.results?.firstOrNull { it.id == route.resultId }
+                        val canContinue = session?.results?.size?.let { it < 5 } == true
                         ResultScreen(
                             session = session,
                             lastResult = result,
-                            canAddMore = viewModel.canAddMoreTests(),
+                            canAddMore = canContinue,
                             onNewTest = {
-                                viewModel.startNewTestInSession()
-                                if (inMeasurement) actions.restartMeasurement()
+                                if (session != null && canContinue) {
+                                    viewModel.selectSession(session)
+                                    viewModel.startNewTestInSession()
+                                    if (inMeasurement) {
+                                        actions.restartMeasurement()
+                                    } else {
+                                        actions.continueMeasurementFromResult(
+                                            TopLevelDestination.PROFILE,
+                                        )
+                                    }
+                                }
                             },
                             onGoHome = {
                                 viewModel.finishMeasurement()

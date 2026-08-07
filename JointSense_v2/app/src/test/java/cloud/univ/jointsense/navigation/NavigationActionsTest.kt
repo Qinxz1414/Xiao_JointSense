@@ -21,6 +21,19 @@ class NavigationActionsTest {
     }
 
     @Test
+    fun openingHomeClearsTopLevelHistoryAndLeavesTheUniqueRoot() {
+        val driver = StackNavigationDriver(mutableListOf(HomeRoute))
+        val actions = NavigationActions(driver)
+
+        actions.openTopLevel(TopLevelDestination.TRENDS)
+        actions.openTopLevel(TopLevelDestination.REPORT)
+        actions.openTopLevel(TopLevelDestination.HOME)
+
+        assertEquals(listOf(HomeRoute), driver.stack)
+        assertEquals(false, actions.navigateBack())
+    }
+
+    @Test
     fun cropBackReturnsToImageSelect() {
         val driver = StackNavigationDriver(mutableListOf(HomeRoute))
         val actions = NavigationActions(driver)
@@ -63,6 +76,33 @@ class NavigationActionsTest {
         actions.openTopLevel(TopLevelDestination.PROFILE)
         actions.openHistory()
         actions.openResult("historical-result-id")
+        actions.exitResult()
+
+        assertEquals(listOf(HomeRoute, ProfileRoute, HistoryRoute), driver.stack)
+    }
+
+    @Test
+    fun continuingHistoricalResultStartsMeasurementAboveHistoryAndReturnsThere() {
+        val driver = StackNavigationDriver(mutableListOf(HomeRoute))
+        val actions = NavigationActions(driver)
+
+        actions.openTopLevel(TopLevelDestination.PROFILE)
+        actions.openHistory()
+        actions.openResult("historical-result-id")
+        actions.continueMeasurementFromResult(TopLevelDestination.PROFILE)
+
+        assertEquals(
+            listOf(
+                HomeRoute,
+                ProfileRoute,
+                HistoryRoute,
+                MeasurementGraph(TopLevelDestination.PROFILE),
+                ImageSelectRoute,
+            ),
+            driver.stack,
+        )
+
+        actions.openResult("continued-result-id")
         actions.exitResult()
 
         assertEquals(listOf(HomeRoute, ProfileRoute, HistoryRoute), driver.stack)

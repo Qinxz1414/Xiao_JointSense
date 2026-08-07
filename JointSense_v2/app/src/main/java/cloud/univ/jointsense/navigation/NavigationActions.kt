@@ -20,7 +20,11 @@ class NavigationActions internal constructor(
     )
 
     fun openTopLevel(destination: TopLevelDestination) {
-        driver.navigate(destination.route(), launchSingleTop = true)
+        if (destination == TopLevelDestination.HOME) {
+            driver.popToHome()
+        } else {
+            driver.navigate(destination.route(), launchSingleTop = true)
+        }
     }
 
     fun startMeasurement(origin: TopLevelDestination) {
@@ -60,6 +64,11 @@ class NavigationActions internal constructor(
     fun exitMeasurement(): Boolean = driver.popMeasurement()
 
     fun restartMeasurement(): Boolean = driver.popToImageSelect()
+
+    fun continueMeasurementFromResult(origin: TopLevelDestination) {
+        driver.popOne()
+        startMeasurement(origin)
+    }
 
     fun exitCalibration(): Boolean = driver.popCalibration()
 
