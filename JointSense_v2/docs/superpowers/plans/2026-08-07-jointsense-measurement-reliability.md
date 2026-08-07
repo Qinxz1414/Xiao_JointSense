@@ -28,6 +28,7 @@
 - Create: `core/analysis/src/main/kotlin/cloud/univ/jointsense/analysis/CurveKnot.kt`
 - Create: `core/analysis/src/main/kotlin/cloud/univ/jointsense/analysis/QuantificationResult.kt`
 - Create: `core/analysis/src/main/kotlin/cloud/univ/jointsense/analysis/StandardCurve.kt`
+- Create: `core/analysis/src/main/kotlin/cloud/univ/jointsense/analysis/FactoryCurves.kt`
 - Create: `core/analysis/src/main/kotlin/cloud/univ/jointsense/analysis/OaIndexCalculator.kt`
 - Create: `core/analysis/src/test/kotlin/cloud/univ/jointsense/analysis/StandardCurveTest.kt`
 - Create: `core/analysis/src/test/kotlin/cloud/univ/jointsense/analysis/OaIndexCalculatorTest.kt`
@@ -36,7 +37,7 @@
 
 **Interfaces:**
 - Consumes: `InflammationFactor`, `RangeStatus`, `TestResult` from `:core:domain`.
-- Produces: `StandardCurve.quantify(signal): QuantificationResult`; `OaIndexCalculator.calculate(latest): Float?`; `OaIndexCalculator.grade(ai): Int`.
+- Produces: `StandardCurve.quantify(signal): QuantificationResult`; immutable `FactoryCurves.forFactor(factor)` using the existing app's exact approved knots; `OaIndexCalculator.calculate(latest): Float?`; `OaIndexCalculator.grade(ai): Int`.
 
 - [ ] **Step 1: Write interpolation regression tests that fail on the current implementation**
 
@@ -86,6 +87,8 @@ class StandardCurve(knots: List<CurveKnot>) {
 ```
 
 Handle an exact first-knot signal as `IN_RANGE` with that knot's concentration; add a dedicated branch before computing `upper` to avoid coercing it into segment 0→1.
+
+Move the current factory knot constants from the legacy `StandardCurve` into immutable `FactoryCurves`; add a round-trip test for every knot (`quantify(knot.signal) == knot.concentration`) so the migration changes no scientific constants.
 
 - [ ] **Step 4: Add OA threshold and missing-factor tests**
 
@@ -181,12 +184,14 @@ git commit -m "fix: validate standard curve calibration"
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/ImageDecodePolicy.kt`
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/SampledBitmapDecoder.kt`
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/DecodedImage.kt`
+- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/MeasurementTempFileStore.kt`
 - Create: `feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/image/ImageDecodePolicyTest.kt`
+- Create: `feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/image/MeasurementTempFileStoreTest.kt`
 - Create: `feature/measurement/src/androidTest/kotlin/cloud/univ/jointsense/measurement/image/SampledBitmapDecoderTest.kt`
 
 **Interfaces:**
 - Consumes: `ContentResolver`, source URI, `Dispatchers.IO`.
-- Produces: `suspend fun decode(uri: Uri, maxEdge: Int = 2048): DecodedImage`; pure `calculateInSampleSize(width, height, maxEdge)`.
+- Produces: `suspend fun decode(uri: Uri, maxEdge: Int = 2048): DecodedImage`; pure `calculateInSampleSize(width, height, maxEdge)`; a temp-file store that owns camera URIs until success or explicit cancellation.
 
 - [ ] **Step 1: Write failing sample-size tests**
 
@@ -205,7 +210,9 @@ Expected: function is unresolved.
 
 - [ ] **Step 3: Implement two-pass decoding and EXIF rotation**
 
-Open the URI once for bounds and once for sampled decode. Use `BitmapFactory.Options.inJustDecodeBounds`, computed power-of-two `inSampleSize`, and `ExifInterface` to rotate 90/180/270 degrees. Throw typed `ImageDecodeError.Unsupported`, `.Unreadable`, or `.OutOfMemory` rather than returning null.
+Add `implementation(libs.androidx.exifinterface)` to `feature/measurement/build.gradle.kts`. Open the URI once for bounds and once for sampled decode. Use `BitmapFactory.Options.inJustDecodeBounds`, computed power-of-two `inSampleSize`, and `ExifInterface` to rotate 90/180/270 degrees. Throw typed `ImageDecodeError.Unsupported`, `.Unreadable`, or `.OutOfMemory` rather than returning null.
+
+`MeasurementTempFileStore` creates files only under `context.cacheDir/measurement`, restores an existing pending URI from `SavedStateHandle`, deletes only files it owns, and clears a temp file after successful persistence or explicit flow cancellation. Its unit test verifies that retry/recreation retains the pending file while success/cancel removes it.
 
 - [ ] **Step 4: Verify policy and instrumentation decoding**
 
@@ -232,9 +239,11 @@ git commit -m "feat: decode measurement images safely"
 **Files:**
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementUiState.kt`
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementAction.kt`
-- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModel.kt`
-- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModelFactory.kt`
+- Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModel.kt`
+- Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModelFactory.kt`
+- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/SessionNameGenerator.kt`
 - Create: `feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModelTest.kt`
+- Create: `feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/SessionNameGeneratorTest.kt`
 
 **Interfaces:**
 - Consumes: decoder from Task 3, analysis from Task 1, `TestSessionRepository`, SavedStateHandle, injected IO/Default dispatchers.
@@ -255,6 +264,12 @@ git commit -m "feat: decode measurement images safely"
     advanceUntilIdle()
     assertEquals(1, repository.commitCalls)
 }
+
+@Test fun continueMeasurementCreatesANewDraftId() = runTest {
+    val committedDraft = viewModel.state.value.draftId
+    val next = factory.create(SavedStateHandle(mapOf("origin" to "HOME")))
+    assertNotEquals(committedDraft, next.state.value.draftId)
+}
 ```
 
 - [ ] **Step 2: Run and confirm RED**
@@ -266,14 +281,29 @@ Expected: state/action/ViewModel types do not exist.
 - [ ] **Step 3: Implement explicit state and recovery data**
 
 ```kotlin
-enum class Stage { AwaitingImage, Decoding, ReadyToCrop, ReadyToAnalyze, Analyzing, Persisting, Success }
+enum class Stage {
+    AwaitingImage, Decoding, ReadyToCrop, ReadyToAnalyze,
+    Analyzing, Persisting, Success, RecoverableError,
+}
+
+sealed interface MeasurementError {
+    data class PermissionDenied(val permanentlyDenied: Boolean) : MeasurementError
+    data object ImageUnreadable : MeasurementError
+    data object UnsupportedImage : MeasurementError
+    data object ImageTooLarge : MeasurementError
+    data object InvalidCrop : MeasurementError
+    data object AnalysisFailed : MeasurementError
+    data object PersistenceFailed : MeasurementError
+}
 
 data class MeasurementUiState(
     val stage: Stage = Stage.AwaitingImage,
+    val draftId: String,
     val imageUri: String? = null,
     val cropRect: CropRect? = null,
     val factor: InflammationFactor = InflammationFactor.IL6,
     val error: MeasurementError? = null,
+    val resumeStage: Stage? = null,
     val resultId: String? = null,
 )
 ```
@@ -282,7 +312,20 @@ Persist URI, crop, factor, origin, and UUID draft ID in SavedStateHandle. Use a 
 
 - [ ] **Step 4: Implement dispatcher boundaries and error recovery**
 
-Decode/file work uses injected IO; feature extraction/interpolation uses injected Default; repository calls are suspend. `Retry` resumes the failed stage without clearing valid URI/crop/factor.
+Decode/file work uses injected IO; feature extraction/interpolation uses injected Default; repository calls are suspend. A failure sets `stage=RecoverableError`, records the prior valid stage in `resumeStage`, and preserves URI/crop/factor/draft ID. `Retry` resumes from `resumeStage`; a persistence retry reuses the same draft ID and cannot show Success before the repository returns.
+
+Generate a display name from the highest numeric suffix for the active locale prefix, not `sessions.size + 1`:
+
+```kotlin
+fun nextSessionName(existingNames: List<String>, prefix: String): String {
+    val pattern = Regex("^${Regex.escape(prefix)} #(\\d+)$")
+    val next = existingNames.mapNotNull { pattern.matchEntire(it)?.groupValues?.get(1)?.toLongOrNull() }
+        .maxOrNull()?.plus(1) ?: 1L
+    return "$prefix #$next"
+}
+```
+
+Test `Test #1, Test #3 → Test #4` so deleting a middle session cannot reuse an existing name.
 
 - [ ] **Step 5: Run ViewModel tests and confirm GREEN**
 
@@ -304,7 +347,7 @@ git commit -m "feat: add recoverable measurement state machine"
 **Files:**
 - Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementScreens.kt`
 - Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementEntry.kt`
-- Move: `app/src/main/java/cloud/univ/jointsense/ui/components/ImageCropView.kt` → `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/crop/ImageCropView.kt`
+- Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/crop/ImageCropView.kt`
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementErrorContent.kt`
 - Create: `feature/measurement/src/androidTest/kotlin/cloud/univ/jointsense/measurement/MeasurementFlowTest.kt`
 
@@ -314,7 +357,7 @@ git commit -m "feat: add recoverable measurement state machine"
 
 - [ ] **Step 1: Write failing Compose flow tests**
 
-Test that Analyze shows a progress indicator and disables itself; Retry preserves factor/crop; Back from Crop returns ImageSelect; Result Back invokes `onReturnToOrigin`.
+Test that Analyze shows a progress indicator and disables itself; Retry preserves factor/crop; Back from Crop returns ImageSelect; Result Back invokes `onReturnToOrigin`; “Continue measurement” returns to the origin and opens a fresh `MeasurementGraph` whose ViewModel creates a new draft ID.
 
 - [ ] **Step 2: Compile tests and confirm RED**
 
@@ -344,7 +387,7 @@ Expected: compilation exits 0; connected flow tests pass when a device exists.
 - [ ] **Step 6: Commit measurement UI integration**
 
 ```powershell
-git add feature/measurement app/src/main/java/cloud/univ/jointsense/ui/components/ImageCropView.kt
+git add feature/measurement
 git commit -m "fix: make measurement flow recoverable"
 ```
 
@@ -356,6 +399,8 @@ git commit -m "fix: make measurement flow recoverable"
 - Create: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationUiState.kt`
 - Create: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationViewModel.kt`
 - Create: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationViewModelFactory.kt`
+- Create: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/GridSignalDetector.kt`
+- Create: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/LegacyCalibrationRevalidator.kt`
 - Modify: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationScreens.kt`
 - Modify: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationEntry.kt`
 - Create: `feature/calibration/src/test/kotlin/cloud/univ/jointsense/calibration/CalibrationViewModelTest.kt`
@@ -364,8 +409,8 @@ git commit -m "fix: make measurement flow recoverable"
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt`
 
 **Interfaces:**
-- Consumes: sampled decoder, grid detector, Task 2 validator, CalibrationRepository, typed calibration routes.
-- Produces: SavedStateHandle-backed calibration state; validated `CalibrationStatus.ACTIVE` writes.
+- Consumes: sampled decoder, moved grid-signal algorithm, Task 2 validator, CalibrationRepository, typed calibration routes.
+- Produces: SavedStateHandle-backed calibration state; validated `CalibrationStatus.ACTIVE` writes; one-shot review of Phase 1 `NEEDS_REVIEW` records.
 
 - [ ] **Step 1: Write failing ViewModel tests**
 
@@ -380,6 +425,8 @@ Expected: graph-scoped ViewModel types do not exist.
 - [ ] **Step 3: Implement state, parsing, validation, and persistence**
 
 Store concentration field text separately from parsed values. Review calls `CalibrationValidator.validate`; Save is enabled only for `CalibrationValidation.Valid`. Saving writes one factor without deleting active curves for other factors.
+
+Move the existing 3×3 detector math into `GridSignalDetector` and feed it only sampled/orientation-corrected images. `LegacyCalibrationRevalidator` processes each `NEEDS_REVIEW` record once: promote it to `ACTIVE` only when the same nine-reading validator passes; otherwise retain it as `NEEDS_REVIEW` and expose that state in Settings.
 
 - [ ] **Step 4: Implement stepwise Back and restore semantics**
 
@@ -413,6 +460,8 @@ git commit -m "fix: validate and persist calibration safely"
 - Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/report/LocalizedReportFormatter.kt`
 - Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/report/PdfReportExporter.kt`
 - Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/report/TextLayout.kt`
+- Create/modify: `feature/insights/src/main/res/values/strings.xml`
+- Create: `feature/insights/src/main/res/values-zh-rCN/strings.xml`
 - Create: `feature/insights/src/test/kotlin/cloud/univ/jointsense/insights/report/TextLayoutTest.kt`
 - Create: `feature/insights/src/androidTest/kotlin/cloud/univ/jointsense/insights/report/PdfReportExporterTest.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/data/ReportExporter.kt`
@@ -426,12 +475,14 @@ git commit -m "fix: validate and persist calibration safely"
 ```kotlin
 @Test fun wrapsLongChineseAndEnglishWithoutDroppingCharacters() {
     val lines = layoutLines(input, fakeMeasurer(maxChars = 12), maxWidth = 100f)
-    assertEquals(input.replace("\n", ""), lines.joinToString("").replace(" ", ""))
+    assertEquals(input.replace("\n", ""), lines.joinToString(""))
     assertTrue(lines.all { it.length <= 12 })
 }
 ```
 
 Assert both locale formatters include the exact approved disclaimer and screen Result formatter does not.
+
+Add formatter tests for `Locale.US` and `Locale.SIMPLIFIED_CHINESE`: dates use the locale's medium date/time format, concentrations and OA index use locale-aware decimal separators, percentages use `NumberFormat.getPercentInstance(locale)`, and the stable scientific unit remains `pg/mL` in both languages.
 
 - [ ] **Step 2: Run and confirm RED**
 
@@ -441,7 +492,7 @@ Expected: report model/layout types do not exist.
 
 - [ ] **Step 3: Implement shared report model and line layout**
 
-Use `Paint.breakText` for PDF line splitting, preserve explicit paragraphs, repeat title/header on new pages, and close `PdfDocument`/FileOutputStream with `use` or `try/finally`.
+Use `Paint.breakText` for PDF line splitting, preserve explicit paragraphs, repeat title/header on new pages, and close `PdfDocument`/FileOutputStream with `use` or `try/finally`. Add the exact approved English and Chinese disclaimer resources now; Plan 3's resource-parity pass keeps these keys unchanged and adds the remaining screen translations.
 
 - [ ] **Step 4: Implement share failure feedback**
 
@@ -505,4 +556,3 @@ Record each fixed defect, curve behavior, calibration thresholds, image limit, r
 git add 项目结构需求梳理.md docs/superpowers/plans/2026-08-07-jointsense-measurement-reliability.md
 git commit -m "docs: record measurement reliability results"
 ```
-

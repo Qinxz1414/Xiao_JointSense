@@ -33,11 +33,14 @@
 - Modify: `app/src/main/res/drawable/ic_launcher_background.xml`
 - Modify: `app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml`
 - Modify: `app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml`
+- Create: `app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml`
+- Create: `app/src/main/res/mipmap-anydpi-v33/ic_launcher_round.xml`
 - Create: `app/src/main/res/mipmap-anydpi/ic_launcher.xml`
 - Create: `app/src/main/res/mipmap-anydpi/ic_launcher_round.xml`
+- Modify: `app/src/main/res/values/colors.xml`
 - Delete: `app/src/main/res/drawable/logo.png`
 - Delete/replace: `app/src/main/res/drawable/ic_launcher_foreground.xml`
-- Create: `app/src/test/java/cloud/univ/jointsense/branding/BrandResourceTest.kt`
+- Create: `core/designsystem/src/test/kotlin/cloud/univ/jointsense/designsystem/BrandResourceTest.kt`
 
 **Interfaces:**
 - Consumes: approved A logo geometry and brand tokens.
@@ -47,17 +50,17 @@
 
 ```kotlin
 @Test fun logoResourcesContainBrandColorsAndNoPurple() {
-    val xml = readResource("core/designsystem/src/main/res/drawable/jointsense_logo.xml")
+    val xml = File("src/main/res/drawable/jointsense_logo.xml").readText()
     assertTrue(xml.contains("#156082"))
     assertTrue(xml.contains("#0F9ED5"))
     assertTrue(xml.contains("#196B24"))
-    assertFalse(Regex("#(?:8A2BE2|7B2CBF|9C27B0|6200EE)", RegexOption.IGNORE_CASE).containsMatchIn(xml))
+    assertFalse(Regex("#(?:8A2BE2|7B2CBF|9C27B0|6200EE|7D21DC|BB86FC|3700B3)", RegexOption.IGNORE_CASE).containsMatchIn(xml))
 }
 ```
 
 - [ ] **Step 2: Run and confirm RED**
 
-Run: `.\gradlew.bat :app:testDebugUnitTest --tests "*BrandResourceTest"`
+Run: `.\gradlew.bat :core:designsystem:testDebugUnitTest --tests "*BrandResourceTest"`
 
 Expected: new vector resource file is absent.
 
@@ -84,14 +87,14 @@ Add Ink endpoint rings as two additional closed paths. The monochrome variant us
 
 - [ ] **Step 4: Wire launcher resources and remove raster usage**
 
-Adaptive foreground uses the same paths on an Ink background; legacy icons use an inset layer-list referencing the vector. Replace all `painterResource(R.drawable.logo)` calls with `R.drawable.jointsense_logo`.
+Adaptive foreground uses the same paths on an Ink background; legacy icons use an inset layer-list referencing the vector. API 33 launcher resources add `<monochrome android:drawable="@drawable/jointsense_logo_monochrome" />`. Replace all `painterResource(R.drawable.logo)` calls with `R.drawable.jointsense_logo`, remove unused purple color resources, and verify no old `logo.png` references remain.
 
 - [ ] **Step 5: Verify resource compilation and brand test**
 
 Run:
 
 ```powershell
-.\gradlew.bat :app:testDebugUnitTest --tests "*BrandResourceTest"
+.\gradlew.bat :core:designsystem:testDebugUnitTest --tests "*BrandResourceTest"
 .\gradlew.bat :app:processDebugResources :app:assembleDebug
 ```
 
@@ -100,7 +103,7 @@ Expected: resource test passes and launcher resources link on API 24 and v26 var
 - [ ] **Step 6: Commit the new identity**
 
 ```powershell
-git add core/designsystem/src/main/res app/src/main/res app/src/test/java/cloud/univ/jointsense/branding
+git add core/designsystem/src/main/res core/designsystem/src/test app/src/main/res
 git commit -m "feat: introduce Joint Signal identity"
 ```
 
@@ -173,7 +176,7 @@ git commit -m "refactor: unify clinical design system"
 
 **Files:**
 - Create/modify: `feature/insights/src/main/res/values/strings.xml`
-- Create: `feature/insights/src/main/res/values-zh-rCN/strings.xml`
+- Create/modify: `feature/insights/src/main/res/values-zh-rCN/strings.xml`
 - Create/modify: `feature/measurement/src/main/res/values/strings.xml`
 - Create: `feature/measurement/src/main/res/values-zh-rCN/strings.xml`
 - Create/modify: `feature/calibration/src/main/res/values/strings.xml`
@@ -211,6 +214,16 @@ Replace each user-visible literal with `stringResource`, plural resources, or a 
 - [ ] **Step 4: Add professional Chinese translations**
 
 Use consistent terms: OA 炎症综合指数、标准曲线校准、空白孔、原始信号、净信号、拟合信号、检测下限、检测上限、肿瘤坏死因子 α、白细胞介素-6、白细胞介素-1β. Do not translate gene/protein abbreviations or `pg/mL`.
+
+Use these exact disclaimer resources in About and the export formatter only:
+
+```xml
+<!-- values/strings.xml -->
+<string name="research_disclaimer">Results in this report are estimates derived from smartphone-photo colorimetry for research and longitudinal trend observation only. They are not intended for clinical diagnosis, treatment decisions, or as a substitute for validated laboratory testing.</string>
+
+<!-- values-zh-rCN/strings.xml -->
+<string name="research_disclaimer">本报告结果基于手机照片色度代理估算，仅供科研与纵向趋势观察，不作为临床诊断、治疗决策或替代经验证实验室检测的依据。</string>
+```
 
 - [ ] **Step 5: Run parity, resource, and hardcoded-string audits**
 
@@ -290,12 +303,13 @@ git commit -m "feat: refine clinical insights workspace"
 - Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/LanguageDialog.kt`
 - Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/AboutScreen.kt`
 - Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/DataManagementDialogs.kt`
-- Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsViewModel.kt`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsViewModel.kt`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsViewModelFactory.kt`
 - Create: `feature/settings/src/test/kotlin/cloud/univ/jointsense/settings/SettingsViewModelTest.kt`
 - Create: `feature/settings/src/androidTest/kotlin/cloud/univ/jointsense/settings/SettingsScreenTest.kt`
 
 **Interfaces:**
-- Consumes: `AppLanguageController`, TestSessionRepository, CalibrationRepository, migration/sample status.
+- Consumes: `LanguageController`, `DataManagementRepository`, TestSessionRepository, CalibrationRepository, migration/sample status.
 - Produces: settings UI state; locale selection; confirmed restore/clear; fixed About disclaimer.
 
 - [ ] **Step 1: Write failing settings behavior tests**
@@ -309,7 +323,7 @@ git commit -m "feat: refine clinical insights workspace"
 
 @Test fun restoreSamplesDoesNotRestoreCalibration() = runTest {
     viewModel.confirmRestoreSamples()
-    assertEquals(1, sessions.restoreCalls)
+    assertEquals(1, dataManager.restoreSamplesCalls)
     assertEquals(0, calibrations.saveCalls)
 }
 ```
@@ -326,7 +340,7 @@ Sections: application settings (language, calibration); data/model (history, res
 
 - [ ] **Step 4: Implement locale and destructive confirmations**
 
-Language dialog has System/简体中文/English radio items and applies via AppLanguageController. Clear dialog explicitly lists user tests, built-in samples, and user calibration; requires one confirmation and invokes one transactional use case. Restore sample dialog states it does not restore calibration.
+Language dialog has System/简体中文/English radio items and applies via `LanguageController`. Clear dialog explicitly lists user tests, built-in samples, and user calibration; requires one confirmation and invokes `DataManagementRepository.clearAllData()` exactly once. Restore sample dialog states it does not restore calibration and invokes only `DataManagementRepository.restoreBuiltInSamples()`.
 
 - [ ] **Step 5: Add About copy and disclaimer**
 
@@ -358,10 +372,25 @@ git commit -m "feat: complete app settings and data controls"
 **Files:**
 - Create: `app/src/androidTest/java/cloud/univ/jointsense/accessibility/AccessibilitySmokeTest.kt`
 - Create: `app/src/androidTest/java/cloud/univ/jointsense/locale/LocaleRecreationTest.kt`
-- Modify: affected Composables in `core/designsystem/src/main/kotlin/` and `feature/*/src/main/kotlin/`
+- Modify: `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/component/JointSenseTopBar.kt`
+- Modify: `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/component/ClinicalCard.kt`
+- Modify: `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/component/FactorValue.kt`
+- Modify: `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/component/GradeScale.kt`
+- Modify: `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/component/LoadingErrorState.kt`
+- Modify: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/HomeScreen.kt`
+- Modify: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/TrendsScreen.kt`
+- Modify: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/ReportScreen.kt`
+- Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementScreens.kt`
+- Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/ResultScreen.kt`
+- Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/HistoryScreen.kt`
+- Modify: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationScreens.kt`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/ProfileScreen.kt`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/AboutScreen.kt`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/LanguageDialog.kt`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/DataManagementDialogs.kt`
 
 **Interfaces:**
-- Consumes: all final screens, NavHost, AppLanguageController.
+- Consumes: all final screens, NavHost, `LanguageController`/`AppCompatLanguageController`.
 - Produces: minimum touch semantics, localized labels, state restoration across Activity recreation.
 
 - [ ] **Step 1: Write failing UI tests**
@@ -457,4 +486,3 @@ Add `/.superpowers/` to `.gitignore`; do not delete the local visual drafts. Run
 git add .gitignore 项目结构需求梳理.md docs/superpowers/plans docs/superpowers/specs
 git commit -m "docs: finalize JointSense v2 handoff"
 ```
-

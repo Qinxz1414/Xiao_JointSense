@@ -77,6 +77,7 @@ activityCompose = "1.12.3"
 appcompat = "1.7.1"
 coreKtx = "1.18.0"
 coroutines = "1.10.2"
+exifinterface = "1.4.1"
 ksp = "2.3.8"
 lifecycle = "2.9.2"
 navigationCompose = "2.9.8"
@@ -85,6 +86,7 @@ serializationJson = "1.9.0"
 
 [libraries]
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
@@ -142,6 +144,23 @@ include(
 
 Each feature module applies `jointsense.android.library` and `jointsense.android.compose`; `:core:domain` and `:core:analysis` apply `jointsense.kotlin.library`; `:core:database` additionally applies `jointsense.android.room`.
 
+Use this one-way project dependency graph in the module build files:
+
+```text
+:core:domain       -> Kotlin/Flow only
+:core:analysis     -> :core:domain
+:core:designsystem -> :core:domain + Compose/Material 3
+:core:database     -> :core:domain + Room
+:core:data         -> :core:domain + :core:database + kotlinx.serialization
+:feature:insights  -> :core:domain + :core:analysis + :core:designsystem
+:feature:measurement -> :core:domain + :core:analysis + :core:designsystem
+:feature:calibration -> :core:domain + :core:analysis + :core:designsystem
+:feature:settings  -> :core:domain + :core:designsystem
+:app               -> every :feature:* + :core:data + :core:database + Navigation/AppCompat
+```
+
+Declare core contracts with `api(project(...))` only when the type appears in a public signature; otherwise use `implementation`. No core or feature module may depend on `:app`, and no feature may depend on another feature.
+
 - [ ] **Step 5: Verify the graph and empty-module compilation**
 
 Run:
@@ -170,11 +189,12 @@ git commit -m "build: establish JointSense module graph"
 - Create: `core/domain/src/main/kotlin/cloud/univ/jointsense/domain/model/CalibrationModels.kt`
 - Create: `core/domain/src/main/kotlin/cloud/univ/jointsense/domain/repository/TestSessionRepository.kt`
 - Create: `core/domain/src/main/kotlin/cloud/univ/jointsense/domain/repository/CalibrationRepository.kt`
+- Create: `core/domain/src/main/kotlin/cloud/univ/jointsense/domain/repository/DataManagementRepository.kt`
 - Create: `core/domain/src/test/kotlin/cloud/univ/jointsense/domain/model/TestModelsTest.kt`
 
 **Interfaces:**
 - Consumes: Kotlin stdlib and `kotlinx.coroutines.flow.Flow`.
-- Produces: `InflammationFactor`, `DataSource`, `RangeStatus`, `TestSession`, `TestResult`, `NewTestResult`, `Calibration`, `CalibrationKnot`, `CalibrationStatus`, `TestSessionRepository`, `CalibrationRepository`.
+- Produces: `InflammationFactor`, `DataSource`, `RangeStatus`, `TestSession`, `TestResult`, `NewTestResult`, `Calibration`, `CalibrationKnot`, `CalibrationStatus`, `TestSessionRepository`, `CalibrationRepository`, `DataManagementRepository`.
 
 - [ ] **Step 1: Write the failing domain invariant test**
 
@@ -221,6 +241,44 @@ data class NewTestResult(
     val features: RgbFeatures,
     val timestamp: Long = System.currentTimeMillis(),
 )
+
+data class TestResult(
+    val id: String,
+    val sessionId: String,
+    val draftId: String?,
+    val factor: InflammationFactor,
+    val concentration: Float,
+    val rangeStatus: RangeStatus,
+    val features: RgbFeatures,
+    val timestamp: Long,
+)
+
+data class TestSession(
+    val id: String,
+    val name: String,
+    val createdAt: Long,
+    val source: DataSource,
+    val results: List<TestResult>,
+)
+
+data class CalibrationKnot(
+    val position: Int,
+    val concentration: Float,
+    val rawSignal: Float,
+    val netSignal: Float,
+    val fittedSignal: Float,
+    val isBlank: Boolean,
+)
+
+data class Calibration(
+    val factor: InflammationFactor,
+    val createdAt: Long,
+    val version: Int,
+    val status: CalibrationStatus,
+    val kitName: String?,
+    val kitLot: String?,
+    val knots: List<CalibrationKnot>,
+)
 ```
 
 Repository signatures:
@@ -232,14 +290,18 @@ interface TestSessionRepository {
     suspend fun createSession(name: String, source: DataSource = DataSource.USER): String
     suspend fun commitResult(sessionId: String, draftId: String, result: NewTestResult): String
     suspend fun deleteSession(id: String)
-    suspend fun clearAll()
-    suspend fun restoreBuiltInSamples()
 }
 
 interface CalibrationRepository {
     fun observeCalibrations(): Flow<List<Calibration>>
+    fun observeCalibration(factor: InflammationFactor): Flow<Calibration?>
     suspend fun save(calibration: Calibration)
     suspend fun clearAll()
+}
+
+interface DataManagementRepository {
+    suspend fun clearAllData()
+    suspend fun restoreBuiltInSamples()
 }
 ```
 
@@ -292,7 +354,19 @@ class JointSenseDatabaseTest {
     }
 
     @Test fun duplicateDraftIdDoesNotCreateSecondResult() = runTest {
-        // insert the same non-null draftId twice; the second insert must conflict
+        val first = TestResultEntity(
+            id = "r1", sessionId = "s1", draftId = "d1",
+            factor = InflammationFactor.IL6, concentration = 10f,
+            rangeStatus = RangeStatus.IN_RANGE, timestamp = 2L,
+            rMean = 90f, gMean = 100f, bMean = 110f,
+            rStd = 1f, gStd = 1f, bStd = 1f,
+        )
+        db.testSessionDao().insertSession(TestSessionEntity("s1", "Test #1", 1L, DataSource.USER))
+        db.testSessionDao().insertResult(first)
+        assertFailsWith<SQLiteConstraintException> {
+            db.testSessionDao().insertResult(first.copy(id = "r2"))
+        }
+        assertEquals(1, db.testSessionDao().resultCountForDraft("d1"))
     }
 }
 ```
@@ -332,6 +406,40 @@ data class TestResultEntity(
 
 Add converters for enums as stable `.name` strings. Export schema version 1.
 
+The calibration tables use the approved keys and cascade relationship:
+
+```kotlin
+@Entity(tableName = "calibration")
+data class CalibrationEntity(
+    @PrimaryKey val factor: InflammationFactor,
+    val createdAt: Long,
+    val version: Int,
+    val status: CalibrationStatus,
+    val kitName: String?,
+    val kitLot: String?,
+)
+
+@Entity(
+    tableName = "calibration_knot",
+    primaryKeys = ["factor", "position"],
+    foreignKeys = [ForeignKey(
+        entity = CalibrationEntity::class,
+        parentColumns = ["factor"], childColumns = ["factor"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+    indices = [Index("factor")],
+)
+data class CalibrationKnotEntity(
+    val factor: InflammationFactor,
+    val position: Int,
+    val concentration: Float,
+    val rawSignal: Float,
+    val netSignal: Float,
+    val fittedSignal: Float,
+    val isBlank: Boolean,
+)
+```
+
 - [ ] **Step 4: Implement DAO queries and database transactions**
 
 Continuous reads return Flow; cross-table writes are transactional:
@@ -370,6 +478,7 @@ git commit -m "feat: add Room persistence schema"
 **Files:**
 - Create: `core/data/src/main/kotlin/cloud/univ/jointsense/data/RoomTestSessionRepository.kt`
 - Create: `core/data/src/main/kotlin/cloud/univ/jointsense/data/RoomCalibrationRepository.kt`
+- Create: `core/data/src/main/kotlin/cloud/univ/jointsense/data/RoomDataManagementRepository.kt`
 - Create: `core/data/src/main/kotlin/cloud/univ/jointsense/data/BuiltInSampleProvider.kt`
 - Create: `core/data/src/main/kotlin/cloud/univ/jointsense/data/legacy/LegacyJsonParser.kt`
 - Create: `core/data/src/main/kotlin/cloud/univ/jointsense/data/legacy/LegacyMigrationCoordinator.kt`
@@ -382,7 +491,7 @@ git commit -m "feat: add Room persistence schema"
 
 **Interfaces:**
 - Consumes: Task 2 repositories; Task 3 database/transactions; legacy prefs names `joint_sense_data` and `joint_sense_calibration`.
-- Produces: repository implementations; `LegacyMigrationCoordinator.migrate(): MigrationOutcome`; deterministic sample restoration.
+- Produces: repository implementations; `LegacyMigrationCoordinator.migrate(): MigrationOutcome`; one-transaction clear; deterministic sample restoration.
 
 - [ ] **Step 1: Write failing legacy parser tests with real field names**
 
@@ -417,15 +526,18 @@ Cover these exact outcomes:
 sealed interface MigrationOutcome {
     data class Completed(val sessions: Int, val results: Int, val calibrations: Int) : MigrationOutcome
     data object AlreadyCompleted : MigrationOutcome
+    data object SkippedByUser : MigrationOutcome
     data class Failed(val reason: String) : MigrationOutcome
 }
 ```
 
-Tests must verify: valid payload imports all rows; malformed payload imports zero rows and writes no completion flag; no legacy rows seeds 12 samples once; `SKIPPED_BY_USER` prevents retries.
+Tests must verify: valid payload imports all rows; malformed payload imports zero rows and writes no completion flag; no legacy rows seeds 12 samples once; `skipLegacyAndStartFresh()` returns `SkippedByUser`; persisted `SKIPPED_BY_USER` prevents retries.
+
+Import every structurally valid legacy calibration as `CalibrationStatus.NEEDS_REVIEW`. Phase 2 revalidates the scientific constraints and promotes only valid curves to `ACTIVE`; this prevents Phase 1 migration from silently activating an unverified curve.
 
 - [ ] **Step 5: Implement atomic migration and repository idempotency**
 
-`commitResult()` performs one transaction and returns the existing row ID when `draftId` already exists. `restoreBuiltInSamples()` upserts stable built-in IDs, so repeated calls never duplicate rows.
+`commitResult()` performs one transaction and returns the existing row ID when `draftId` already exists. `RoomDataManagementRepository.clearAllData()` delegates to the single Room transaction from Task 3. `restoreBuiltInSamples()` upserts stable built-in IDs and writes `samplesInitialized=true`, so repeated calls never duplicate rows and clearing data never triggers automatic reseeding after restart.
 
 - [ ] **Step 6: Run repository and migration tests**
 
@@ -460,7 +572,7 @@ git commit -m "feat: migrate legacy data into Room"
 - Modify: `app/src/main/AndroidManifest.xml`
 
 **Interfaces:**
-- Consumes: feature destination-registration functions introduced in Task 7; AppContainer from Task 7.
+- Consumes: current app screen composables through callback slots; Task 7 later replaces their implementations with feature-module entries without changing routes.
 - Produces: serializable routes; `JointSenseNavHost()`; unified Back behavior; `MainActivity : AppCompatActivity`.
 
 - [ ] **Step 1: Write failing route and Back policy tests**
@@ -522,9 +634,10 @@ git commit -m "feat: adopt typed Navigation Compose"
 
 **Files:**
 - Create: `app/src/main/res/resources.properties`
-- Create: `app/src/main/java/cloud/univ/jointsense/locale/LanguageOption.kt`
-- Create: `app/src/main/java/cloud/univ/jointsense/locale/AppLanguageController.kt`
-- Create: `app/src/test/java/cloud/univ/jointsense/locale/LanguageOptionTest.kt`
+- Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/locale/LanguageOption.kt`
+- Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/locale/LanguageController.kt`
+- Create: `app/src/main/java/cloud/univ/jointsense/locale/AppCompatLanguageController.kt`
+- Create: `feature/settings/src/test/kotlin/cloud/univ/jointsense/settings/locale/LanguageOptionTest.kt`
 - Modify: `app/src/main/AndroidManifest.xml`
 - Modify: `app/build.gradle.kts`
 - Modify: `app/src/main/res/values/strings.xml`
@@ -532,7 +645,7 @@ git commit -m "feat: adopt typed Navigation Compose"
 
 **Interfaces:**
 - Consumes: AppCompat 1.7.1 and Android resource locale generation.
-- Produces: `LanguageOption.SYSTEM`, `.SIMPLIFIED_CHINESE`, `.ENGLISH`; `AppLanguageController.current()` and `.apply(option)`.
+- Produces: feature-owned `LanguageOption.SYSTEM`, `.SIMPLIFIED_CHINESE`, `.ENGLISH` and `LanguageController`; app-owned `AppCompatLanguageController` implementation.
 
 - [ ] **Step 1: Write failing language-tag tests**
 
@@ -546,7 +659,7 @@ git commit -m "feat: adopt typed Navigation Compose"
 
 - [ ] **Step 2: Run and confirm RED**
 
-Run: `.\gradlew.bat :app:testDebugUnitTest --tests "*LanguageOptionTest"`
+Run: `.\gradlew.bat :feature:settings:testDebugUnitTest --tests "*LanguageOptionTest"`
 
 Expected: `LanguageOption` is unresolved.
 
@@ -560,6 +673,8 @@ fun apply(option: LanguageOption) {
 }
 ```
 
+`LanguageController` exposes `fun current(): LanguageOption` and `fun apply(option: LanguageOption)`. `AppCompatLanguageController` is the only class that calls `AppCompatDelegate`, so `:feature:settings` never depends on `:app`.
+
 Enable `androidResources { generateLocaleConfig = true }`, set `unqualifiedResLocale=en-US`, and add AppCompat's disabled metadata holder service with `autoStoreLocales=true` for API 24–32.
 
 - [ ] **Step 4: Add matched base and Chinese bootstrap resources**
@@ -571,7 +686,7 @@ Both resource files must contain identical keys for app name, top-level navigati
 Run:
 
 ```powershell
-.\gradlew.bat :app:testDebugUnitTest --tests "*LanguageOptionTest"
+.\gradlew.bat :feature:settings:testDebugUnitTest --tests "*LanguageOptionTest"
 .\gradlew.bat :app:processDebugResources :app:lintDebug
 ```
 
@@ -580,7 +695,7 @@ Expected: tests and Android resource merge pass; no missing default resource.
 - [ ] **Step 6: Commit locale infrastructure**
 
 ```powershell
-git add app/src/main/java/cloud/univ/jointsense/locale app/src/main/res app/src/main/AndroidManifest.xml app/build.gradle.kts app/src/test
+git add app/src/main/java/cloud/univ/jointsense/locale feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/locale feature/settings/src/test app/src/main/res app/src/main/AndroidManifest.xml app/build.gradle.kts
 git commit -m "feat: add Chinese and English app locales"
 ```
 
@@ -597,23 +712,36 @@ git commit -m "feat: add Chinese and English app locales"
 - Move: `app/src/main/java/cloud/univ/jointsense/ui/screens/HistoryScreen.kt` → `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/HistoryScreen.kt`
 - Move: `app/src/main/java/cloud/univ/jointsense/ui/screens/CalibrationFlowScreen.kt` → `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationScreens.kt`
 - Move: `app/src/main/java/cloud/univ/jointsense/ui/screens/ProfileScreen.kt` → `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/ProfileScreen.kt`
-- Move: `app/src/main/java/cloud/univ/jointsense/ui/components/*` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/`
-- Move: `app/src/main/java/cloud/univ/jointsense/ui/theme/*` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/theme/`
+- Move: `app/src/main/java/cloud/univ/jointsense/ui/components/AppBars.kt` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/component/AppBars.kt`
+- Move: `app/src/main/java/cloud/univ/jointsense/ui/components/LineChart.kt` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/chart/LineChart.kt`
+- Move: `app/src/main/java/cloud/univ/jointsense/ui/components/ChartComponents.kt` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/chart/ChartComponents.kt`
+- Move: `app/src/main/java/cloud/univ/jointsense/ui/components/ImageCropView.kt` → `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/crop/ImageCropView.kt`
+- Move: `app/src/main/java/cloud/univ/jointsense/ui/theme/Color.kt` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/theme/Color.kt`
+- Move: `app/src/main/java/cloud/univ/jointsense/ui/theme/Theme.kt` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/theme/Theme.kt`
+- Move: `app/src/main/java/cloud/univ/jointsense/ui/theme/Type.kt` → `core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/theme/Type.kt`
 - Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/InsightsEntry.kt`
+- Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/InsightsViewModel.kt`
+- Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/InsightsViewModelFactory.kt`
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementEntry.kt`
+- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModel.kt`
+- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModelFactory.kt`
 - Create: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationEntry.kt`
 - Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsEntry.kt`
+- Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsViewModel.kt`
+- Create: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsViewModelFactory.kt`
 - Create: `app/src/main/java/cloud/univ/jointsense/di/AppContainer.kt`
+- Create: `app/src/main/java/cloud/univ/jointsense/migration/MigrationGate.kt`
+- Create: `app/src/main/java/cloud/univ/jointsense/migration/MigrationErrorScreen.kt`
 - Create: `app/src/test/java/cloud/univ/jointsense/ModuleBoundarySmokeTest.kt`
 - Delete after migration: `app/src/main/java/cloud/univ/jointsense/viewmodel/JointSenseViewModel.kt`
 
 **Interfaces:**
 - Consumes: Tasks 2–6 contracts, repositories, routes, locale controller.
-- Produces: `fun NavGraphBuilder.insightsDestinations(...)`, `measurementGraph(...)`, `calibrationGraph(...)`, `settingsDestinations(...)`; `AppContainer` repository instances.
+- Produces: feature-owned route-screen Composables with state/callback inputs; `AppContainer` repository instances. Typed routes and `NavGraphBuilder` destination registration remain in `:app`, preventing an `app ↔ feature` dependency cycle.
 
 - [ ] **Step 1: Write a failing module-boundary smoke test**
 
-The test imports only public entry functions from each feature and asserts that `AppContainer` exposes `testSessions`, `calibrations`, and `migrationCoordinator`.
+The test imports only public route-screen Composables from each feature and asserts that `AppContainer` exposes `testSessions`, `calibrations`, `dataManagement`, and `migrationCoordinator`. A separate MigrationGate test asserts that Failed shows retry/start-empty choices and that NavHost is not composed until migration is Completed, AlreadyCompleted, or SKIPPED_BY_USER.
 
 - [ ] **Step 2: Run and confirm RED**
 
@@ -623,20 +751,35 @@ Expected: entry functions and container are unresolved.
 
 - [ ] **Step 3: Move code without changing user-visible behavior**
 
-Preserve the current screen content for this task. Replace direct `JointSenseViewModel` access with narrow state/callback parameters or feature ViewModels that depend on domain repositories. Do not fix the image pipeline or redesign screens here; those are Plan 2 and Plan 3.
+Preserve the current screen content for this task. Split `JointSenseViewModel` responsibilities as follows: `InsightsViewModel` observes sessions and derives dashboard/trend/report inputs; the baseline `MeasurementViewModel` owns the current session/image/crop/factor/result flow; `SettingsViewModel` observes counts and exposes repository actions; calibration remains graph-local and receives its repository through `CalibrationEntry`. Every ViewModel uses domain repositories and exposes immutable UI state/callbacks. Do not fix the image pipeline or redesign screens here; Plan 2 replaces the baseline measurement internals with the coroutine state machine and Plan 3 expands settings/UI state.
 
-Public feature entry example:
+Public feature entry and app-owned registration:
 
 ```kotlin
-fun NavGraphBuilder.insightsDestinations(
+// feature/insights/.../InsightsEntry.kt
+@Composable
+fun HomeRouteScreen(
     repository: TestSessionRepository,
-    onStartMeasurement: (TopLevelDestination) -> Unit,
-) { /* register HomeRoute, TrendsRoute, ReportRoute */ }
+    onStartMeasurement: () -> Unit,
+) {
+    val viewModel: InsightsViewModel = viewModel(factory = InsightsViewModelFactory(repository))
+    HomeScreen(state = viewModel.homeState.collectAsStateWithLifecycle().value, onStartMeasurement)
+}
+
+// app/.../JointSenseNavHost.kt
+composable<HomeRoute> {
+    HomeRouteScreen(
+        repository = appContainer.testSessions,
+        onStartMeasurement = { navController.navigate(MeasurementGraph(TopLevelDestination.HOME)) },
+    )
+}
 ```
 
 - [ ] **Step 4: Wire explicit dependencies**
 
-`AppContainer(application)` builds one Room database, repositories, migration coordinator, and analysis engine. `MainActivity` obtains it from a custom `JointSenseApplication` and passes factories to navigation entries.
+`AppContainer(application)` builds one Room database, test/calibration/data-management repositories, migration coordinator, and analysis engine. `MainActivity` obtains it from a custom `JointSenseApplication` and passes dependencies to app-owned navigation entries.
+
+`MigrationGate` runs the coordinator from a lifecycle-aware coroutine before composing the NavHost. `MigrationOutcome.Failed` renders a localized recoverable error. Retry reruns migration; “start with an empty database” requires a second confirmation and calls `LegacyMigrationCoordinator.skipLegacyAndStartFresh()`, which transactionally clears partial Room rows, writes `legacyMigrationStatus=SKIPPED_BY_USER` and `samplesInitialized=true`, and leaves both legacy SharedPreferences files untouched.
 
 - [ ] **Step 5: Remove old cross-layer classes only after compilation**
 
@@ -710,4 +853,3 @@ Replace the target-only Phase 1 language in `项目结构需求梳理.md` with t
 git add 项目结构需求梳理.md docs/superpowers/plans/2026-08-07-jointsense-architecture-foundation.md
 git commit -m "docs: record architecture migration results"
 ```
-
