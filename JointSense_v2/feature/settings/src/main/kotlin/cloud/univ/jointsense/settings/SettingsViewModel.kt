@@ -2,6 +2,7 @@ package cloud.univ.jointsense.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import cloud.univ.jointsense.domain.repository.DataManagementRepository
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
@@ -32,7 +33,9 @@ class SettingsViewModel(
         SettingsUiState(
             sessionCount = observedSessions.size,
             measurementCount = observedSessions.sumOf { it.results.size },
-            calibrationCount = observedCalibrations.size,
+            calibrationCount = observedCalibrations.count {
+                it.status == CalibrationStatus.ACTIVE
+            },
         )
     }.stateIn(
         scope = viewModelScope,

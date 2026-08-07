@@ -21,21 +21,23 @@ internal object BaselineCalibrationImageAnalyzer {
         cols: Int,
         wellFraction: Float = 0.6f,
     ): List<BaselineWellReading> {
-        require(rows > 0 && cols > 0)
-        val cellWidth = crop.width().toFloat() / cols
-        val cellHeight = crop.height().toFloat() / rows
-        val margin = (1f - wellFraction) / 2f
-        return buildList {
-            var index = 0
-            for (row in 0 until rows) {
-                for (col in 0 until cols) {
-                    val left = (crop.left + cellWidth * (col + margin)).toInt()
-                    val top = (crop.top + cellHeight * (row + margin)).toInt()
-                    val width = (cellWidth * wellFraction).toInt().coerceAtLeast(1)
-                    val height = (cellHeight * wellFraction).toInt().coerceAtLeast(1)
-                    add(BaselineWellReading(row, col, index++, bitmap.tealness(left, top, width, height)))
-                }
-            }
+        return legacyCalibrationSampleWindows(
+            crop = CalibrationIntBounds(crop.left, crop.top, crop.right, crop.bottom),
+            rows = rows,
+            cols = cols,
+            wellFraction = wellFraction,
+        ).map { window ->
+            BaselineWellReading(
+                row = window.row,
+                col = window.col,
+                index = window.index,
+                signal = bitmap.tealness(
+                    window.left,
+                    window.top,
+                    window.width,
+                    window.height,
+                ),
+            )
         }
     }
 }

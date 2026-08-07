@@ -8,20 +8,25 @@ import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -91,6 +96,173 @@ class MeasurementViewModelTest {
         assertEquals(listOf("session-1"), repository.deletedIds)
         assertNull(viewModel.state.value.currentSession)
     }
+
+    @Test
+    fun sessionCreationWaitsForInsertAndGuardsRepeatedRequests() = runTest(dispatcher) {
+        val repository = ControlledCreateRepository()
+        val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
+        var navigationCalls = 0
+
+        viewModel.createNewSession { navigationCalls += 1 }
+        viewModel.createNewSession { navigationCalls += 1 }
+        runCurrent()
+
+        assertEquals(1, repository.createCalls)
+        assertEquals(0, navigationCalls)
+        assertTrue(viewModel.state.value.isCreatingSession)
+
+        repository.completeCreate("created-session")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, navigationCalls)
+        assertFalse(viewModel.state.value.isCreatingSession)
+        assertEquals("created-session", viewModel.state.value.currentSession?.id)
+    }
+
+    @Test
+    fun failedSessionCreationStaysPutAndExposesConsumableError() = runTest(dispatcher) {
+        val repository = ControlledCreateRepository()
+        val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
+        var navigationCalls = 0
+
+        viewModel.createNewSession { navigationCalls += 1 }
+        runCurrent()
+        repository.failCreate(IllegalStateException("insert failed"))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, navigationCalls)
+        assertFalse(viewModel.state.value.isCreatingSession)
+        assertEquals("insert failed", viewModel.state.value.sessionCreationError)
+
+        viewModel.consumeSessionCreationError()
+        assertNull(viewModel.state.value.sessionCreationError)
+    }
+
+    @Test
+    fun abandonWhileInsertIsPendingDeletesLateEmptySessionAndNeverNavigates() = runTest(dispatcher) {
+        val repository = ControlledCreateRepository()
+        val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
+        var navigationCalls = 0
+
+        viewModel.createNewSession { navigationCalls += 1 }
+        runCurrent()
+        viewModel.abandonMeasurement()
+        runCurrent()
+        repository.completeCreate("late-session")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, navigationCalls)
+        assertEquals(listOf("late-session"), repository.deletedIds)
+        assertNull(viewModel.state.value.currentSession)
+        assertFalse(viewModel.state.value.isCreatingSession)
+    }
+
+    @Test
+    fun completionCommittedWithoutCollectorIsDeliveredExactlyOnceToLaterCollector() =
+        runTest(dispatcher) {
+            val repository = FakeMeasurementRepository()
+            val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
+
+            viewModel.createNewSession()
+            testScheduler.advanceUntilIdle()
+            viewModel.setImage(FakeImage(width = 800, height = 600))
+            viewModel.analyze()
+            testScheduler.advanceUntilIdle()
+
+            val committedId = repository.sessions.value.single().results.single().id
+            val deliveredId = withTimeoutOrNull(1_000) {
+                viewModel.analysisCompletions.first()
+            }
+            val duplicate = withTimeoutOrNull(1) {
+                viewModel.analysisCompletions.first()
+            }
+
+            assertEquals(committedId, deliveredId)
+            assertEquals("result-1", deliveredId)
+            assertNull(duplicate)
+        }
+
+    @Test
+    fun retryReusesDraftAndResultWhileContinueAndNewSessionRotateDraft() = runTest(dispatcher) {
+        val repository = FakeMeasurementRepository()
+        var draftNumber = 0
+        val viewModel = MeasurementViewModel(
+            repository = repository,
+            analyzer = FakeAnalyzer(),
+            draftIdFactory = { "draft-${++draftNumber}" },
+        )
+
+        viewModel.createNewSession()
+        testScheduler.advanceUntilIdle()
+        viewModel.setImage(FakeImage(width = 800, height = 600))
+
+        viewModel.analyze()
+        testScheduler.advanceUntilIdle()
+        val firstResultId = viewModel.analysisCompletions.first()
+        viewModel.analyze()
+        testScheduler.advanceUntilIdle()
+        val retryResultId = viewModel.analysisCompletions.first()
+
+        assertEquals(listOf("draft-1", "draft-1"), repository.draftIds)
+        assertEquals(firstResultId, retryResultId)
+        assertEquals(1, repository.sessions.value.single().results.size)
+
+        viewModel.startNewTestInSession()
+        viewModel.setImage(FakeImage(width = 800, height = 600))
+        viewModel.analyze()
+        testScheduler.advanceUntilIdle()
+        val continuedResultId = viewModel.analysisCompletions.first()
+
+        assertEquals("draft-2", repository.draftIds.last())
+        assertFalse(continuedResultId == firstResultId)
+
+        viewModel.createNewSession()
+        testScheduler.advanceUntilIdle()
+        viewModel.setImage(FakeImage(width = 800, height = 600))
+        viewModel.analyze()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("draft-3", repository.draftIds.last())
+    }
+}
+
+private class ControlledCreateRepository : TestSessionRepository {
+    private val createResult = CompletableDeferred<Result<String>>()
+    val sessions = MutableStateFlow<List<TestSession>>(emptyList())
+    val deletedIds = mutableListOf<String>()
+    var createCalls = 0
+        private set
+
+    fun completeCreate(id: String) {
+        createResult.complete(Result.success(id))
+    }
+
+    fun failCreate(exception: Throwable) {
+        createResult.complete(Result.failure(exception))
+    }
+
+    override fun observeSessions(): Flow<List<TestSession>> = sessions
+    override fun observeSession(id: String): Flow<TestSession?> = MutableStateFlow(
+        sessions.value.firstOrNull { it.id == id },
+    )
+
+    override suspend fun createSession(name: String, source: DataSource): String {
+        createCalls += 1
+        val id = createResult.await().getOrThrow()
+        sessions.value = sessions.value + session(id)
+        return id
+    }
+
+    override suspend fun commitResult(
+        sessionId: String,
+        draftId: String,
+        result: NewTestResult,
+    ): String = error("unused")
+
+    override suspend fun deleteSession(id: String) {
+        deletedIds += id
+        sessions.value = sessions.value.filterNot { it.id == id }
+    }
 }
 
 private data class FakeImage(
@@ -124,8 +296,10 @@ private class FakeMeasurementRepository(
 ) : TestSessionRepository {
     private var nextSession = 1
     private var nextResult = 1
+    private val resultIdsByDraft = mutableMapOf<String, String>()
     val sessions = MutableStateFlow(initial)
     val deletedIds = mutableListOf<String>()
+    val draftIds = mutableListOf<String>()
     var lastDraftId: String? = null
 
     override fun observeSessions(): Flow<List<TestSession>> = sessions
@@ -145,6 +319,8 @@ private class FakeMeasurementRepository(
         result: NewTestResult,
     ): String {
         lastDraftId = draftId
+        draftIds += draftId
+        resultIdsByDraft[draftId]?.let { return it }
         val id = "result-${nextResult++}"
         val stored = TestResult(
             id = id,
@@ -159,6 +335,7 @@ private class FakeMeasurementRepository(
         sessions.value = sessions.value.map {
             if (it.id == sessionId) it.copy(results = it.results + stored) else it
         }
+        resultIdsByDraft[draftId] = id
         return id
     }
 

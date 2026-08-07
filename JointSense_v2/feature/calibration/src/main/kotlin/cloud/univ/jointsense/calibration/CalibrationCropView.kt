@@ -137,6 +137,14 @@ internal fun CalibrationCropView(
             drawRect(shade, Offset(offsetX, top), Size(left - offsetX, bottom - top))
             drawRect(shade, Offset(right, top), Size(offsetX + displayWidth - right, bottom - top))
             drawRect(Color.White, Offset(left, top), Size(right - left, bottom - top), style = Stroke(3f))
+            calibrationGridLines(left, top, right, bottom).forEach { line ->
+                drawLine(
+                    color = Color.White.copy(alpha = 0.5f),
+                    start = Offset(line.startX, line.startY),
+                    end = Offset(line.endX, line.endY),
+                    strokeWidth = 1f,
+                )
+            }
             listOf(
                 Offset(left, top),
                 Offset(right, top),

@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -80,6 +81,47 @@ class SettingsViewModelTest {
         assertEquals(1, data.restoreCalls)
     }
 
+    @Test
+    fun needsReviewCalibrationDoesNotReportAnActiveUserCurve() = runTest(dispatcher) {
+        val calibrations = FakeSettingsCalibrationRepository(
+            listOf(calibration(InflammationFactor.IL6, CalibrationStatus.NEEDS_REVIEW)),
+        )
+        val viewModel = SettingsViewModel(
+            FakeSettingsSessionRepository(emptyList()),
+            calibrations,
+            FakeDataManagementRepository(),
+        )
+        val collection = backgroundScope.launch { viewModel.state.collect {} }
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(0, viewModel.state.value.calibrationCount)
+        assertFalse(viewModel.state.value.hasCalibration)
+        collection.cancel()
+    }
+
+    @Test
+    fun mixedCalibrationStatusesCountOnlyActiveCurves() = runTest(dispatcher) {
+        val calibrations = FakeSettingsCalibrationRepository(
+            listOf(
+                calibration(InflammationFactor.IL6, CalibrationStatus.NEEDS_REVIEW),
+                calibration(InflammationFactor.TNF_ALPHA, CalibrationStatus.ACTIVE),
+            ),
+        )
+        val viewModel = SettingsViewModel(
+            FakeSettingsSessionRepository(emptyList()),
+            calibrations,
+            FakeDataManagementRepository(),
+        )
+        val collection = backgroundScope.launch { viewModel.state.collect {} }
+
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, viewModel.state.value.calibrationCount)
+        assertTrue(viewModel.state.value.hasCalibration)
+        collection.cancel()
+    }
+
     private fun sessionWithTwoResults() = TestSession(
         id = "session",
         name = "Settings fixture",
@@ -99,11 +141,14 @@ class SettingsViewModelTest {
         timestamp = 1L,
     )
 
-    private fun calibration(factor: InflammationFactor) = Calibration(
+    private fun calibration(
+        factor: InflammationFactor,
+        status: CalibrationStatus = CalibrationStatus.ACTIVE,
+    ) = Calibration(
         factor = factor,
         createdAt = 1L,
         version = 1,
-        status = CalibrationStatus.ACTIVE,
+        status = status,
         kitName = null,
         kitLot = null,
         knots = emptyList(),

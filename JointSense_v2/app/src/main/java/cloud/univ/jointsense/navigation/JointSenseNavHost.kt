@@ -28,9 +28,12 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -94,9 +97,19 @@ fun JointSenseNavHost(
     val actions = remember(navController) { NavigationActions(navController) }
     val currentEntry by navController.currentBackStackEntryAsState()
     val topLevelDestination = currentEntry?.destination?.topLevelDestination()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val sessionCreationError = featureViewModels?.measurement?.state
+        ?.collectAsStateWithLifecycle()?.value?.sessionCreationError
+
+    LaunchedEffect(sessionCreationError) {
+        val message = sessionCreationError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        featureViewModels?.measurement?.consumeSessionCreationError()
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             bottomBar = {
                 if (topLevelDestination != null) {
                     MainBottomBar(
@@ -120,8 +133,9 @@ fun JointSenseNavHost(
                         HomeRouteScreen(
                             viewModel = viewModels.insights,
                             onStartMeasurement = {
-                                viewModels.measurement.createNewSession()
-                                actions.startMeasurement(TopLevelDestination.HOME)
+                                viewModels.measurement.createNewSession {
+                                    actions.startMeasurement(TopLevelDestination.HOME)
+                                }
                             },
                             onOpenReport = {
                                 actions.openTopLevel(TopLevelDestination.REPORT)
@@ -272,8 +286,9 @@ fun JointSenseNavHost(
                         .clip(CircleShape)
                         .background(PrimaryAccent)
                         .clickable {
-                            featureViewModels?.measurement?.createNewSession()
-                            actions.startMeasurement(topLevelDestination)
+                            featureViewModels?.measurement?.createNewSession {
+                                actions.startMeasurement(topLevelDestination)
+                            }
                         },
                     contentAlignment = Alignment.Center,
                 ) {
