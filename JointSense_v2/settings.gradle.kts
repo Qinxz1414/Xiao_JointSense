@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         // Regional mirrors first: dl.google.com is unreachable on this
         // machine; the mirrors carry identical artifacts and google()
@@ -30,4 +31,15 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "JointSense"
-include(":app")
+include(
+    ":app",
+    ":core:domain",
+    ":core:analysis",
+    ":core:designsystem",
+    ":core:database",
+    ":core:data",
+    ":feature:insights",
+    ":feature:measurement",
+    ":feature:calibration",
+    ":feature:settings",
+)
