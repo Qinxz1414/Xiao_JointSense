@@ -29,7 +29,9 @@ fun TestSessionWithResults.toDomain(): TestSession = TestSession(
     name = session.name,
     createdAt = session.createdAt,
     source = session.source,
-    results = results.map(TestResultEntity::toDomain),
+    results = results
+        .sortedWith(compareBy<TestResultEntity> { it.timestamp }.thenBy { it.id })
+        .map(TestResultEntity::toDomain),
 )
 
 fun TestSession.toEntity(): TestSessionEntity = TestSessionEntity(

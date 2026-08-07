@@ -9,6 +9,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import cloud.univ.jointsense.data.legacy.LegacyMigrationCoordinator
 import cloud.univ.jointsense.data.legacy.MigrationOutcome
 import cloud.univ.jointsense.database.JointSenseDatabase
+import cloud.univ.jointsense.database.entity.TestResultEntity
 import cloud.univ.jointsense.database.entity.TestSessionEntity
 import cloud.univ.jointsense.database.entity.toDomain
 import cloud.univ.jointsense.domain.model.Calibration
@@ -204,6 +205,26 @@ class LegacyMigrationCoordinatorTest {
     }
 
     @Test
+    fun roomRepositoryOrdersInverseTimeResultsByTimestampThenId() = runTest {
+        database.testSessionDao().insertSession(
+            TestSessionEntity("session-id", "New test", 1L, DataSource.USER),
+        )
+        database.testSessionDao().insertResult(testResultEntity("result-z", timestamp = 30L))
+        database.testSessionDao().insertResult(testResultEntity("result-a", timestamp = 30L))
+        database.testSessionDao().insertResult(testResultEntity("result-oldest", timestamp = 10L))
+
+        val stored = RoomTestSessionRepository(database)
+            .observeSession("session-id")
+            .first()!!
+
+        assertEquals(
+            listOf("result-oldest", "result-a", "result-z"),
+            stored.results.map { it.id },
+        )
+        assertEquals("result-z", stored.results.last().id)
+    }
+
+    @Test
     fun roomCalibrationRepositorySavesObservesAndClearsCalibrations() = runTest {
         val repository = RoomCalibrationRepository(database)
         val calibration = Calibration(
@@ -281,6 +302,22 @@ class LegacyMigrationCoordinatorTest {
         }""".trimIndent()
     }
 }
+
+private fun testResultEntity(id: String, timestamp: Long) = TestResultEntity(
+    id = id,
+    sessionId = "session-id",
+    draftId = null,
+    factor = InflammationFactor.IL6,
+    concentration = 10f,
+    rangeStatus = RangeStatus.IN_RANGE,
+    timestamp = timestamp,
+    rMean = 90f,
+    gMean = 100f,
+    bMean = 110f,
+    rStd = 1f,
+    gStd = 1f,
+    bStd = 1f,
+)
 
 private class BlockingLegacyReadContext(
     base: Context,

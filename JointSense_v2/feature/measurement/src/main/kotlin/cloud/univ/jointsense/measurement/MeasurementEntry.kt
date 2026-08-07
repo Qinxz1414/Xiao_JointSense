@@ -4,6 +4,8 @@ import android.graphics.Rect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import cloud.univ.jointsense.domain.model.TestResult
+import cloud.univ.jointsense.domain.model.TestSession
 
 @Composable
 fun ImageSelectRouteScreen(
@@ -88,15 +90,19 @@ fun HistoryRouteScreen(
     HistoryScreen(
         sessions = state.sessions,
         onSessionClick = { session ->
-            session.results.lastOrNull()?.let { result ->
+            latestHistoryResultId(session)?.let { resultId ->
                 viewModel.selectSession(session.id)
-                onOpenResult(result.id)
+                onOpenResult(resultId)
             }
         },
         onDeleteSession = { viewModel.deleteSession(it.id) },
         onBack = onBack,
     )
 }
+
+internal fun latestHistoryResultId(session: TestSession): String? = session.results
+    .maxWithOrNull(compareBy<TestResult> { it.timestamp }.thenBy { it.id })
+    ?.id
 
 private fun CropBounds.toRect(): Rect = Rect(left, top, right, bottom)
 private fun Rect.toBounds(): CropBounds = CropBounds(left, top, right, bottom)
