@@ -1,3 +1,19 @@
 <resources>
     <string name="app_name">JointSense</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_trends">Trends</string>
+    <string name="nav_test">Test</string>
+    <string name="nav_report">Report</string>
+    <string name="nav_profile">Profile</string>
+    <string name="language_title">Language</string>
+    <string name="language_system">System</string>
+    <string name="language_simplified_chinese">Simplified Chinese</string>
+    <string name="language_english">English</string>
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+    <string name="migration_status_completed">Migration completed</string>
+    <string name="migration_status_already_completed">Migration already completed</string>
+    <string name="migration_status_skipped">Migration skipped</string>
+    <string name="migration_status_failed">Migration failed</string>
 </resources>

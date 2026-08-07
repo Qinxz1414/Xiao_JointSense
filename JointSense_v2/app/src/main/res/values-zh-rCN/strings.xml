@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">JointSense</string>
+    <string name="nav_home">首页</string>
+    <string name="nav_trends">趋势</string>
+    <string name="nav_test">检测</string>
+    <string name="nav_report">报告</string>
+    <string name="nav_profile">个人中心</string>
+    <string name="language_title">语言</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_simplified_chinese">简体中文</string>
+    <string name="language_english">English</string>
+    <string name="action_back">返回</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_retry">重试</string>
+    <string name="migration_status_completed">数据迁移已完成</string>
+    <string name="migration_status_already_completed">数据已迁移，无需重复操作</string>
+    <string name="migration_status_skipped">已跳过数据迁移</string>
+    <string name="migration_status_failed">数据迁移失败</string>
+</resources>
