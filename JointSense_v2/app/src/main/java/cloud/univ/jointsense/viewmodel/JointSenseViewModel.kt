@@ -17,31 +17,10 @@ import cloud.univ.jointsense.model.FeatureExtractor
 import cloud.univ.jointsense.model.OaIndex
 import cloud.univ.jointsense.model.StandardCurve
 import cloud.univ.jointsense.ui.components.TimePoint
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlin.math.abs
-
-/**
- * Main bottom-navigation tabs (design: Home / Trends / Test / Report /
- * Profile). The center Test tab is an action, not a page.
- */
-enum class MainTab {
-    HOME,
-    TRENDS,
-    REPORT,
-    PROFILE
-}
-
-/**
- * Full-screen flow pages shown above the tab scaffold while a test is
- * in progress (or when browsing history).
- */
-enum class FlowScreen {
-    IMAGE_SELECT,
-    IMAGE_CROP,
-    FACTOR_SELECT,
-    RESULT,
-    HISTORY,
-    CALIBRATION
-}
 
 enum class EventKind { TEST, UP, DOWN }
 
@@ -53,20 +32,12 @@ data class KeyEventItem(
 
 /**
  * Main ViewModel for the JointSense application.
- * Manages tab + flow navigation, test sessions, image processing,
- * predictions and the derived statistics that feed the dashboard,
- * trends and AI report screens.
+ * Manages test sessions, image processing, predictions and the derived
+ * statistics that feed the dashboard, trends and AI report screens.
  */
 class JointSenseViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = TestRepository(application)
-
-    // Navigation state
-    var activeTab by mutableStateOf(MainTab.HOME)
-        private set
-
-    var flowScreen by mutableStateOf<FlowScreen?>(null)
-        private set
 
     // All test sessions
     var sessions by mutableStateOf(listOf<TestSession>())
@@ -96,6 +67,9 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
     var isAnalyzing by mutableStateOf(false)
         private set
 
+    private val analysisCompletionChannel = Channel<String>(Channel.BUFFERED)
+    val analysisCompletions: Flow<String> = analysisCompletionChannel.receiveAsFlow()
+
     // Extracted features (for display)
     var lastFeatures by mutableStateOf<FeatureExtractor.Features?>(null)
         private set
@@ -117,17 +91,8 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    // ========================
-    // Tab navigation
-    // ========================
-
-    fun selectTab(tab: MainTab) {
-        activeTab = tab
-        flowScreen = null
-    }
-
-    /** Leave the flow and return to whichever tab was active. */
-    fun exitFlow() {
+    /** Discard an unfinished run and its empty persisted session. */
+    fun abandonMeasurement() {
         // Drop result-less sessions created by an abandoned test run
         currentSession?.let { session ->
             if (session.results.isEmpty()) {
@@ -139,16 +104,14 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
         lastResult = null
         lastFeatures = null
         currentSession = null
-        flowScreen = null
     }
 
-    fun goHome() {
-        exitFlow()
-        activeTab = MainTab.HOME
-    }
-
-    fun navigateToFlow(screen: FlowScreen) {
-        flowScreen = screen
+    /** Clear transient state after leaving a completed measurement. */
+    fun finishMeasurement() {
+        selectedBitmap = null
+        lastResult = null
+        lastFeatures = null
+        currentSession = null
     }
 
     // ========================
@@ -161,12 +124,10 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
         currentSession = session
         sessions = sessions + session
         repository.saveSessions(sessions)
-        flowScreen = FlowScreen.IMAGE_SELECT
     }
 
     fun selectSession(session: TestSession) {
         currentSession = session
-        flowScreen = FlowScreen.RESULT
     }
 
     fun deleteSession(session: TestSession) {
@@ -196,15 +157,10 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
         val w = bitmap.width
         val h = bitmap.height
         cropRect = Rect(w / 4, h / 4, 3 * w / 4, 3 * h / 4)
-        flowScreen = FlowScreen.IMAGE_CROP
     }
 
     fun updateCropRect(rect: Rect) {
         cropRect = rect
-    }
-
-    fun confirmCrop() {
-        flowScreen = FlowScreen.FACTOR_SELECT
     }
 
     // ========================
@@ -221,6 +177,7 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
 
     fun analyze() {
         val bitmap = selectedBitmap ?: return
+        if (isAnalyzing) return
         val rect = cropRect
         isAnalyzing = true
 
@@ -268,7 +225,7 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
 
-            flowScreen = FlowScreen.RESULT
+            analysisCompletionChannel.trySend(result.id).getOrThrow()
         } finally {
             isAnalyzing = false
         }
@@ -282,7 +239,6 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
         selectedBitmap = null
         lastResult = null
         lastFeatures = null
-        flowScreen = FlowScreen.IMAGE_SELECT
     }
 
     /**
