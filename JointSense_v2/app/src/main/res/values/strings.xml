@@ -16,4 +16,11 @@
     <string name="migration_status_already_completed">Migration already completed</string>
     <string name="migration_status_skipped">Migration skipped</string>
     <string name="migration_status_failed">Migration failed</string>
+    <string name="migration_preparing_data">Preparing your saved data…</string>
+    <string name="migration_error_title">We couldn’t prepare your saved data</string>
+    <string name="migration_error_message">Your existing data has not been changed. You can retry, or start with an empty database.\n\nDetails: %1$s</string>
+    <string name="migration_start_empty">Start empty</string>
+    <string name="migration_start_empty_confirm_title">Start with an empty database?</string>
+    <string name="migration_start_empty_confirm_message">This removes any partially imported Room data and skips the legacy import. The original legacy files are left untouched.</string>
+    <string name="migration_start_empty_confirm_action">Confirm start empty</string>
 </resources>

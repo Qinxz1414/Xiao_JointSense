@@ -24,8 +24,8 @@ import cloud.univ.jointsense.model.StandardCurve
  * device-measured pixel stats) and are only there to keep the data model
  * complete.
  *
- * Seeded into the repository on first launch (when no user data exists) by
- * [cloud.univ.jointsense.viewmodel.JointSenseViewModel].
+ * This legacy seed set is retained only for compatibility with old app data;
+ * current startup seeding is owned by the Room data layer.
  */
 object BuiltInData {
 

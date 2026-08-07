@@ -21,17 +21,16 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -42,6 +41,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
 import androidx.navigation.NavHostController
@@ -51,21 +51,27 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import cloud.univ.jointsense.ui.screens.CalibrationFlowScreen
-import cloud.univ.jointsense.ui.screens.FactorSelectScreen
-import cloud.univ.jointsense.ui.screens.HistoryScreen
-import cloud.univ.jointsense.ui.screens.HomeScreen
-import cloud.univ.jointsense.ui.screens.ImageCropScreen
-import cloud.univ.jointsense.ui.screens.ImageSelectScreen
-import cloud.univ.jointsense.ui.screens.ProfileScreen
-import cloud.univ.jointsense.ui.screens.ReportScreen
-import cloud.univ.jointsense.ui.screens.ResultScreen
-import cloud.univ.jointsense.ui.screens.TrendsScreen
-import cloud.univ.jointsense.ui.theme.BgLight
-import cloud.univ.jointsense.ui.theme.BgWhite
-import cloud.univ.jointsense.ui.theme.PrimaryAccent
-import cloud.univ.jointsense.ui.theme.TextSecondary
-import cloud.univ.jointsense.viewmodel.JointSenseViewModel
+import cloud.univ.jointsense.calibration.CalibrationRouteScreen
+import cloud.univ.jointsense.designsystem.theme.BgLight
+import cloud.univ.jointsense.designsystem.theme.BgWhite
+import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
+import cloud.univ.jointsense.designsystem.theme.TextSecondary
+import cloud.univ.jointsense.di.AppContainer
+import cloud.univ.jointsense.insights.HomeRouteScreen
+import cloud.univ.jointsense.insights.InsightsViewModel
+import cloud.univ.jointsense.insights.InsightsViewModelFactory
+import cloud.univ.jointsense.insights.ReportRouteScreen
+import cloud.univ.jointsense.insights.TrendsRouteScreen
+import cloud.univ.jointsense.measurement.CropRouteScreen
+import cloud.univ.jointsense.measurement.FactorSelectRouteScreen
+import cloud.univ.jointsense.measurement.HistoryRouteScreen
+import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
+import cloud.univ.jointsense.measurement.MeasurementViewModel
+import cloud.univ.jointsense.measurement.MeasurementViewModelFactory
+import cloud.univ.jointsense.measurement.ResultRouteScreen
+import cloud.univ.jointsense.settings.SettingsRouteScreen
+import cloud.univ.jointsense.settings.SettingsViewModel
+import cloud.univ.jointsense.settings.SettingsViewModelFactory
 
 typealias JointSenseScreenSlot =
     @Composable (route: JointSenseRoute, actions: NavigationActions) -> Unit
@@ -74,9 +80,17 @@ typealias JointSenseScreenSlot =
 fun JointSenseNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    viewModel: JointSenseViewModel = viewModel(),
+    appContainer: AppContainer? = null,
     screenSlot: JointSenseScreenSlot? = null,
 ) {
+    require(appContainer != null || screenSlot != null) {
+        "JointSenseNavHost needs an AppContainer unless a test screenSlot is supplied"
+    }
+    val featureViewModels = if (appContainer == null) {
+        null
+    } else {
+        rememberFeatureViewModels(appContainer)
+    }
     val actions = remember(navController) { NavigationActions(navController) }
     val currentEntry by navController.currentBackStackEntryAsState()
     val topLevelDestination = currentEntry?.destination?.topLevelDestination()
@@ -102,10 +116,11 @@ fun JointSenseNavHost(
             ) {
                 composable<HomeRoute> {
                     Destination(screenSlot, HomeRoute, actions) {
-                        HomeScreen(
-                            viewModel = viewModel,
-                            onTestNow = {
-                                viewModel.createNewSession()
+                        val viewModels = requireNotNull(featureViewModels)
+                        HomeRouteScreen(
+                            viewModel = viewModels.insights,
+                            onStartMeasurement = {
+                                viewModels.measurement.createNewSession()
                                 actions.startMeasurement(TopLevelDestination.HOME)
                             },
                             onOpenReport = {
@@ -116,18 +131,20 @@ fun JointSenseNavHost(
                 }
                 composable<TrendsRoute> {
                     Destination(screenSlot, TrendsRoute, actions) {
-                        TrendsScreen(viewModel = viewModel)
+                        TrendsRouteScreen(requireNotNull(featureViewModels).insights)
                     }
                 }
                 composable<ReportRoute> {
                     Destination(screenSlot, ReportRoute, actions) {
-                        ReportScreen(viewModel = viewModel)
+                        ReportRouteScreen(requireNotNull(featureViewModels).insights)
                     }
                 }
                 composable<ProfileRoute> {
                     Destination(screenSlot, ProfileRoute, actions) {
-                        ProfileScreen(
-                            viewModel = viewModel,
+                        val container = requireNotNull(appContainer)
+                        SettingsRouteScreen(
+                            viewModel = requireNotNull(featureViewModels).settings,
+                            languageController = container.languageController,
                             onOpenHistory = actions::openHistory,
                             onCalibrate = actions::startCalibration,
                         )
@@ -135,15 +152,9 @@ fun JointSenseNavHost(
                 }
                 composable<HistoryRoute> {
                     Destination(screenSlot, HistoryRoute, actions) {
-                        HistoryScreen(
-                            sessions = viewModel.sessions,
-                            onSessionClick = { session ->
-                                session.results.lastOrNull()?.let { result ->
-                                    viewModel.selectSession(session)
-                                    actions.openResult(result.id)
-                                }
-                            },
-                            onDeleteSession = viewModel::deleteSession,
+                        HistoryRouteScreen(
+                            viewModel = requireNotNull(featureViewModels).measurement,
+                            onOpenResult = actions::openResult,
                             onBack = { actions.navigateBack() },
                         )
                     }
@@ -151,48 +162,39 @@ fun JointSenseNavHost(
 
                 navigation<MeasurementGraph>(startDestination = ImageSelectRoute) {
                     composable<ImageSelectRoute> {
-                        BackHandler {
-                            viewModel.abandonMeasurement()
-                            actions.exitMeasurement()
+                        if (screenSlot == null) {
+                            BackHandler {
+                                requireNotNull(featureViewModels).measurement.abandonMeasurement()
+                                actions.exitMeasurement()
+                            }
                         }
                         Destination(screenSlot, ImageSelectRoute, actions) {
-                            ImageSelectScreen(
-                                onImageSelected = { bitmap ->
-                                    viewModel.setImage(bitmap)
-                                    actions.openCrop()
-                                },
+                            val measurement = requireNotNull(featureViewModels).measurement
+                            ImageSelectRouteScreen(
+                                viewModel = measurement,
+                                onImageReady = actions::openCrop,
                                 onBack = {
-                                    viewModel.abandonMeasurement()
+                                    measurement.abandonMeasurement()
                                     actions.exitMeasurement()
                                 },
-                                sessionName = viewModel.currentSession?.name ?: "New Test",
                             )
                         }
                     }
                     composable<CropRoute> {
                         Destination(screenSlot, CropRoute, actions) {
-                            viewModel.selectedBitmap?.let { bitmap ->
-                                ImageCropScreen(
-                                    bitmap = bitmap,
-                                    cropRect = viewModel.cropRect,
-                                    onCropRectChanged = viewModel::updateCropRect,
-                                    onConfirm = actions::openFactorSelect,
-                                    onBack = { actions.navigateBack() },
-                                )
-                            }
+                            CropRouteScreen(
+                                viewModel = requireNotNull(featureViewModels).measurement,
+                                onConfirm = actions::openFactorSelect,
+                                onBack = { actions.navigateBack() },
+                            )
                         }
                     }
                     composable<FactorSelectRoute> {
-                        LaunchedEffect(viewModel) {
-                            viewModel.analysisCompletions.collect(actions::openResult)
-                        }
                         Destination(screenSlot, FactorSelectRoute, actions) {
-                            FactorSelectScreen(
-                                selectedFactor = viewModel.selectedFactor,
-                                onFactorSelected = viewModel::selectFactor,
-                                onAnalyze = viewModel::analyze,
+                            FactorSelectRouteScreen(
+                                viewModel = requireNotNull(featureViewModels).measurement,
+                                onResultReady = actions::openResult,
                                 onBack = { actions.navigateBack() },
-                                isAnalyzing = viewModel.isAnalyzing,
                             )
                         }
                     }
@@ -202,24 +204,23 @@ fun JointSenseNavHost(
                     val route = entry.toRoute<ResultRoute>()
                     val inMeasurement = actions.isInMeasurement()
                     BackHandler {
-                        if (inMeasurement) viewModel.finishMeasurement()
+                        if (inMeasurement) featureViewModels?.measurement?.finishMeasurement()
                         actions.exitResult()
                     }
                     Destination(screenSlot, route, actions) {
-                        val session = viewModel.currentSession
-                            ?: viewModel.sessions.firstOrNull { candidate ->
-                                candidate.results.any { it.id == route.resultId }
-                            }
-                        val result = session?.results?.firstOrNull { it.id == route.resultId }
+                        val measurement = requireNotNull(featureViewModels).measurement
+                        val state = measurement.state.collectAsStateWithLifecycle().value
+                        val session = state.currentSession ?: state.sessions.firstOrNull { candidate ->
+                            candidate.results.any { it.id == route.resultId }
+                        }
                         val canContinue = session?.results?.size?.let { it < 5 } == true
-                        ResultScreen(
-                            session = session,
-                            lastResult = result,
-                            canAddMore = canContinue,
-                            onNewTest = {
+                        ResultRouteScreen(
+                            viewModel = measurement,
+                            resultId = route.resultId,
+                            onRetest = {
                                 if (session != null && canContinue) {
-                                    viewModel.selectSession(session)
-                                    viewModel.startNewTestInSession()
+                                    measurement.selectSession(session.id)
+                                    measurement.startNewTestInSession()
                                     if (inMeasurement) {
                                         actions.restartMeasurement()
                                     } else {
@@ -229,8 +230,8 @@ fun JointSenseNavHost(
                                     }
                                 }
                             },
-                            onGoHome = {
-                                viewModel.finishMeasurement()
+                            onFinish = {
+                                measurement.finishMeasurement()
                                 actions.goHome()
                             },
                         )
@@ -239,19 +240,19 @@ fun JointSenseNavHost(
 
                 navigation<CalibrationGraph>(startDestination = CalibrationSelectRoute) {
                     composable<CalibrationSelectRoute> {
-                        CalibrationDestination(screenSlot, CalibrationSelectRoute, actions)
+                        CalibrationDestination(screenSlot, CalibrationSelectRoute, actions, appContainer)
                     }
                     composable<CalibrationCropRoute> {
-                        CalibrationDestination(screenSlot, CalibrationCropRoute, actions)
+                        CalibrationDestination(screenSlot, CalibrationCropRoute, actions, appContainer)
                     }
                     composable<CalibrationAssignRoute> {
-                        CalibrationDestination(screenSlot, CalibrationAssignRoute, actions)
+                        CalibrationDestination(screenSlot, CalibrationAssignRoute, actions, appContainer)
                     }
                     composable<CalibrationReviewRoute> {
-                        CalibrationDestination(screenSlot, CalibrationReviewRoute, actions)
+                        CalibrationDestination(screenSlot, CalibrationReviewRoute, actions, appContainer)
                     }
                     composable<CalibrationDoneRoute> {
-                        CalibrationDestination(screenSlot, CalibrationDoneRoute, actions)
+                        CalibrationDestination(screenSlot, CalibrationDoneRoute, actions, appContainer)
                     }
                 }
             }
@@ -271,7 +272,7 @@ fun JointSenseNavHost(
                         .clip(CircleShape)
                         .background(PrimaryAccent)
                         .clickable {
-                            viewModel.createNewSession()
+                            featureViewModels?.measurement?.createNewSession()
                             actions.startMeasurement(topLevelDestination)
                         },
                     contentAlignment = Alignment.Center,
@@ -286,6 +287,32 @@ fun JointSenseNavHost(
             }
         }
     }
+}
+
+private data class FeatureViewModels(
+    val insights: InsightsViewModel,
+    val measurement: MeasurementViewModel,
+    val settings: SettingsViewModel,
+)
+
+@Composable
+private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModels {
+    val insightsFactory = remember(container) { InsightsViewModelFactory(container.testSessions) }
+    val measurementFactory = remember(container) {
+        MeasurementViewModelFactory(container.testSessions, container.measurementAnalysis)
+    }
+    val settingsFactory = remember(container) {
+        SettingsViewModelFactory(
+            container.testSessions,
+            container.calibrations,
+            container.dataManagement,
+        )
+    }
+    return FeatureViewModels(
+        insights = viewModel(key = "insights", factory = insightsFactory),
+        measurement = viewModel(key = "measurement", factory = measurementFactory),
+        settings = viewModel(key = "settings", factory = settingsFactory),
+    )
 }
 
 @Composable
@@ -303,11 +330,13 @@ private fun CalibrationDestination(
     screenSlot: JointSenseScreenSlot?,
     route: JointSenseRoute,
     actions: NavigationActions,
+    appContainer: AppContainer?,
 ) {
     Destination(screenSlot, route, actions) {
-        // Compatibility entry while the legacy calibration screen owns its
-        // internal five-step state. Task 7 can replace each registered route.
-        CalibrationFlowScreen(onExit = { actions.exitCalibration() })
+        CalibrationRouteScreen(
+            repository = requireNotNull(appContainer).calibrations,
+            onExit = actions::exitCalibration,
+        )
     }
 }
 
@@ -343,7 +372,7 @@ private fun MainBottomBar(
                     onClick = { onDestination(TopLevelDestination.HOME) },
                 )
                 BarTab(
-                    icon = Icons.Default.ShowChart,
+                    icon = Icons.AutoMirrored.Filled.ShowChart,
                     label = "Trends",
                     selected = activeDestination == TopLevelDestination.TRENDS,
                     onClick = { onDestination(TopLevelDestination.TRENDS) },

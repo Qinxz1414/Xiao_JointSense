@@ -11,9 +11,9 @@ import org.json.JSONObject
 /**
  * Persists user-calibrated standard curves and wires them into [StandardCurve].
  *
- * On [init] it loads any saved calibration and applies it so the live
- * [cloud.univ.jointsense.viewmodel.JointSenseViewModel.analyze] path uses the
- * user's curve instead of the factory knots. Calibrating one factor updates
+ * On [init] it loads any saved calibration and applies it so the legacy
+ * analysis path uses the user's curve instead of the factory knots.
+ * Calibrating one factor updates
  * only that factor; the others keep their factory values until calibrated.
  */
 object CalibrationManager {

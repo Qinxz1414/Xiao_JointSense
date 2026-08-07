@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import cloud.univ.jointsense.data.InflammationFactor
 import cloud.univ.jointsense.data.TestResult
 import cloud.univ.jointsense.data.TestSession
-import cloud.univ.jointsense.ui.theme.WellPalette
+import cloud.univ.jointsense.designsystem.theme.WellPalette
 import kotlin.math.roundToInt
 
 /**
