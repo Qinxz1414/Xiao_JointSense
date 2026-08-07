@@ -10,5 +10,7 @@ android {
 dependencies {
     implementation(project(":core:domain"))
     testImplementation(libs.junit)
-    testImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
