@@ -56,6 +56,7 @@ import cloud.univ.jointsense.ui.screens.HomeScreen
 import cloud.univ.jointsense.ui.screens.ImageCropScreen
 import cloud.univ.jointsense.ui.screens.ImageSelectScreen
 import cloud.univ.jointsense.ui.screens.ProfileScreen
+import cloud.univ.jointsense.ui.screens.CalibrationFlowScreen
 import cloud.univ.jointsense.ui.screens.ReportScreen
 import cloud.univ.jointsense.ui.screens.ResultScreen
 import cloud.univ.jointsense.ui.screens.TrendsScreen
@@ -147,6 +148,18 @@ fun JointSenseApp(
                         onBack = { viewModel.exitFlow() }
                     )
                 }
+
+                FlowScreen.CALIBRATION -> {
+                    CalibrationFlowScreen(
+                        onExit = { viewModel.exitFlow() }
+                    )
+                }
+
+                FlowScreen.CALIBRATION -> {
+                    CalibrationFlowScreen(
+                        onExit = { viewModel.exitFlow() }
+                    )
+                }
             }
         }
     } else {
@@ -180,7 +193,8 @@ fun JointSenseApp(
                         MainTab.REPORT -> ReportScreen(viewModel = viewModel)
                         MainTab.PROFILE -> ProfileScreen(
                             viewModel = viewModel,
-                            onOpenHistory = { viewModel.navigateToFlow(FlowScreen.HISTORY) }
+                            onOpenHistory = { viewModel.navigateToFlow(FlowScreen.HISTORY) },
+                            onCalibrate = { viewModel.navigateToFlow(FlowScreen.CALIBRATION) }
                         )
                     }
                 }

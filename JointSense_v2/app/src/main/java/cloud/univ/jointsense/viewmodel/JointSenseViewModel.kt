@@ -7,13 +7,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import cloud.univ.jointsense.data.BuiltInData
+import cloud.univ.jointsense.data.CalibrationManager
 import cloud.univ.jointsense.data.InflammationFactor
 import cloud.univ.jointsense.data.TestRepository
 import cloud.univ.jointsense.data.TestResult
 import cloud.univ.jointsense.data.TestSession
 import cloud.univ.jointsense.model.FeatureExtractor
 import cloud.univ.jointsense.model.OaIndex
-import cloud.univ.jointsense.model.PredictionModel
+import cloud.univ.jointsense.model.StandardCurve
 import cloud.univ.jointsense.ui.components.TimePoint
 import kotlin.math.abs
 
@@ -37,7 +39,8 @@ enum class FlowScreen {
     IMAGE_CROP,
     FACTOR_SELECT,
     RESULT,
-    HISTORY
+    HISTORY,
+    CALIBRATION
 }
 
 enum class EventKind { TEST, UP, DOWN }
@@ -98,7 +101,20 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
         private set
 
     init {
-        sessions = repository.loadSessions()
+        // Load and activate any user-calibrated standard curve so the live
+        // analysis path uses it instead of the factory knots.
+        CalibrationManager.init(application)
+
+        val loaded = repository.loadSessions()
+        sessions = if (loaded.isEmpty()) {
+            // First launch (or after "clear all"): populate the app with
+            // the built-in quantified ELISA detection data so the dashboard
+            // is not empty. User-created data always takes precedence.
+            repository.saveSessions(BuiltInData.sessions)
+            BuiltInData.sessions
+        } else {
+            loaded
+        }
     }
 
     // ========================
@@ -219,11 +235,11 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
             )
             lastFeatures = features
 
-            // Step 2: Predict concentration using linear regression model
-            val concentration = PredictionModel.predict(
-                features.toFloatArray(),
-                selectedFactor
-            )
+            // Step 2: Quantify concentration by interpolating the well's
+            // tealness signal (B − R) along the calibrated standard curve —
+            // proper ELISA "插补" instead of the placeholder linear model.
+            val tealness = features.bMean - features.rMean
+            val concentration = StandardCurve.concentrationFor(tealness, selectedFactor)
 
             // Step 3: Create test result
             val result = TestResult(
@@ -283,6 +299,14 @@ class JointSenseViewModel(application: Application) : AndroidViewModel(applicati
     /** Every stored result, chronologically. */
     val allResults: List<TestResult>
         get() = sessions.flatMap { it.results }.sortedBy { it.timestamp }
+
+    /** Whether a user-calibrated curve (vs the factory knots) is active. */
+    val hasUserCalibration: Boolean
+        get() = CalibrationManager.hasUserCalibration()
+
+    /** How many factors have a user calibration. */
+    val calibrationFactorCount: Int
+        get() = CalibrationManager.factorCount()
 
     /** Chronological concentration series for one factor. */
     fun factorSeries(factor: InflammationFactor): List<TimePoint> =

@@ -25,11 +25,23 @@ import kotlin.math.roundToInt
  */
 object OaIndex {
 
-    /** Assay working-range caps in pg/mL (normalization denominators). */
+    /**
+     * Assay working-range caps in pg/mL (normalization denominators).
+     *
+     * These define the upper end of each factor's standard curve and are
+     * used to normalize a concentration to 0..1 before the composite AI
+     * is computed. They were raised from the previous placeholder values
+     * (6 / 8 / 4) to the actual upper bounds of the 样本.pptx standard
+     * ladder — TNF-α & IL-1β reach 500 pg/mL, IL-6 reaches 1000 pg/mL —
+     * so real measurements (and the built-in detection data) no longer
+     * saturate the AI index at grade 4.
+     *
+     * Tune these to the validated kit's working range for production use.
+     */
     val caps: Map<InflammationFactor, Float> = mapOf(
-        InflammationFactor.TNF_ALPHA to 6.0f,
-        InflammationFactor.IL6 to 8.0f,
-        InflammationFactor.IL1_BETA to 4.0f
+        InflammationFactor.TNF_ALPHA to 500f,
+        InflammationFactor.IL6 to 1000f,
+        InflammationFactor.IL1_BETA to 500f
     )
 
     /** Composite weights; renormalized over whichever factors are present. */

@@ -1,0 +1,130 @@
+<style>
+  #js-room {
+    --js-ink: #0E2841;
+    --js-primary: #156082;
+    --js-cyan: #0F9ED5;
+    --js-green: #196B24;
+    --js-well: #7B9694;
+  }
+  #js-room .data-layout {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 24px;
+    align-items: start;
+  }
+  #js-room .entity-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 10px;
+  }
+  #js-room .entity {
+    border-radius: 13px;
+    border: 1px solid color-mix(in srgb, var(--js-primary) 24%, transparent);
+    background: light-dark(#FFFFFF, #142838);
+    overflow: hidden;
+  }
+  #js-room .entity h3 {
+    margin: 0;
+    padding: 11px 13px;
+    background: light-dark(#EAF4F8, #163447);
+    color: light-dark(var(--js-ink), #F7F9FA);
+  }
+  #js-room .entity ul {
+    margin: 0;
+    padding: 11px 13px 13px 30px;
+    color: light-dark(#5F6B7A, #C3D0D8);
+  }
+  #js-room .relation {
+    text-align: center;
+    color: var(--js-primary);
+    font-weight: 500;
+    padding: 8px 0;
+  }
+  #js-room .migration-flow {
+    display: grid;
+    gap: 8px;
+  }
+  #js-room .migration-step {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 12px;
+    border-left: 3px solid var(--js-cyan);
+    background: light-dark(#F7F9FA, #132331);
+  }
+  #js-room .migration-step strong,
+  #js-room .migration-step span { display: block; }
+  #js-room .migration-step span {
+    margin-top: 4px;
+    color: light-dark(#5F6B7A, #C3D0D8);
+  }
+  #js-room .step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--js-primary);
+    color: #FFFFFF;
+  }
+  #js-room .policy {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 10px;
+  }
+  #js-room .policy-item {
+    padding-top: 10px;
+    border-top: 2px solid var(--js-green);
+    color: light-dark(var(--js-ink), #F7F9FA);
+  }
+  #js-room .policy-item span {
+    display: block;
+    margin-top: 4px;
+    color: light-dark(#5F6B7A, #C3D0D8);
+  }
+  @media (max-width: 780px) {
+    #js-room .data-layout { grid-template-columns: 1fr; }
+    #js-room .policy { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    #js-room .entity-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div id="js-room">
+  <h2>阶段 1 · Room 数据模型与无损迁移</h2>
+  <p class="subtitle">Room 成为唯一运行时数据源；旧 SharedPreferences 仅作为一次性迁移输入保留，不再承担写入。</p>
+
+  <div class="data-layout">
+    <div>
+      <div class="label">数据库 v1</div>
+      <div class="entity-grid">
+        <div class="entity"><h3>test_session</h3><ul><li>id · 主键</li><li>name / createdAt</li><li>source: USER | BUILT_IN</li></ul></div>
+        <div class="entity"><h3>test_result</h3><ul><li>id · 主键</li><li>sessionId · 外键级联</li><li>factor / concentration</li><li>RGB 均值与标准差</li></ul></div>
+        <div class="entity"><h3>calibration</h3><ul><li>factor · 主键</li><li>createdAt / version</li><li>kit metadata</li></ul></div>
+        <div class="entity"><h3>calibration_knot</h3><ul><li>factor + position</li><li>concentration</li><li>signal / isBlank</li></ul></div>
+        <div class="entity" style="grid-column:1/-1"><h3>app_metadata</h3><ul><li>legacyMigrationStatus</li><li>samplesInitialized</li><li>schema 与审计标记</li></ul></div>
+      </div>
+      <div class="relation">Session 1 → N Result · Calibration 1 → N Knot</div>
+    </div>
+
+    <div>
+      <div class="label">首次启动协调器</div>
+      <div class="migration-flow">
+        <div class="migration-step"><span class="step-number">1</span><div><strong>检查迁移标记</strong><span>已完成则直接订阅 Room Flow。</span></div></div>
+        <div class="migration-step"><span class="step-number">2</span><div><strong>解析旧 JSON</strong><span>会话、结果与校准全部验证后再写入。</span></div></div>
+        <div class="migration-step"><span class="step-number">3</span><div><strong>单事务导入</strong><span>任一记录失败即整体回滚，不产生半迁移状态。</span></div></div>
+        <div class="migration-step"><span class="step-number">4</span><div><strong>一次性样例初始化</strong><span>没有旧会话时写入 12 板 BUILT_IN 数据。</span></div></div>
+        <div class="migration-step"><span class="step-number">5</span><div><strong>保留旧源</strong><span>成功后写入标记，但不删除旧 SP，便于版本回退与核验。</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="policy">
+    <div class="policy-item"><strong>统一清空</strong><span>检测、样例、校准在单一事务内全部删除。</span></div>
+    <div class="policy-item"><strong>不自动回填</strong><span>清空后保持空态，重启不会恢复 12 板。</span></div>
+    <div class="policy-item"><strong>手动恢复样例</strong><span>独立操作只恢复 BUILT_IN 数据，不恢复校准。</span></div>
+  </div>
+</div>

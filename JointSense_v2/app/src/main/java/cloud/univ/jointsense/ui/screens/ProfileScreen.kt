@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,6 +50,7 @@ import cloud.univ.jointsense.R
 import cloud.univ.jointsense.ui.components.NavyTopBar
 import cloud.univ.jointsense.ui.theme.BgLight
 import cloud.univ.jointsense.ui.theme.InkText
+import cloud.univ.jointsense.ui.theme.MedicalGreen
 import cloud.univ.jointsense.ui.theme.PrimaryAccent
 import cloud.univ.jointsense.ui.theme.StructureGray
 import cloud.univ.jointsense.ui.theme.TextSecondary
@@ -62,6 +64,7 @@ import cloud.univ.jointsense.viewmodel.JointSenseViewModel
 fun ProfileScreen(
     viewModel: JointSenseViewModel,
     onOpenHistory: () -> Unit,
+    onCalibrate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
@@ -154,6 +157,18 @@ fun ProfileScreen(
                         title = "About the Model",
                         subtitle = "How the RGB + LASSO prediction works",
                         onClick = { showAboutDialog = true }
+                    )
+                    HorizontalDivider(color = StructureGray, thickness = 1.dp)
+                    ProfileEntry(
+                        icon = Icons.Default.Science,
+                        tint = MedicalGreen,
+                        title = "Calibrate Standard Curve",
+                        subtitle = if (viewModel.hasUserCalibration) {
+                            "User curve active (${viewModel.calibrationFactorCount} factor(s))"
+                        } else {
+                            "Capture a standard plate to improve accuracy"
+                        },
+                        onClick = onCalibrate
                     )
                     HorizontalDivider(color = StructureGray, thickness = 1.dp)
                     ProfileEntry(
