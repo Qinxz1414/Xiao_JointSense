@@ -98,8 +98,26 @@ fun JointSenseNavHost(
     val currentEntry by navController.currentBackStackEntryAsState()
     val topLevelDestination = currentEntry?.destination?.topLevelDestination()
     val snackbarHostState = remember { SnackbarHostState() }
-    val sessionCreationError = featureViewModels?.measurement?.state
-        ?.collectAsStateWithLifecycle()?.value?.sessionCreationError
+    val measurementState = featureViewModels?.measurement?.state
+        ?.collectAsStateWithLifecycle()?.value
+    val sessionCreationError = measurementState?.sessionCreationError
+    val sessionCreationDriver = featureViewModels?.measurement?.let { measurement ->
+        remember(measurement, actions) {
+            SessionCreationNavigationDriver(measurement, actions)
+        }
+    }
+
+    LaunchedEffect(
+        sessionCreationDriver,
+        currentEntry != null,
+        topLevelDestination,
+        measurementState?.sessionCreationRequest,
+    ) {
+        sessionCreationDriver?.synchronize(
+            currentOrigin = topLevelDestination,
+            routeReady = currentEntry != null,
+        )
+    }
 
     LaunchedEffect(sessionCreationError) {
         val message = sessionCreationError ?: return@LaunchedEffect
@@ -133,9 +151,8 @@ fun JointSenseNavHost(
                         HomeRouteScreen(
                             viewModel = viewModels.insights,
                             onStartMeasurement = {
-                                viewModels.measurement.createNewSession {
-                                    actions.startMeasurement(TopLevelDestination.HOME)
-                                }
+                                requireNotNull(sessionCreationDriver)
+                                    .request(TopLevelDestination.HOME)
                             },
                             onOpenReport = {
                                 actions.openTopLevel(TopLevelDestination.REPORT)
@@ -286,9 +303,7 @@ fun JointSenseNavHost(
                         .clip(CircleShape)
                         .background(PrimaryAccent)
                         .clickable {
-                            featureViewModels?.measurement?.createNewSession {
-                                actions.startMeasurement(topLevelDestination)
-                            }
+                            sessionCreationDriver?.request(topLevelDestination)
                         },
                     contentAlignment = Alignment.Center,
                 ) {

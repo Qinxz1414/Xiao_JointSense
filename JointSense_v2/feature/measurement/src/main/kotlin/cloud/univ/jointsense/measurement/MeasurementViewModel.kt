@@ -27,11 +27,18 @@ data class MeasurementUiState(
     val lastResult: TestResult? = null,
     val isAnalyzing: Boolean = false,
     val isCreatingSession: Boolean = false,
+    val sessionCreationRequest: SessionCreationRequest? = null,
     val sessionCreationError: String? = null,
     val errorMessage: String? = null,
 ) {
     val canAddMore: Boolean get() = (currentSession?.results?.size ?: 0) < 5
 }
+
+data class SessionCreationRequest(
+    val requestId: Long,
+    val originIdentity: String,
+    val completedSessionId: String? = null,
+)
 
 class MeasurementViewModel(
     private val repository: TestSessionRepository,
@@ -54,12 +61,19 @@ class MeasurementViewModel(
         }
     }
 
-    fun createNewSession(onCreated: () -> Unit = {}) {
+    fun createNewSession(originIdentity: String) {
         if (state.value.isCreatingSession) return
         val creationId = ++nextSessionCreationId
         activeSessionCreationId = creationId
         mutableState.update {
-            it.copy(isCreatingSession = true, sessionCreationError = null)
+            it.copy(
+                isCreatingSession = true,
+                sessionCreationRequest = SessionCreationRequest(
+                    requestId = creationId,
+                    originIdentity = originIdentity,
+                ),
+                sessionCreationError = null,
+            )
         }
         viewModelScope.launch {
             try {
@@ -68,17 +82,29 @@ class MeasurementViewModel(
                     repository.deleteSession(id)
                     return@launch
                 }
-                activeSessionCreationId = null
-                currentSessionId = id
-                lastResultId = null
-                activeDraftId = null
-                mutableState.update { it.copy(isCreatingSession = false) }
-                applySessions(state.value.sessions)
-                onCreated()
+                mutableState.update { current ->
+                    val request = current.sessionCreationRequest
+                    if (request?.requestId == creationId) {
+                        current.copy(
+                            sessionCreationRequest = request.copy(completedSessionId = id),
+                        )
+                    } else {
+                        current
+                    }
+                }
             } catch (exception: CancellationException) {
                 if (activeSessionCreationId == creationId) {
                     activeSessionCreationId = null
-                    mutableState.update { it.copy(isCreatingSession = false) }
+                    mutableState.update { current ->
+                        if (current.sessionCreationRequest?.requestId == creationId) {
+                            current.copy(
+                                isCreatingSession = false,
+                                sessionCreationRequest = null,
+                            )
+                        } else {
+                            current
+                        }
+                    }
                 }
                 throw exception
             } catch (exception: Exception) {
@@ -87,12 +113,48 @@ class MeasurementViewModel(
                     mutableState.update {
                         it.copy(
                             isCreatingSession = false,
+                            sessionCreationRequest = null,
                             sessionCreationError =
                                 exception.message ?: exception::class.java.simpleName,
                         )
                     }
                 }
             }
+        }
+    }
+
+    fun acceptSessionCreation(requestId: Long): String? {
+        val request = state.value.sessionCreationRequest ?: return null
+        val sessionId = request.completedSessionId ?: return null
+        if (request.requestId != requestId || activeSessionCreationId != requestId) return null
+        activeSessionCreationId = null
+        currentSessionId = sessionId
+        lastResultId = null
+        activeDraftId = null
+        mutableState.update { current ->
+            if (current.sessionCreationRequest?.requestId == requestId) {
+                current.copy(isCreatingSession = false, sessionCreationRequest = null)
+            } else {
+                current
+            }
+        }
+        applySessions(state.value.sessions)
+        return sessionId
+    }
+
+    fun cancelSessionCreation(requestId: Long) {
+        val request = state.value.sessionCreationRequest ?: return
+        if (request.requestId != requestId) return
+        activeSessionCreationId = null
+        mutableState.update { current ->
+            if (current.sessionCreationRequest?.requestId == requestId) {
+                current.copy(isCreatingSession = false, sessionCreationRequest = null)
+            } else {
+                current
+            }
+        }
+        request.completedSessionId?.let { sessionId ->
+            viewModelScope.launch { repository.deleteSession(sessionId) }
         }
     }
 
@@ -116,6 +178,9 @@ class MeasurementViewModel(
 
     fun abandonMeasurement() {
         val session = state.value.currentSession
+        state.value.sessionCreationRequest?.let { request ->
+            cancelSessionCreation(request.requestId)
+        }
         activeSessionCreationId = null
         clearTransient()
         viewModelScope.launch {

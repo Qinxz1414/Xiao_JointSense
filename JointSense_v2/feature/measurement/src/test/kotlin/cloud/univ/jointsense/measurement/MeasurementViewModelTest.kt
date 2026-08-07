@@ -55,8 +55,9 @@ class MeasurementViewModelTest {
         )
         backgroundScope.launch { viewModel.state.collect {} }
 
-        viewModel.createNewSession()
+        viewModel.createNewSession("test-origin")
         testScheduler.advanceUntilIdle()
+        viewModel.acceptCreatedSession()
         assertEquals("session-1", viewModel.state.value.currentSession?.id)
 
         viewModel.setImage(FakeImage(width = 800, height = 600))
@@ -87,8 +88,9 @@ class MeasurementViewModelTest {
         viewModel.selectSession("history")
         assertEquals("old-result", viewModel.state.value.currentSession?.results?.single()?.id)
 
-        viewModel.createNewSession()
+        viewModel.createNewSession("test-origin")
         testScheduler.advanceUntilIdle()
+        viewModel.acceptCreatedSession()
         assertNotNull(viewModel.state.value.currentSession)
         viewModel.abandonMeasurement()
         testScheduler.advanceUntilIdle()
@@ -101,21 +103,28 @@ class MeasurementViewModelTest {
     fun sessionCreationWaitsForInsertAndGuardsRepeatedRequests() = runTest(dispatcher) {
         val repository = ControlledCreateRepository()
         val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
-        var navigationCalls = 0
 
-        viewModel.createNewSession { navigationCalls += 1 }
-        viewModel.createNewSession { navigationCalls += 1 }
+        viewModel.createNewSession("home")
+        viewModel.createNewSession("home")
         runCurrent()
 
         assertEquals(1, repository.createCalls)
-        assertEquals(0, navigationCalls)
         assertTrue(viewModel.state.value.isCreatingSession)
 
         repository.completeCreate("created-session")
         testScheduler.advanceUntilIdle()
 
-        assertEquals(1, navigationCalls)
+        val completion = viewModel.state.value.sessionCreationRequest
+        assertNotNull(completion)
+        assertEquals("home", completion?.originIdentity)
+        assertEquals("created-session", completion?.completedSessionId)
+        assertNull(viewModel.state.value.currentSession)
+        assertTrue(viewModel.state.value.isCreatingSession)
+
+        assertEquals("created-session", viewModel.acceptSessionCreation(completion!!.requestId))
+        assertNull(viewModel.acceptSessionCreation(completion.requestId))
         assertFalse(viewModel.state.value.isCreatingSession)
+        assertNull(viewModel.state.value.sessionCreationRequest)
         assertEquals("created-session", viewModel.state.value.currentSession?.id)
     }
 
@@ -123,15 +132,14 @@ class MeasurementViewModelTest {
     fun failedSessionCreationStaysPutAndExposesConsumableError() = runTest(dispatcher) {
         val repository = ControlledCreateRepository()
         val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
-        var navigationCalls = 0
 
-        viewModel.createNewSession { navigationCalls += 1 }
+        viewModel.createNewSession("home")
         runCurrent()
         repository.failCreate(IllegalStateException("insert failed"))
         testScheduler.advanceUntilIdle()
 
-        assertEquals(0, navigationCalls)
         assertFalse(viewModel.state.value.isCreatingSession)
+        assertNull(viewModel.state.value.sessionCreationRequest)
         assertEquals("insert failed", viewModel.state.value.sessionCreationError)
 
         viewModel.consumeSessionCreationError()
@@ -142,16 +150,14 @@ class MeasurementViewModelTest {
     fun abandonWhileInsertIsPendingDeletesLateEmptySessionAndNeverNavigates() = runTest(dispatcher) {
         val repository = ControlledCreateRepository()
         val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
-        var navigationCalls = 0
 
-        viewModel.createNewSession { navigationCalls += 1 }
+        viewModel.createNewSession("home")
         runCurrent()
         viewModel.abandonMeasurement()
         runCurrent()
         repository.completeCreate("late-session")
         testScheduler.advanceUntilIdle()
 
-        assertEquals(0, navigationCalls)
         assertEquals(listOf("late-session"), repository.deletedIds)
         assertNull(viewModel.state.value.currentSession)
         assertFalse(viewModel.state.value.isCreatingSession)
@@ -163,8 +169,9 @@ class MeasurementViewModelTest {
             val repository = FakeMeasurementRepository()
             val viewModel = MeasurementViewModel(repository, FakeAnalyzer())
 
-            viewModel.createNewSession()
+            viewModel.createNewSession("test-origin")
             testScheduler.advanceUntilIdle()
+            viewModel.acceptCreatedSession()
             viewModel.setImage(FakeImage(width = 800, height = 600))
             viewModel.analyze()
             testScheduler.advanceUntilIdle()
@@ -192,8 +199,9 @@ class MeasurementViewModelTest {
             draftIdFactory = { "draft-${++draftNumber}" },
         )
 
-        viewModel.createNewSession()
+        viewModel.createNewSession("test-origin")
         testScheduler.advanceUntilIdle()
+        viewModel.acceptCreatedSession()
         viewModel.setImage(FakeImage(width = 800, height = 600))
 
         viewModel.analyze()
@@ -216,14 +224,20 @@ class MeasurementViewModelTest {
         assertEquals("draft-2", repository.draftIds.last())
         assertFalse(continuedResultId == firstResultId)
 
-        viewModel.createNewSession()
+        viewModel.createNewSession("test-origin")
         testScheduler.advanceUntilIdle()
+        viewModel.acceptCreatedSession()
         viewModel.setImage(FakeImage(width = 800, height = 600))
         viewModel.analyze()
         testScheduler.advanceUntilIdle()
 
         assertEquals("draft-3", repository.draftIds.last())
     }
+}
+
+private fun MeasurementViewModel.acceptCreatedSession(): String {
+    val request = requireNotNull(state.value.sessionCreationRequest)
+    return requireNotNull(acceptSessionCreation(request.requestId))
 }
 
 private class ControlledCreateRepository : TestSessionRepository {

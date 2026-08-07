@@ -43,9 +43,13 @@ class MeasurementCompletionRecreationTest {
         composeRule.runOnIdle { collectorAttached.value = false }
         composeRule.waitForIdle()
 
-        composeRule.runOnIdle { viewModel.createNewSession() }
-        composeRule.waitUntil(timeoutMillis = 5_000) { repository.sessions.value.isNotEmpty() }
+        composeRule.runOnIdle { viewModel.createNewSession("test-origin") }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            viewModel.state.value.sessionCreationRequest?.completedSessionId != null
+        }
         composeRule.runOnIdle {
+            val request = requireNotNull(viewModel.state.value.sessionCreationRequest)
+            requireNotNull(viewModel.acceptSessionCreation(request.requestId))
             viewModel.setImage(RecreationImage(width = 800, height = 600))
             viewModel.analyze()
         }
