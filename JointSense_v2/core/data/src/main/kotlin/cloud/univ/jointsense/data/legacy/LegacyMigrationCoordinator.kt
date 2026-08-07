@@ -48,6 +48,11 @@ class LegacyMigrationCoordinator(
 
         return try {
             database.withTransaction {
+                when (database.metadataDao().getValue(MIGRATION_STATUS_KEY)) {
+                    STATUS_COMPLETED -> return@withTransaction MigrationOutcome.AlreadyCompleted
+                    STATUS_SKIPPED_BY_USER -> return@withTransaction MigrationOutcome.SkippedByUser
+                }
+
                 sessions.forEach { session ->
                     database.testSessionDao().insertSession(session.toEntity())
                     session.results.forEach { result -> database.testSessionDao().insertResult(result.toEntity()) }

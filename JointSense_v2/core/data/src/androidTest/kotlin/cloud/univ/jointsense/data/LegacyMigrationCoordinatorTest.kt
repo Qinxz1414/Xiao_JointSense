@@ -1,6 +1,8 @@
 package cloud.univ.jointsense.data
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -17,11 +19,16 @@ import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.NewTestResult
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -129,6 +136,49 @@ class LegacyMigrationCoordinatorTest {
     }
 
     @Test
+    fun concurrentMigrationsCompleteOnlyOnceAcrossCoordinatorInstances() = runTest {
+        legacyDataPrefs().edit().putString("sessions", VALID_SESSIONS).commit()
+        val readsStarted = CountDownLatch(2)
+        val allowReads = CountDownLatch(1)
+        val blockingContext = BlockingLegacyReadContext(context, readsStarted, allowReads)
+
+        val first = async(Dispatchers.Default) {
+            LegacyMigrationCoordinator(blockingContext, database).migrate()
+        }
+        val second = async(Dispatchers.Default) {
+            LegacyMigrationCoordinator(blockingContext, database).migrate()
+        }
+        assertTrue("Both migrations did not reach legacy parsing", readsStarted.await(5, TimeUnit.SECONDS))
+        allowReads.countDown()
+
+        val outcomes = listOf(first.await(), second.await())
+        assertEquals(1, outcomes.count { it == MigrationOutcome.Completed(1, 2, 0) })
+        assertEquals(1, outcomes.count { it == MigrationOutcome.AlreadyCompleted })
+        assertEquals(1, database.testSessionDao().sessions().first().size)
+        assertEquals("COMPLETED", metadata("legacyMigrationStatus"))
+    }
+
+    @Test
+    fun skipCommittedDuringLegacyReadPreventsMigrationFromImporting() = runTest {
+        legacyDataPrefs().edit().putString("sessions", VALID_SESSIONS).commit()
+        val readStarted = CountDownLatch(1)
+        val allowRead = CountDownLatch(1)
+        val blockingContext = BlockingLegacyReadContext(context, readStarted, allowRead)
+        val migration = async(Dispatchers.Default) {
+            LegacyMigrationCoordinator(blockingContext, database).migrate()
+        }
+        assertTrue("Migration did not reach legacy parsing", readStarted.await(5, TimeUnit.SECONDS))
+
+        val skipOutcome = LegacyMigrationCoordinator(context, database).skipLegacyAndStartFresh()
+        allowRead.countDown()
+
+        assertEquals(MigrationOutcome.SkippedByUser, skipOutcome)
+        assertEquals(MigrationOutcome.SkippedByUser, migration.await())
+        assertEquals(0, database.testSessionDao().sessions().first().size)
+        assertEquals("SKIPPED_BY_USER", metadata("legacyMigrationStatus"))
+    }
+
+    @Test
     fun roomTestSessionRepositoryCommitsDraftOnlyOnceAndExposesDomainRows() = runTest {
         val ids = ArrayDeque(listOf("session-id", "result-id-1", "result-id-2"))
         val repository = RoomTestSessionRepository(database) { ids.removeFirst() }
@@ -229,5 +279,27 @@ class LegacyMigrationCoordinatorTest {
                 "IL1_BETA":[{"c":0.0,"s":-10.0}]
             }
         }""".trimIndent()
+    }
+}
+
+private class BlockingLegacyReadContext(
+    base: Context,
+    private val readsStarted: CountDownLatch,
+    private val allowReads: CountDownLatch,
+) : ContextWrapper(base) {
+    override fun getApplicationContext(): Context = this
+
+    override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
+        val preferences = baseContext.getSharedPreferences(name, mode)
+        if (name != "joint_sense_data") return preferences
+        return object : SharedPreferences by preferences {
+            override fun getString(key: String?, defValue: String?): String? {
+                if (key == "sessions") {
+                    readsStarted.countDown()
+                    check(allowReads.await(5, TimeUnit.SECONDS)) { "Timed out waiting to release legacy read" }
+                }
+                return preferences.getString(key, defValue)
+            }
+        }
     }
 }
