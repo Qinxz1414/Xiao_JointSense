@@ -10,6 +10,7 @@ android {
 dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:database"))
+    implementation(libs.androidx.room.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)

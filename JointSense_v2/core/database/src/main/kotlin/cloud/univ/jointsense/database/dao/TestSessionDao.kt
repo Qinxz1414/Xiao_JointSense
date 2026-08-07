@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 import cloud.univ.jointsense.database.entity.TestResultEntity
 import cloud.univ.jointsense.database.entity.TestSessionEntity
 import cloud.univ.jointsense.database.entity.TestSessionWithResults
@@ -33,6 +34,12 @@ interface TestSessionDao {
 
     @Insert
     suspend fun insertResult(result: TestResultEntity)
+
+    @Upsert
+    suspend fun upsertSession(session: TestSessionEntity)
+
+    @Upsert
+    suspend fun upsertResult(result: TestResultEntity)
 
     @Query("DELETE FROM test_session WHERE id = :id")
     suspend fun deleteSession(id: String)
