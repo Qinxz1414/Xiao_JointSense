@@ -35,7 +35,6 @@
 - Create: `core/analysis/src/main/kotlin/cloud/univ/jointsense/analysis/OaIndexCalculator.kt`
 - Create: `core/analysis/src/test/kotlin/cloud/univ/jointsense/analysis/StandardCurveTest.kt`
 - Create: `core/analysis/src/test/kotlin/cloud/univ/jointsense/analysis/OaIndexCalculatorTest.kt`
-- Delete after replacement: `app/src/main/java/cloud/univ/jointsense/model/StandardCurve.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/model/OaIndex.kt`
 
 **Interfaces:**
@@ -103,6 +102,8 @@ For an exact signal shared by two or more consecutive knots, scan the complete e
 
 Move the current factory knot constants from the legacy `StandardCurve` into immutable `FactoryCurves`; add a round-trip test for every knot (`quantify(knot.signal) == knot.concentration`) so the migration changes no scientific constants.
 
+The compile-only legacy `StandardCurve` cannot be deleted in this pure-analysis task because the isolated legacy `BuiltInData` and `CalibrationManager` sources still reference its mutable/inverse-only API. Do not add new callers or build a compatibility facade. Task 6 removes that complete unused cluster after the Room-backed calibration flow is rebuilt.
+
 - [ ] **Step 4: Add OA threshold and missing-factor tests**
 
 Test exact grades at 0, 0.25, 0.50, 0.75, 0.90, 1.0 and verify weights renormalize over present factors. Return a grade number only; move all Compose color mapping to `:core:designsystem`.
@@ -116,7 +117,7 @@ Expected: all interpolation and OA tests pass.
 - [ ] **Step 6: Commit analysis corrections**
 
 ```powershell
-git add core/analysis app/src/main/java/cloud/univ/jointsense/model/StandardCurve.kt app/src/main/java/cloud/univ/jointsense/model/OaIndex.kt
+git add core/analysis app/src/main/java/cloud/univ/jointsense/model/OaIndex.kt
 git commit -m "fix: correct inflammation quantification"
 ```
 
@@ -428,6 +429,8 @@ git commit -m "fix: make measurement flow recoverable"
 - Create: `feature/calibration/src/test/kotlin/cloud/univ/jointsense/calibration/CalibrationViewModelTest.kt`
 - Create: `feature/calibration/src/androidTest/kotlin/cloud/univ/jointsense/calibration/CalibrationFlowTest.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt`
+- Delete after replacement: `app/src/main/java/cloud/univ/jointsense/data/BuiltInData.kt`
+- Delete after replacement: `app/src/main/java/cloud/univ/jointsense/model/StandardCurve.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt`
 
 **Interfaces:**
@@ -469,7 +472,7 @@ Expected: unit tests pass; connected tests pass with a device.
 - [ ] **Step 6: Commit calibration rebuild**
 
 ```powershell
-git add feature/calibration app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt app/src/main/java/cloud/univ/jointsense/navigation/NavigationActions.kt app/src/androidTest/java/cloud/univ/jointsense/navigation/JointSenseNavigationTest.kt app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt
+git add feature/calibration app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt app/src/main/java/cloud/univ/jointsense/navigation/NavigationActions.kt app/src/androidTest/java/cloud/univ/jointsense/navigation/JointSenseNavigationTest.kt app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt app/src/main/java/cloud/univ/jointsense/data/BuiltInData.kt app/src/main/java/cloud/univ/jointsense/model/StandardCurve.kt app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt
 git commit -m "fix: validate and persist calibration safely"
 ```
 
