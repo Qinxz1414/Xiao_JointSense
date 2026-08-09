@@ -10,6 +10,7 @@ import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -69,6 +70,9 @@ class MeasurementViewModel(
     private var decodeJob: Job? = null
     private var captureRequestJob: Job? = null
     private var permissionRequestJob: Job? = null
+    private var permissionHistoryReadJob: Job? = null
+    private var permissionHistoryReadGeneration = 0L
+    private var permissionHistoryReady = cameraPermissionHistoryStore == null
     private var captureCleanupJob: Job? = null
     private val captureMutex = Mutex()
     private var selectedCapture: MeasurementCapture? = null
@@ -550,6 +554,10 @@ class MeasurementViewModel(
                 startAnalysis()
             }
             Stage.AwaitingImage -> {
+                if (state.value.error == MeasurementError.PermissionHistoryUnavailable) {
+                    restorePermissionHistory()
+                    return
+                }
                 updateState {
                     it.copy(stage = Stage.AwaitingImage, error = null, resumeStage = null)
                 }
@@ -578,8 +586,13 @@ class MeasurementViewModel(
 
     private fun recordCameraPermissionRequest() {
         if (blocksMutuallyExclusiveInputs() || permissionRequestRecordedForCallback ||
-            permissionRequestJob?.isActive == true
+            permissionRequestJob?.isActive == true || permissionHistoryReadJob != null ||
+            state.value.stage == Stage.RecoverableError
         ) return
+        if (!permissionHistoryReady) {
+            restorePermissionHistory()
+            return
+        }
         val requestedDraft = state.value.draftId
         permissionRequestJob = viewModelScope.launch {
             val ownerJob = coroutineContext[Job]
@@ -628,16 +641,49 @@ class MeasurementViewModel(
 
     private fun restorePermissionHistory() {
         val store = cameraPermissionHistoryStore ?: return
-        viewModelScope.launch {
-            val requested = try {
-                withContext(ioDispatcher) { store.wasRequested() }
+        if (permissionHistoryReadJob != null || permissionRequestJob?.isActive == true) return
+        permissionHistoryReady = false
+        val generation = ++permissionHistoryReadGeneration
+        val requestedDraft = state.value.draftId
+        lateinit var job: Job
+        job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val requested = withContext(ioDispatcher) { store.wasRequested() }
+                if (generation != permissionHistoryReadGeneration) return@launch
+                permissionHistoryReady = true
+                updateState { current ->
+                    val recovering = current.stage == Stage.RecoverableError &&
+                        current.error == MeasurementError.PermissionHistoryUnavailable &&
+                        current.resumeStage == Stage.AwaitingImage
+                    current.copy(
+                        stage = if (recovering) Stage.AwaitingImage else current.stage,
+                        hasRequestedCameraPermission =
+                            current.hasRequestedCameraPermission || requested,
+                        error = if (recovering) null else current.error,
+                        resumeStage = if (recovering) null else current.resumeStage,
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
             } catch (_: Exception) {
-                false
-            }
-            if (requested && !state.value.hasRequestedCameraPermission) {
-                updateState { it.copy(hasRequestedCameraPermission = true) }
+                if (generation != permissionHistoryReadGeneration) return@launch
+                permissionHistoryReady = false
+                val current = state.value
+                if (current.draftId == requestedDraft &&
+                    (current.stage == Stage.AwaitingImage ||
+                        current.error == MeasurementError.PermissionHistoryUnavailable)
+                ) {
+                    setRecoverableError(
+                        MeasurementError.PermissionHistoryUnavailable,
+                        Stage.AwaitingImage,
+                    )
+                }
+            } finally {
+                if (permissionHistoryReadJob === job) permissionHistoryReadJob = null
             }
         }
+        permissionHistoryReadJob = job
+        job.start()
     }
 
     private fun requestCameraCapture() {
@@ -901,6 +947,9 @@ class MeasurementViewModel(
 
     private fun clearTransient() {
         val expected = selectedCapture ?: activeCameraRequest?.capture
+        permissionHistoryReadGeneration += 1
+        permissionHistoryReadJob?.cancel()
+        permissionHistoryReadJob = null
         permissionRequestJob?.cancel()
         permissionRequestJob = null
         permissionRequestRecordedForCallback = false
@@ -1046,6 +1095,7 @@ class MeasurementViewModel(
         decodeJob?.cancel()
         captureRequestJob?.cancel()
         permissionRequestJob?.cancel()
+        permissionHistoryReadJob?.cancel()
         captureCleanupJob?.cancel()
         releaseStateImageUnlessBorrowed()
         super.onCleared()

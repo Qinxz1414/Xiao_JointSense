@@ -18,6 +18,8 @@ enum class Stage {
 sealed interface MeasurementError {
     data class PermissionDenied(val permanentlyDenied: Boolean) : MeasurementError
 
+    data object PermissionHistoryUnavailable : MeasurementError
+
     data object ImageUnreadable : MeasurementError
 
     data object UnsupportedImage : MeasurementError

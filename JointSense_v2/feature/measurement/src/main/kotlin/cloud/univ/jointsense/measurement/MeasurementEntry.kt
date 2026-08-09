@@ -60,8 +60,9 @@ fun ImageSelectRouteScreen(
     LaunchedEffect(viewModel, cameraLauncher) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                MeasurementEffect.RequestCameraPermission ->
+                MeasurementEffect.RequestCameraPermission -> handleCameraPermissionEffect(effect) {
                     permissionLauncher.launch(Manifest.permission.CAMERA)
+                }
                 is MeasurementEffect.LaunchCamera -> viewModel.claimCameraLaunch(effect)?.let { claim ->
                     launchClaimedCamera(
                         claim = claim,
@@ -85,16 +86,18 @@ fun ImageSelectRouteScreen(
     when (state.stage) {
         Stage.AwaitingImage -> ImageSelectScreen(
             onTakePhoto = {
-                if (ContextCompat.checkSelfPermission(
+                handleTakePhotoRequest(
+                    cameraPermissionGranted = ContextCompat.checkSelfPermission(
                         context,
                         Manifest.permission.CAMERA,
-                    ) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    viewModel.onAction(MeasurementAction.CameraCaptureRequested)
-                } else {
-                    viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
-                    permissionLauncher.launch(Manifest.permission.CAMERA)
-                }
+                    ) == PackageManager.PERMISSION_GRANTED,
+                    onCaptureRequested = {
+                        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+                    },
+                    onPermissionRequested = {
+                        viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
+                    },
+                )
             },
             onPickImage = {
                 photoPicker.launch(

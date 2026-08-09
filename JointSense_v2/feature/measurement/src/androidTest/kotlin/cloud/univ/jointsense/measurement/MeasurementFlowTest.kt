@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -135,6 +136,27 @@ class MeasurementFlowTest {
         composeRule.onNodeWithTag(MEASUREMENT_ERROR_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(RETRY_BUTTON_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Open settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun permissionHistoryUnavailableIsVisibleAndRetryable() {
+        var retries = 0
+        composeRule.setContent {
+            JointSenseTheme {
+                MeasurementErrorContent(
+                    error = MeasurementError.PermissionHistoryUnavailable,
+                    onRetry = { retries += 1 },
+                    onOpenSettings = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(MEASUREMENT_ERROR_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText(
+            "Camera permission status could not be loaded. Retry before taking a photo.",
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag(RETRY_BUTTON_TAG).performClick()
+        composeRule.runOnIdle { assertEquals(1, retries) }
     }
 
     @Test
