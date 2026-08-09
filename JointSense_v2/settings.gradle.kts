@@ -35,6 +35,7 @@ include(
     ":app",
     ":core:domain",
     ":core:analysis",
+    ":core:image",
     ":core:designsystem",
     ":core:database",
     ":core:data",
