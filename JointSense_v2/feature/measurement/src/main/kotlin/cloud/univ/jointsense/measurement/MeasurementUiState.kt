@@ -29,9 +29,20 @@ sealed interface MeasurementError {
     data object AnalysisFailed : MeasurementError
 
     data object PersistenceFailed : MeasurementError
+
+    data class CameraLaunchFailed(val reason: String) : MeasurementError
 }
 
+class CameraLaunchClaim internal constructor(
+    val uri: String,
+    internal val requestToken: String,
+    internal val draftId: String,
+    internal val captureToken: String,
+)
+
 sealed interface MeasurementEffect {
+    data object RequestCameraPermission : MeasurementEffect
+
     class LaunchCamera internal constructor(
         val uri: String,
         internal val requestToken: String,

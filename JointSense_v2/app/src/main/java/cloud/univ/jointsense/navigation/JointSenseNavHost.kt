@@ -88,7 +88,43 @@ fun JointSenseNavHost(
     appContainer: AppContainer? = null,
     screenSlot: JointSenseScreenSlot? = null,
 ) {
-    require(appContainer != null || screenSlot != null) {
+    JointSenseNavHostContent(
+        modifier = modifier,
+        navController = navController,
+        appContainer = appContainer,
+        screenSlot = screenSlot,
+        testMeasurementViewModel = null,
+        forceProductionResult = false,
+    )
+}
+
+@Composable
+internal fun JointSenseNavHostForTest(
+    navController: NavHostController,
+    measurementViewModel: MeasurementViewModel,
+    screenSlot: JointSenseScreenSlot,
+    modifier: Modifier = Modifier,
+) {
+    JointSenseNavHostContent(
+        modifier = modifier,
+        navController = navController,
+        appContainer = null,
+        screenSlot = screenSlot,
+        testMeasurementViewModel = measurementViewModel,
+        forceProductionResult = true,
+    )
+}
+
+@Composable
+private fun JointSenseNavHostContent(
+    modifier: Modifier,
+    navController: NavHostController,
+    appContainer: AppContainer?,
+    screenSlot: JointSenseScreenSlot?,
+    testMeasurementViewModel: MeasurementViewModel?,
+    forceProductionResult: Boolean,
+) {
+    require(appContainer != null || screenSlot != null || testMeasurementViewModel != null) {
         "JointSenseNavHost needs an AppContainer unless a test screenSlot is supplied"
     }
     val featureViewModels = if (appContainer == null) {
@@ -97,10 +133,11 @@ fun JointSenseNavHost(
         rememberFeatureViewModels(appContainer)
     }
     val actions = remember(navController) { NavigationActions(navController) }
+    val measurementViewModel = featureViewModels?.measurement ?: testMeasurementViewModel
     val currentEntry by navController.currentBackStackEntryAsState()
     val topLevelDestination = currentEntry?.destination?.topLevelDestination()
     val snackbarHostState = remember { SnackbarHostState() }
-    val measurementState = featureViewModels?.measurement?.state
+    val measurementState = measurementViewModel?.state
         ?.collectAsStateWithLifecycle()?.value
     val sessionCreationError = measurementState?.sessionCreationError
     val sessionCreationDriver = featureViewModels?.measurement?.let { measurement ->
@@ -124,7 +161,7 @@ fun JointSenseNavHost(
     LaunchedEffect(sessionCreationError) {
         val message = sessionCreationError ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
-        featureViewModels?.measurement?.consumeSessionCreationError()
+        measurementViewModel?.consumeSessionCreationError()
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -186,7 +223,7 @@ fun JointSenseNavHost(
                 composable<HistoryRoute> {
                     Destination(screenSlot, HistoryRoute, actions) {
                         HistoryRouteScreen(
-                            viewModel = requireNotNull(featureViewModels).measurement,
+                            viewModel = requireNotNull(measurementViewModel),
                             onOpenResult = actions::openResult,
                             onBack = { actions.navigateBack() },
                         )
@@ -197,12 +234,12 @@ fun JointSenseNavHost(
                     composable<ImageSelectRoute> {
                         if (screenSlot == null) {
                             BackHandler {
-                                requireNotNull(featureViewModels).measurement.abandonMeasurement()
+                                requireNotNull(measurementViewModel).abandonMeasurement()
                                 actions.exitMeasurement()
                             }
                         }
                         Destination(screenSlot, ImageSelectRoute, actions) {
-                            val measurement = requireNotNull(featureViewModels).measurement
+                            val measurement = requireNotNull(measurementViewModel)
                             ImageSelectRouteScreen(
                                 viewModel = measurement,
                                 onImageReady = actions::openCrop,
@@ -216,7 +253,7 @@ fun JointSenseNavHost(
                     composable<CropRoute> {
                         Destination(screenSlot, CropRoute, actions) {
                             CropRouteScreen(
-                                viewModel = requireNotNull(featureViewModels).measurement,
+                                viewModel = requireNotNull(measurementViewModel),
                                 onConfirm = actions::openFactorSelect,
                                 onBack = { actions.navigateBack() },
                             )
@@ -225,7 +262,7 @@ fun JointSenseNavHost(
                     composable<FactorSelectRoute> {
                         Destination(screenSlot, FactorSelectRoute, actions) {
                             FactorSelectRouteScreen(
-                                viewModel = requireNotNull(featureViewModels).measurement,
+                                viewModel = requireNotNull(measurementViewModel),
                                 onResultReady = actions::openResult,
                                 onBack = { actions.navigateBack() },
                             )
@@ -237,13 +274,13 @@ fun JointSenseNavHost(
                     val route = entry.toRoute<ResultRoute>()
                     val inMeasurement = actions.isInMeasurement()
                     val returnToOrigin: () -> Unit = {
-                        if (inMeasurement) featureViewModels?.measurement?.finishMeasurement()
+                        if (inMeasurement) measurementViewModel?.finishMeasurement()
                         actions.exitResult()
                         Unit
                     }
                     BackHandler(onBack = returnToOrigin)
-                    Destination(screenSlot, route, actions) {
-                        val measurement = requireNotNull(featureViewModels).measurement
+                    Destination(if (forceProductionResult) null else screenSlot, route, actions) {
+                        val measurement = requireNotNull(measurementViewModel)
                         val state = measurement.state.collectAsStateWithLifecycle().value
                         val session = state.currentSession ?: state.sessions.firstOrNull { candidate ->
                             candidate.results.any { it.id == route.resultId }

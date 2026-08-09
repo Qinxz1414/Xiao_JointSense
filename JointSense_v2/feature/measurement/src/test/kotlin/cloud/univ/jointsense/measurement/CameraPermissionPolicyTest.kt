@@ -6,17 +6,32 @@ import org.junit.Test
 
 class CameraPermissionPolicyTest {
     @Test
-    fun firstDenialWithNoPriorRequestIsRecoverable() {
-        assertFalse(classifyPermanentCameraDenial(wasRequestedBeforeLaunch = false, shouldShowRationale = false))
+    fun firstActualRequestWithNoRationaleIsPermanentOnceFormallyRecorded() {
+        assertTrue(
+            classifyPermanentCameraDenial(
+                wasRequestFormallyRecorded = true,
+                shouldShowRationale = false,
+            ),
+        )
     }
 
     @Test
     fun denialWithoutRationaleAfterARecordedRequestIsPermanent() {
-        assertTrue(classifyPermanentCameraDenial(wasRequestedBeforeLaunch = true, shouldShowRationale = false))
+        assertTrue(
+            classifyPermanentCameraDenial(
+                wasRequestFormallyRecorded = true,
+                shouldShowRationale = false,
+            ),
+        )
     }
 
     @Test
     fun rationaleKeepsDenialRecoverableEvenAfterRecreationHistory() {
-        assertFalse(classifyPermanentCameraDenial(wasRequestedBeforeLaunch = true, shouldShowRationale = true))
+        assertFalse(
+            classifyPermanentCameraDenial(
+                wasRequestFormallyRecorded = true,
+                shouldShowRationale = true,
+            ),
+        )
     }
 }

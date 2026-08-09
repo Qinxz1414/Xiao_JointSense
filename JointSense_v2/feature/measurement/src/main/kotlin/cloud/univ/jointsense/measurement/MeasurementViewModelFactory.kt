@@ -22,6 +22,8 @@ class MeasurementViewModelFactory(
     private val pickedImageResolverFactory: (MeasurementCaptureStore?) -> MeasurementPickedImageResolver = {
         MeasurementPickedImageResolver { uri -> MeasurementImageInput(uri, null) }
     },
+    private val cameraPermissionHistoryStore: CameraPermissionHistoryStore =
+        VolatileCameraPermissionHistoryStore(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val sessionNamePrefix: () -> String = { "Test" },
@@ -49,6 +51,9 @@ class MeasurementViewModelFactory(
                 captureStore = requireNotNull(captureStore),
             )
         },
+        cameraPermissionHistoryStore = ApplicationCameraPermissionHistoryStore(
+            context.applicationContext,
+        ),
         ioDispatcher = ioDispatcher,
         defaultDispatcher = defaultDispatcher,
         sessionNamePrefix = sessionNamePrefix,
@@ -77,6 +82,7 @@ class MeasurementViewModelFactory(
             decoder = decoder,
             captureStore = captureStore,
             pickedImageResolver = pickedImageResolverFactory(captureStore),
+            cameraPermissionHistoryStore = cameraPermissionHistoryStore,
             ioDispatcher = ioDispatcher,
             defaultDispatcher = defaultDispatcher,
             sessionNamePrefix = sessionNamePrefix,

@@ -59,6 +59,8 @@ fun MeasurementErrorContent(
         MeasurementError.InvalidCrop -> "The selected analysis area is invalid. Adjust the crop and try again."
         MeasurementError.AnalysisFailed -> "Analysis could not be completed. Your image, crop, and factor are preserved."
         MeasurementError.PersistenceFailed -> "The result could not be saved. Retry to save the same measurement."
+        is MeasurementError.CameraLaunchFailed ->
+            "The camera could not be opened. ${error.reason} Retry when the camera is available."
     }
     Column(
         modifier = modifier

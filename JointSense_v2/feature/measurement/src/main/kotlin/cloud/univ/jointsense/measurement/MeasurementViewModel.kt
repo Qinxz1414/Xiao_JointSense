@@ -35,6 +35,7 @@ class MeasurementViewModel(
     private val captureStore: MeasurementCaptureStore? = null,
     private val pickedImageResolver: MeasurementPickedImageResolver =
         MeasurementPickedImageResolver { MeasurementImageInput(it, null) },
+    private val cameraPermissionHistoryStore: CameraPermissionHistoryStore? = null,
     private val captureRequestTokenFactory: () -> String = { UUID.randomUUID().toString() },
     private val ioDispatcher: CoroutineDispatcher,
     private val defaultDispatcher: CoroutineDispatcher,
@@ -67,10 +68,13 @@ class MeasurementViewModel(
     private var analysisJob: Job? = null
     private var decodeJob: Job? = null
     private var captureRequestJob: Job? = null
+    private var permissionRequestJob: Job? = null
     private var captureCleanupJob: Job? = null
     private val captureMutex = Mutex()
     private var selectedCapture: MeasurementCapture? = null
     private var activeCameraRequest: CameraRequestSnapshot? = restoredCameraRequest()
+    private var permissionRequestRecordedForCallback: Boolean =
+        savedStateHandle[KEY_PERMISSION_REQUEST_PENDING] ?: false
     private var decodeGeneration = 0L
     private var nextOperationToken = 0L
     private var activeOperation: ActiveOperation? = null
@@ -85,7 +89,8 @@ class MeasurementViewModel(
         state.value.imageUri?.takeIf { decoder != null }?.let {
             decodeImage(it, restoring = true, picked = false)
         }
-        reissueRestoredCameraRequest()
+        restorePermissionHistory()
+        reissueCameraRequest()
     }
 
     fun onAction(action: MeasurementAction) {
@@ -102,6 +107,8 @@ class MeasurementViewModel(
             is MeasurementAction.CameraCaptureCompleted -> if (!blocksMutuallyExclusiveInputs()) {
                 completeCameraCapture(action.success)
             }
+            is MeasurementAction.CameraLaunchAcknowledged -> acknowledgeCameraLaunch(action.claim)
+            is MeasurementAction.CameraLaunchFailed -> failCameraLaunch(action.claim, action.reason)
             MeasurementAction.CameraPermissionRequestStarted -> recordCameraPermissionRequest()
             is MeasurementAction.CameraPermissionResult -> completeCameraPermissionRequest(action)
             is MeasurementAction.CropChanged -> if (!blocksMutuallyExclusiveInputs()) {
@@ -542,8 +549,11 @@ class MeasurementViewModel(
                 updateState { it.copy(stage = Stage.ReadyToAnalyze, error = null, resumeStage = null) }
                 startAnalysis()
             }
-            Stage.AwaitingImage -> updateState {
-                it.copy(stage = Stage.AwaitingImage, error = null, resumeStage = null)
+            Stage.AwaitingImage -> {
+                updateState {
+                    it.copy(stage = Stage.AwaitingImage, error = null, resumeStage = null)
+                }
+                reissueCameraRequest()
             }
             Stage.ReadyToCrop -> updateState {
                 it.copy(stage = Stage.ReadyToCrop, error = null, resumeStage = null)
@@ -567,21 +577,47 @@ class MeasurementViewModel(
     }
 
     private fun recordCameraPermissionRequest() {
-        if (blocksMutuallyExclusiveInputs()) return
-        savedStateHandle[KEY_PERMISSION_PRIOR_TO_LAUNCH] = state.value.hasRequestedCameraPermission
-        updateState { it.copy(hasRequestedCameraPermission = true) }
+        if (blocksMutuallyExclusiveInputs() || permissionRequestRecordedForCallback ||
+            permissionRequestJob?.isActive == true
+        ) return
+        val requestedDraft = state.value.draftId
+        permissionRequestJob = viewModelScope.launch {
+            val ownerJob = coroutineContext[Job]
+            try {
+                cameraPermissionHistoryStore?.let { store ->
+                    withContext(ioDispatcher) { store.markRequested() }
+                }
+                if (state.value.draftId != requestedDraft) return@launch
+                permissionRequestRecordedForCallback = true
+                savedStateHandle[KEY_PERMISSION_REQUEST_PENDING] = true
+                updateState { it.copy(hasRequestedCameraPermission = true) }
+                effectChannel.send(MeasurementEffect.RequestCameraPermission)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                setRecoverableError(
+                    MeasurementError.PermissionDenied(permanentlyDenied = false),
+                    Stage.AwaitingImage,
+                )
+            } finally {
+                if (permissionRequestJob === ownerJob) permissionRequestJob = null
+            }
+        }
     }
 
     private fun completeCameraPermissionRequest(action: MeasurementAction.CameraPermissionResult) {
         if (blocksMutuallyExclusiveInputs()) return
-        val hadPriorRequest = savedStateHandle[KEY_PERMISSION_PRIOR_TO_LAUNCH] ?: false
+        val formallyRecorded = permissionRequestRecordedForCallback ||
+            state.value.hasRequestedCameraPermission
+        permissionRequestRecordedForCallback = false
+        savedStateHandle[KEY_PERMISSION_REQUEST_PENDING] = false
         if (action.granted) {
             requestCameraCapture()
         } else {
             setRecoverableError(
                 MeasurementError.PermissionDenied(
                     permanentlyDenied = classifyPermanentCameraDenial(
-                        wasRequestedBeforeLaunch = hadPriorRequest,
+                        wasRequestFormallyRecorded = formallyRecorded,
                         shouldShowRationale = action.shouldShowRationale,
                     ),
                 ),
@@ -590,21 +626,40 @@ class MeasurementViewModel(
         }
     }
 
+    private fun restorePermissionHistory() {
+        val store = cameraPermissionHistoryStore ?: return
+        viewModelScope.launch {
+            val requested = try {
+                withContext(ioDispatcher) { store.wasRequested() }
+            } catch (_: Exception) {
+                false
+            }
+            if (requested && !state.value.hasRequestedCameraPermission) {
+                updateState { it.copy(hasRequestedCameraPermission = true) }
+            }
+        }
+    }
+
     private fun requestCameraCapture() {
         val store = captureStore ?: run {
             setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             return
         }
-        if (activeCameraRequest != null || captureRequestJob?.isActive == true ||
+        if (activeCameraRequest != null || captureRequestJob != null ||
             state.value.stage != Stage.AwaitingImage
         ) return
         val requestedDraft = state.value.draftId
         val requestToken = captureRequestTokenFactory()
         captureRequestJob = viewModelScope.launch {
+            val ownerJob = coroutineContext[Job]
+            var acquired: MeasurementCapture? = null
+            var ownershipTransferred = false
             try {
                 captureCleanupJob?.join()
                 val capture = withContext(ioDispatcher) {
-                    captureMutex.withLock { store.createOrRestorePending() }
+                    captureMutex.withLock {
+                        store.createOrRestorePending().also { acquired = it }
+                    }
                 }
                 if (state.value.draftId != requestedDraft || state.value.stage != Stage.AwaitingImage) {
                     return@launch
@@ -613,25 +668,46 @@ class MeasurementViewModel(
                     requestToken = requestToken,
                     draftId = requestedDraft,
                     capture = capture,
-                    consumed = false,
+                    claimed = false,
+                    acknowledged = false,
                 )
                 activeCameraRequest = snapshot
                 persistCameraRequest(snapshot)
+                ownershipTransferred = true
                 effectChannel.send(snapshot.toEffect())
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
                 setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             } finally {
-                captureRequestJob = null
+                val orphan = acquired?.takeUnless { ownershipTransferred }
+                if (orphan != null) {
+                    val cleanup = withContext(NonCancellable + ioDispatcher) {
+                        captureMutex.withLock {
+                            try {
+                                store.clearExpected(orphan)
+                            } catch (error: Exception) {
+                                CaptureCleanupResult.Failed(
+                                    error.message ?: error::class.java.simpleName,
+                                )
+                            }
+                        }
+                    }
+                    if (cleanup is CaptureCleanupResult.Failed) {
+                        updateState { it.copy(captureCleanupWarning = cleanup.reason) }
+                    }
+                }
+                if (captureRequestJob === ownerJob) captureRequestJob = null
             }
         }
     }
 
-    private fun reissueRestoredCameraRequest() {
-        val restored = activeCameraRequest?.takeUnless { it.consumed } ?: return
+    private fun reissueCameraRequest() {
+        if (captureRequestJob != null) return
+        val restored = activeCameraRequest?.takeUnless { it.claimed || it.acknowledged } ?: return
         val store = captureStore ?: return
         captureRequestJob = viewModelScope.launch {
+            val ownerJob = coroutineContext[Job]
             try {
                 val current = withContext(ioDispatcher) {
                     captureMutex.withLock { store.currentCapture() }
@@ -652,24 +728,45 @@ class MeasurementViewModel(
                     setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
                 }
             } finally {
-                captureRequestJob = null
+                if (captureRequestJob === ownerJob) captureRequestJob = null
             }
         }
     }
 
-    fun consumeCameraLaunch(effect: MeasurementEffect.LaunchCamera): String? {
+    fun claimCameraLaunch(effect: MeasurementEffect.LaunchCamera): CameraLaunchClaim? {
         val active = activeCameraRequest ?: return null
-        if (!active.matches(effect) || active.consumed || state.value.draftId != active.draftId ||
+        if (!active.matches(effect) || active.claimed || active.acknowledged ||
+            state.value.draftId != active.draftId ||
             state.value.stage != Stage.AwaitingImage
         ) return null
-        val consumed = active.copy(consumed = true)
-        activeCameraRequest = consumed
-        persistCameraRequest(consumed)
-        return active.capture.uri
+        val claimed = active.copy(claimed = true)
+        activeCameraRequest = claimed
+        return claimed.toClaim()
+    }
+
+    private fun acknowledgeCameraLaunch(claim: CameraLaunchClaim) {
+        val active = activeCameraRequest ?: return
+        if (!active.claimed || active.acknowledged || !active.matches(claim)) return
+        val acknowledged = active.copy(claimed = false, acknowledged = true)
+        activeCameraRequest = acknowledged
+        persistCameraRequest(acknowledged)
+    }
+
+    private fun failCameraLaunch(claim: CameraLaunchClaim, reason: String) {
+        val active = activeCameraRequest ?: return
+        if (!active.claimed || active.acknowledged || !active.matches(claim)) return
+        val rolledBack = active.copy(claimed = false, acknowledged = false)
+        activeCameraRequest = rolledBack
+        persistCameraRequest(rolledBack)
+        setRecoverableError(
+            MeasurementError.CameraLaunchFailed(reason),
+            Stage.AwaitingImage,
+        )
     }
 
     private fun completeCameraCapture(success: Boolean) {
         val request = activeCameraRequest ?: return
+        if (!request.acknowledged) return
         if (success) {
             captureRequestJob = viewModelScope.launch {
                 val current = withContext(ioDispatcher) {
@@ -705,7 +802,6 @@ class MeasurementViewModel(
     private fun returnToImageSelection() {
         val expected = selectedCapture ?: activeCameraRequest?.capture
         captureRequestJob?.cancel()
-        captureRequestJob = null
         invalidateCameraRequest()
         decodeJob?.cancel()
         decodeGeneration += 1
@@ -805,8 +901,11 @@ class MeasurementViewModel(
 
     private fun clearTransient() {
         val expected = selectedCapture ?: activeCameraRequest?.capture
+        permissionRequestJob?.cancel()
+        permissionRequestJob = null
+        permissionRequestRecordedForCallback = false
+        savedStateHandle[KEY_PERMISSION_REQUEST_PENDING] = false
         captureRequestJob?.cancel()
-        captureRequestJob = null
         invalidateCameraRequest()
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
@@ -920,7 +1019,7 @@ class MeasurementViewModel(
         savedStateHandle[KEY_CAMERA_REQUEST_DRAFT] = request?.draftId
         savedStateHandle[KEY_CAMERA_CAPTURE_URI] = request?.capture?.uri
         savedStateHandle[KEY_CAMERA_CAPTURE_TOKEN] = request?.capture?.token
-        savedStateHandle[KEY_CAMERA_REQUEST_CONSUMED] = request?.consumed
+        savedStateHandle[KEY_CAMERA_REQUEST_ACKNOWLEDGED] = request?.acknowledged
     }
 
     private fun restoredCameraRequest(): CameraRequestSnapshot? {
@@ -932,7 +1031,8 @@ class MeasurementViewModel(
             requestToken = requestToken,
             draftId = draft,
             capture = MeasurementCapture(uri, captureToken),
-            consumed = savedStateHandle[KEY_CAMERA_REQUEST_CONSUMED] ?: false,
+            claimed = false,
+            acknowledged = savedStateHandle[KEY_CAMERA_REQUEST_ACKNOWLEDGED] ?: false,
         )
     }
 
@@ -945,6 +1045,7 @@ class MeasurementViewModel(
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
         captureRequestJob?.cancel()
+        permissionRequestJob?.cancel()
         captureCleanupJob?.cancel()
         releaseStateImageUnlessBorrowed()
         super.onCleared()
@@ -1015,7 +1116,8 @@ class MeasurementViewModel(
         val requestToken: String,
         val draftId: String,
         val capture: MeasurementCapture,
-        val consumed: Boolean,
+        val claimed: Boolean,
+        val acknowledged: Boolean,
     ) {
         fun toEffect() = MeasurementEffect.LaunchCamera(
             uri = capture.uri,
@@ -1029,6 +1131,19 @@ class MeasurementViewModel(
                 draftId == effect.draftId &&
                 capture.uri == effect.uri &&
                 capture.token == effect.captureToken
+
+        fun toClaim() = CameraLaunchClaim(
+            uri = capture.uri,
+            requestToken = requestToken,
+            draftId = draftId,
+            captureToken = capture.token,
+        )
+
+        fun matches(claim: CameraLaunchClaim): Boolean =
+            requestToken == claim.requestToken &&
+                draftId == claim.draftId &&
+                capture.uri == claim.uri &&
+                capture.token == claim.captureToken
     }
 
     private data class PersistenceOperationSnapshot(
@@ -1062,13 +1177,14 @@ class MeasurementViewModel(
         const val KEY_ORIGIN = "measurement.origin"
         const val KEY_SESSION_ID = "measurement.sessionId"
         const val KEY_PERMISSION_REQUESTED = "measurement.permission.camera.requested"
-        const val KEY_PERMISSION_PRIOR_TO_LAUNCH = "measurement.permission.camera.prior"
+        const val KEY_PERMISSION_REQUEST_PENDING = "measurement.permission.camera.pending"
         const val KEY_CAPTURE_CLEANUP_WARNING = "measurement.capture.cleanup.warning"
         const val KEY_CAMERA_REQUEST_TOKEN = "measurement.camera.request.token"
         const val KEY_CAMERA_REQUEST_DRAFT = "measurement.camera.request.draft"
         const val KEY_CAMERA_CAPTURE_URI = "measurement.camera.capture.uri"
         const val KEY_CAMERA_CAPTURE_TOKEN = "measurement.camera.capture.token"
-        const val KEY_CAMERA_REQUEST_CONSUMED = "measurement.camera.request.consumed"
+        // Keep the original key string so acknowledged launches migrate without duplication.
+        const val KEY_CAMERA_REQUEST_ACKNOWLEDGED = "measurement.camera.request.consumed"
     }
 }
 

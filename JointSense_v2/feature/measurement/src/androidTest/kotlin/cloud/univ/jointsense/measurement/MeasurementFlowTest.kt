@@ -93,6 +93,7 @@ class MeasurementFlowTest {
             viewModel.onAction(MeasurementAction.FactorSelected(InflammationFactor.TNF_ALPHA))
         }
         val draft = viewModel.state.value.draftId
+        val crop = viewModel.state.value.cropRect
         var resultCalls = 0
         composeRule.setContent {
             JointSenseTheme {
@@ -112,6 +113,7 @@ class MeasurementFlowTest {
 
         composeRule.runOnIdle {
             assertEquals(draft, viewModel.state.value.draftId)
+            assertEquals(crop, viewModel.state.value.cropRect)
             assertEquals(InflammationFactor.TNF_ALPHA, viewModel.state.value.factor)
             assertEquals(2, analyzer.calls)
             assertEquals(1, repository.commitCalls)

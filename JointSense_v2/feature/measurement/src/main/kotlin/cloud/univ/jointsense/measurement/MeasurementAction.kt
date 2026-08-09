@@ -11,6 +11,15 @@ sealed interface MeasurementAction {
 
     data class CameraCaptureCompleted(val success: Boolean) : MeasurementAction
 
+    class CameraLaunchAcknowledged internal constructor(
+        val claim: CameraLaunchClaim,
+    ) : MeasurementAction
+
+    class CameraLaunchFailed internal constructor(
+        val claim: CameraLaunchClaim,
+        val reason: String,
+    ) : MeasurementAction
+
     data object CameraPermissionRequestStarted : MeasurementAction
 
     data class CameraPermissionResult(

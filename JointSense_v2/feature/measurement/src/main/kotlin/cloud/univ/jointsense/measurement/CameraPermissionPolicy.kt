@@ -1,6 +1,6 @@
 package cloud.univ.jointsense.measurement
 
 fun classifyPermanentCameraDenial(
-    wasRequestedBeforeLaunch: Boolean,
+    wasRequestFormallyRecorded: Boolean,
     shouldShowRationale: Boolean,
-): Boolean = wasRequestedBeforeLaunch && !shouldShowRationale
+): Boolean = wasRequestFormallyRecorded && !shouldShowRationale
