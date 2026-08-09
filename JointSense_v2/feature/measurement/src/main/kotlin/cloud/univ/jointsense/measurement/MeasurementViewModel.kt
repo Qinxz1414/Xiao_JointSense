@@ -1,15 +1,19 @@
 package cloud.univ.jointsense.measurement
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.NewTestResult
-import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,41 +21,46 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-data class MeasurementUiState(
-    val sessions: List<TestSession> = emptyList(),
-    val currentSession: TestSession? = null,
-    val image: MeasurementImage? = null,
-    val cropBounds: CropBounds = CropBounds(0, 0, 200, 200),
-    val selectedFactor: InflammationFactor = InflammationFactor.IL6,
-    val lastResult: TestResult? = null,
-    val isAnalyzing: Boolean = false,
-    val isCreatingSession: Boolean = false,
-    val sessionCreationRequest: SessionCreationRequest? = null,
-    val sessionCreationError: String? = null,
-    val errorMessage: String? = null,
-) {
-    val canAddMore: Boolean get() = (currentSession?.results?.size ?: 0) < 5
-}
-
-data class SessionCreationRequest(
-    val requestId: Long,
-    val originIdentity: String,
-    val completedSessionId: String? = null,
-)
+import kotlinx.coroutines.withContext
 
 class MeasurementViewModel(
     private val repository: TestSessionRepository,
     private val analyzer: BaselinePhotoAnalysisAdapter,
     private val draftIdFactory: () -> String = { UUID.randomUUID().toString() },
+    private val savedStateHandle: SavedStateHandle,
+    private val decoder: MeasurementImageDecoder?,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val defaultDispatcher: CoroutineDispatcher,
+    private val sessionNamePrefix: () -> String = { "Test" },
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(MeasurementUiState())
+    /** Transitional constructor for Phase-1 callers; production uses the dispatcher-aware factory. */
+    constructor(
+        repository: TestSessionRepository,
+        analyzer: BaselinePhotoAnalysisAdapter,
+        draftIdFactory: () -> String = { UUID.randomUUID().toString() },
+    ) : this(
+        repository = repository,
+        analyzer = analyzer,
+        draftIdFactory = draftIdFactory,
+        savedStateHandle = SavedStateHandle(),
+        decoder = null,
+        ioDispatcher = Dispatchers.Main.immediate,
+        defaultDispatcher = Dispatchers.Main.immediate,
+    )
+
+    private val mutableState = MutableStateFlow(restoredState())
     val state: StateFlow<MeasurementUiState> = mutableState.asStateFlow()
-    private val completions = Channel<String>(Channel.BUFFERED)
-    val analysisCompletions = completions.receiveAsFlow()
-    private var currentSessionId: String? = null
-    private var lastResultId: String? = null
-    private var activeDraftId: String? = null
+
+    private val effectChannel = Channel<MeasurementEffect>(Channel.BUFFERED)
+    val effects: Flow<MeasurementEffect> = effectChannel.receiveAsFlow()
+    private val legacyCompletionChannel = Channel<String>(Channel.BUFFERED)
+    val analysisCompletions: Flow<String> = legacyCompletionChannel.receiveAsFlow()
+
+    private var currentSessionId: String? = savedStateHandle[KEY_SESSION_ID]
+    private var pendingResult: NewTestResult? = null
+    private var analysisJob: Job? = null
+    private var decodeJob: Job? = null
+    private var cropConfirmed: Boolean = savedStateHandle[KEY_CROP_CONFIRMED] ?: false
     private var nextSessionCreationId = 0L
     private var activeSessionCreationId: Long? = null
 
@@ -59,63 +68,63 @@ class MeasurementViewModel(
         viewModelScope.launch {
             repository.observeSessions().collectLatest(::applySessions)
         }
+        state.value.imageUri?.takeIf { decoder != null }?.let { decodeImage(it, restoring = true) }
+    }
+
+    fun onAction(action: MeasurementAction) {
+        when (action) {
+            is MeasurementAction.ImageSelected -> decodeImage(action.uri, restoring = false)
+            is MeasurementAction.CropChanged -> updateCrop(action.bounds)
+            MeasurementAction.CropConfirmed -> confirmCrop()
+            is MeasurementAction.FactorSelected -> updateState {
+                it.copy(factor = action.factor, error = null, errorMessage = null)
+            }
+            MeasurementAction.Analyze -> startAnalysis()
+            MeasurementAction.Retry -> retry()
+            MeasurementAction.CancelAnalysis -> cancelAnalysis()
+            MeasurementAction.ContinueMeasurement -> beginNewDraft()
+        }
     }
 
     fun createNewSession(originIdentity: String) {
         if (state.value.isCreatingSession) return
         val creationId = ++nextSessionCreationId
         activeSessionCreationId = creationId
-        mutableState.update {
+        updateState {
             it.copy(
+                originDestination = originIdentity,
                 isCreatingSession = true,
-                sessionCreationRequest = SessionCreationRequest(
-                    requestId = creationId,
-                    originIdentity = originIdentity,
-                ),
+                sessionCreationRequest = SessionCreationRequest(creationId, originIdentity),
                 sessionCreationError = null,
             )
         }
+        val requestedName = nextSessionName(state.value.sessions.map(TestSession::name), sessionNamePrefix())
         viewModelScope.launch {
             try {
-                val id = repository.createSession("Test #${state.value.sessions.size + 1}")
+                val id = withContext(ioDispatcher) { repository.createSession(requestedName) }
                 if (activeSessionCreationId != creationId) {
-                    repository.deleteSession(id)
+                    withContext(ioDispatcher) { repository.deleteSession(id) }
                     return@launch
                 }
                 mutableState.update { current ->
                     val request = current.sessionCreationRequest
                     if (request?.requestId == creationId) {
-                        current.copy(
-                            sessionCreationRequest = request.copy(completedSessionId = id),
-                        )
+                        current.copy(sessionCreationRequest = request.copy(completedSessionId = id))
                     } else {
                         current
                     }
                 }
-            } catch (exception: CancellationException) {
-                if (activeSessionCreationId == creationId) {
-                    activeSessionCreationId = null
-                    mutableState.update { current ->
-                        if (current.sessionCreationRequest?.requestId == creationId) {
-                            current.copy(
-                                isCreatingSession = false,
-                                sessionCreationRequest = null,
-                            )
-                        } else {
-                            current
-                        }
-                    }
-                }
-                throw exception
-            } catch (exception: Exception) {
+            } catch (error: CancellationException) {
+                clearCreationIfOwned(creationId)
+                throw error
+            } catch (error: Exception) {
                 if (activeSessionCreationId == creationId) {
                     activeSessionCreationId = null
                     mutableState.update {
                         it.copy(
                             isCreatingSession = false,
                             sessionCreationRequest = null,
-                            sessionCreationError =
-                                exception.message ?: exception::class.java.simpleName,
+                            sessionCreationError = error.message ?: error::class.java.simpleName,
                         )
                     }
                 }
@@ -129,14 +138,10 @@ class MeasurementViewModel(
         if (request.requestId != requestId || activeSessionCreationId != requestId) return null
         activeSessionCreationId = null
         currentSessionId = sessionId
-        lastResultId = null
-        activeDraftId = null
+        savedStateHandle[KEY_SESSION_ID] = sessionId
+        beginNewDraft()
         mutableState.update { current ->
-            if (current.sessionCreationRequest?.requestId == requestId) {
-                current.copy(isCreatingSession = false, sessionCreationRequest = null)
-            } else {
-                current
-            }
+            current.copy(isCreatingSession = false, sessionCreationRequest = null)
         }
         applySessions(state.value.sessions)
         return sessionId
@@ -147,14 +152,10 @@ class MeasurementViewModel(
         if (request.requestId != requestId) return
         activeSessionCreationId = null
         mutableState.update { current ->
-            if (current.sessionCreationRequest?.requestId == requestId) {
-                current.copy(isCreatingSession = false, sessionCreationRequest = null)
-            } else {
-                current
-            }
+            current.copy(isCreatingSession = false, sessionCreationRequest = null)
         }
         request.completedSessionId?.let { sessionId ->
-            viewModelScope.launch { repository.deleteSession(sessionId) }
+            viewModelScope.launch { withContext(ioDispatcher) { repository.deleteSession(sessionId) } }
         }
     }
 
@@ -164,27 +165,27 @@ class MeasurementViewModel(
 
     fun selectSession(id: String) {
         currentSessionId = id
-        lastResultId = null
-        activeDraftId = null
+        savedStateHandle[KEY_SESSION_ID] = id
+        updateState { it.copy(resultId = null) }
         applySessions(state.value.sessions)
     }
 
     fun deleteSession(id: String) {
         viewModelScope.launch {
-            repository.deleteSession(id)
+            withContext(ioDispatcher) { repository.deleteSession(id) }
             if (currentSessionId == id) clearTransient()
         }
     }
 
     fun abandonMeasurement() {
         val session = state.value.currentSession
-        state.value.sessionCreationRequest?.let { request ->
-            cancelSessionCreation(request.requestId)
-        }
+        state.value.sessionCreationRequest?.let { cancelSessionCreation(it.requestId) }
         activeSessionCreationId = null
         clearTransient()
         viewModelScope.launch {
-            if (session != null && session.results.isEmpty()) repository.deleteSession(session.id)
+            if (session != null && session.results.isEmpty()) {
+                withContext(ioDispatcher) { repository.deleteSession(session.id) }
+            }
         }
     }
 
@@ -193,77 +194,281 @@ class MeasurementViewModel(
     }
 
     fun setImage(image: MeasurementImage) {
-        mutableState.update { current -> current.copy(
-            image = image,
-            cropBounds = CropBounds(
-                left = image.width / 4,
-                top = image.height / 4,
-                right = image.width * 3 / 4,
-                bottom = image.height * 3 / 4,
-            ),
-            errorMessage = null,
-        ) }
+        decodeJob?.cancel()
+        state.value.image?.takeIf { it !== image }?.release()
+        cropConfirmed = false
+        updateState {
+            it.copy(
+                stage = Stage.ReadyToCrop,
+                imageUri = null,
+                image = image,
+                cropRect = defaultCrop(image),
+                error = null,
+                resumeStage = null,
+                errorMessage = null,
+            )
+        }
     }
 
     fun updateCropBounds(bounds: CropBounds) {
-        mutableState.update { it.copy(cropBounds = bounds) }
+        onAction(MeasurementAction.CropChanged(bounds))
     }
 
     fun selectFactor(factor: InflammationFactor) {
-        mutableState.update { it.copy(selectedFactor = factor) }
+        onAction(MeasurementAction.FactorSelected(factor))
     }
 
     fun analyze() {
-        val current = state.value
-        val image = current.image ?: return
-        val sessionId = currentSessionId ?: return
-        if (current.isAnalyzing) return
-        val draftId = activeDraftId ?: draftIdFactory().also { activeDraftId = it }
-        mutableState.value = current.copy(isAnalyzing = true, errorMessage = null)
-        viewModelScope.launch {
+        if (state.value.stage == Stage.ReadyToCrop) confirmCrop()
+        onAction(MeasurementAction.Analyze)
+    }
+
+    fun startNewTestInSession() {
+        onAction(MeasurementAction.ContinueMeasurement)
+    }
+
+    private fun decodeImage(uri: String, restoring: Boolean) {
+        val imageDecoder = decoder ?: run {
+            if (!restoring) setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+            return
+        }
+        decodeJob?.cancel()
+        if (!restoring) {
+            state.value.image?.release()
+            cropConfirmed = false
+            pendingResult = null
+        }
+        updateState {
+            it.copy(
+                stage = Stage.Decoding,
+                imageUri = uri,
+                cropRect = if (restoring) it.cropRect else null,
+                image = null,
+                error = null,
+                resumeStage = null,
+                resultId = null,
+                errorMessage = null,
+            )
+        }
+        decodeJob = viewModelScope.launch {
             try {
-                val analysis = analyzer.analyze(image, current.cropBounds, current.selectedFactor)
-                val resultId = repository.commitResult(
-                    sessionId = sessionId,
-                    draftId = draftId,
-                    result = NewTestResult(
-                        factor = current.selectedFactor,
-                        concentration = analysis.concentration,
-                        rangeStatus = analysis.rangeStatus,
-                        features = analysis.features,
-                    ),
-                )
-                lastResultId = resultId
-                applySessions(state.value.sessions)
-                completions.send(resultId)
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                mutableState.update { it.copy(
-                    errorMessage = exception.message ?: exception::class.java.simpleName,
-                ) }
-            } finally {
-                mutableState.update { it.copy(isAnalyzing = false) }
+                val decoded = withContext(ioDispatcher) { imageDecoder.decode(uri) }
+                if (state.value.imageUri != uri) {
+                    decoded.release()
+                    return@launch
+                }
+                state.value.image?.takeIf { it !== decoded }?.release()
+                val restoredCrop = state.value.cropRect
+                updateState {
+                    it.copy(
+                        stage = if (restoring && restoredCrop != null && cropConfirmed) {
+                            Stage.ReadyToAnalyze
+                        } else {
+                            Stage.ReadyToCrop
+                        },
+                        image = decoded,
+                        cropRect = restoredCrop ?: defaultCrop(decoded),
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: MeasurementImageDecodeException) {
+                setRecoverableError(error.error, Stage.AwaitingImage)
+            } catch (_: Exception) {
+                setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             }
         }
     }
 
-    fun startNewTestInSession() {
-        lastResultId = null
-        activeDraftId = null
-        mutableState.update { it.copy(
-            image = null,
-            cropBounds = CropBounds(0, 0, 200, 200),
-            lastResult = null,
-            errorMessage = null,
-        ) }
+    private fun updateCrop(bounds: CropBounds) {
+        cropConfirmed = false
+        if (!isValidCrop(bounds, state.value.image)) {
+            setRecoverableError(MeasurementError.InvalidCrop, Stage.ReadyToCrop)
+            return
+        }
+        updateState {
+            it.copy(
+                stage = Stage.ReadyToCrop,
+                cropRect = bounds,
+                error = null,
+                resumeStage = null,
+                errorMessage = null,
+            )
+        }
+    }
+
+    private fun confirmCrop() {
+        val crop = state.value.cropRect
+        if (crop == null || !isValidCrop(crop, state.value.image)) {
+            setRecoverableError(MeasurementError.InvalidCrop, Stage.ReadyToCrop)
+            return
+        }
+        cropConfirmed = true
+        updateState { it.copy(stage = Stage.ReadyToAnalyze, error = null, resumeStage = null) }
+    }
+
+    private fun startAnalysis() {
+        if (analysisJob?.isActive == true || state.value.isAnalyzing) return
+        val current = state.value
+        val image = current.image ?: return
+        val crop = current.cropRect ?: return
+        val sessionId = currentSessionId ?: return
+        if (current.stage != Stage.ReadyToAnalyze) return
+        updateState {
+            it.copy(
+                stage = Stage.Analyzing,
+                error = null,
+                resumeStage = null,
+                resultId = null,
+                errorMessage = null,
+            )
+        }
+        analysisJob = viewModelScope.launch {
+            try {
+                val analysis = withContext(defaultDispatcher) {
+                    analyzer.analyze(image, crop, current.factor)
+                }
+                pendingResult = NewTestResult(
+                    factor = current.factor,
+                    concentration = analysis.concentration,
+                    rangeStatus = analysis.rangeStatus,
+                    features = analysis.features,
+                )
+                persistPending(sessionId)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                setRecoverableError(MeasurementError.AnalysisFailed, Stage.ReadyToAnalyze)
+            }
+        }
+    }
+
+    private suspend fun persistPending(sessionId: String) {
+        val result = pendingResult ?: run {
+            setRecoverableError(MeasurementError.AnalysisFailed, Stage.ReadyToAnalyze)
+            return
+        }
+        updateState { it.copy(stage = Stage.Persisting, error = null, resumeStage = null) }
+        try {
+            val resultId = withContext(ioDispatcher) {
+                repository.commitResult(sessionId, state.value.draftId, result)
+            }
+            state.value.image?.release()
+            updateState {
+                it.copy(
+                    stage = Stage.Success,
+                    resultId = resultId,
+                    image = null,
+                    lastResult = findResult(it.sessions, resultId),
+                )
+            }
+            effectChannel.send(MeasurementEffect.NavigateToResult(resultId))
+            legacyCompletionChannel.send(resultId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            setRecoverableError(MeasurementError.PersistenceFailed, Stage.Persisting)
+        }
+    }
+
+    private fun retry() {
+        if (analysisJob?.isActive == true || state.value.stage != Stage.RecoverableError) return
+        when (state.value.resumeStage) {
+            Stage.Persisting -> {
+                val sessionId = currentSessionId ?: return
+                updateState { it.copy(stage = Stage.Persisting, error = null, resumeStage = null) }
+                analysisJob = viewModelScope.launch { persistPending(sessionId) }
+            }
+            Stage.ReadyToAnalyze -> {
+                updateState { it.copy(stage = Stage.ReadyToAnalyze, error = null, resumeStage = null) }
+                startAnalysis()
+            }
+            Stage.AwaitingImage -> updateState {
+                it.copy(stage = Stage.AwaitingImage, error = null, resumeStage = null)
+            }
+            Stage.ReadyToCrop -> updateState {
+                it.copy(stage = Stage.ReadyToCrop, error = null, resumeStage = null)
+            }
+            else -> Unit
+        }
+    }
+
+    private fun cancelAnalysis() {
+        if (state.value.stage != Stage.Analyzing && state.value.stage != Stage.Persisting) return
+        analysisJob?.cancel()
+        analysisJob = null
+        updateState {
+            it.copy(
+                stage = Stage.ReadyToAnalyze,
+                error = null,
+                resumeStage = null,
+                errorMessage = null,
+            )
+        }
+    }
+
+    private fun beginNewDraft() {
+        analysisJob?.cancel()
+        decodeJob?.cancel()
+        state.value.image?.release()
+        pendingResult = null
+        cropConfirmed = false
+        updateState {
+            it.copy(
+                stage = Stage.AwaitingImage,
+                draftId = draftIdFactory(),
+                imageUri = null,
+                cropRect = null,
+                error = null,
+                resumeStage = null,
+                resultId = null,
+                image = null,
+                lastResult = null,
+                errorMessage = null,
+            )
+        }
     }
 
     private fun clearTransient() {
+        analysisJob?.cancel()
+        decodeJob?.cancel()
+        state.value.image?.release()
         currentSessionId = null
-        lastResultId = null
-        activeDraftId = null
-        mutableState.value = MeasurementUiState(sessions = state.value.sessions)
+        savedStateHandle[KEY_SESSION_ID] = null
+        pendingResult = null
+        cropConfirmed = false
+        val sessions = state.value.sessions
+        val origin = state.value.originDestination
+        val draft = draftIdFactory()
+        mutableState.value = MeasurementUiState(
+            draftId = draft,
+            sessions = sessions,
+            originDestination = origin,
+        )
+        persistFormalState(mutableState.value)
+    }
+
+    private fun clearCreationIfOwned(creationId: Long) {
+        if (activeSessionCreationId != creationId) return
+        activeSessionCreationId = null
+        mutableState.update { current ->
+            if (current.sessionCreationRequest?.requestId == creationId) {
+                current.copy(isCreatingSession = false, sessionCreationRequest = null)
+            } else {
+                current
+            }
+        }
+    }
+
+    private fun setRecoverableError(error: MeasurementError, resumeStage: Stage) {
+        updateState {
+            it.copy(
+                stage = Stage.RecoverableError,
+                error = error,
+                resumeStage = resumeStage,
+                errorMessage = error.toString(),
+            )
+        }
     }
 
     private fun applySessions(sessions: List<TestSession>) {
@@ -271,9 +476,88 @@ class MeasurementViewModel(
             current.copy(
                 sessions = sessions,
                 currentSession = sessions.firstOrNull { it.id == currentSessionId },
-                lastResult = sessions.asSequence().flatMap { it.results.asSequence() }
-                    .firstOrNull { it.id == lastResultId },
+                lastResult = current.resultId?.let { findResult(sessions, it) },
             )
         }
+    }
+
+    private fun updateState(transform: (MeasurementUiState) -> MeasurementUiState) {
+        mutableState.update { current -> transform(current).also(::persistFormalState) }
+    }
+
+    private fun restoredState(): MeasurementUiState {
+        val draftId = savedStateHandle.get<String>(KEY_DRAFT_ID)
+            ?: draftIdFactory().also { savedStateHandle[KEY_DRAFT_ID] = it }
+        val uri = savedStateHandle.get<String>(KEY_IMAGE_URI)
+        val crop = restoredCrop()
+        val factor = savedStateHandle.get<String>(KEY_FACTOR)
+            ?.let { runCatching { InflammationFactor.valueOf(it) }.getOrNull() }
+            ?: InflammationFactor.IL6
+        val origin = savedStateHandle.get<String>(KEY_ORIGIN)
+        return MeasurementUiState(
+            stage = if (uri == null) Stage.AwaitingImage else Stage.Decoding,
+            draftId = draftId,
+            imageUri = uri,
+            cropRect = crop,
+            factor = factor,
+            originDestination = origin,
+        )
+    }
+
+    private fun restoredCrop(): CropBounds? {
+        val left = savedStateHandle.get<Int>(KEY_CROP_LEFT) ?: return null
+        val top = savedStateHandle.get<Int>(KEY_CROP_TOP) ?: return null
+        val right = savedStateHandle.get<Int>(KEY_CROP_RIGHT) ?: return null
+        val bottom = savedStateHandle.get<Int>(KEY_CROP_BOTTOM) ?: return null
+        return CropBounds(left, top, right, bottom)
+    }
+
+    private fun persistFormalState(state: MeasurementUiState) {
+        savedStateHandle[KEY_DRAFT_ID] = state.draftId
+        savedStateHandle[KEY_IMAGE_URI] = state.imageUri
+        savedStateHandle[KEY_FACTOR] = state.factor.name
+        savedStateHandle[KEY_ORIGIN] = state.originDestination
+        savedStateHandle[KEY_CROP_LEFT] = state.cropRect?.left
+        savedStateHandle[KEY_CROP_TOP] = state.cropRect?.top
+        savedStateHandle[KEY_CROP_RIGHT] = state.cropRect?.right
+        savedStateHandle[KEY_CROP_BOTTOM] = state.cropRect?.bottom
+        savedStateHandle[KEY_CROP_CONFIRMED] = cropConfirmed
+    }
+
+    override fun onCleared() {
+        analysisJob?.cancel()
+        decodeJob?.cancel()
+        state.value.image?.release()
+        super.onCleared()
+    }
+
+    private fun defaultCrop(image: MeasurementImage) = CropBounds(
+        left = image.width / 4,
+        top = image.height / 4,
+        right = image.width * 3 / 4,
+        bottom = image.height * 3 / 4,
+    )
+
+    private fun isValidCrop(bounds: CropBounds, image: MeasurementImage?): Boolean =
+        image != null &&
+            bounds.left >= 0 && bounds.top >= 0 &&
+            bounds.right <= image.width && bounds.bottom <= image.height &&
+            bounds.width > 0 && bounds.height > 0
+
+    private fun findResult(sessions: List<TestSession>, id: String) = sessions.asSequence()
+        .flatMap { it.results.asSequence() }
+        .firstOrNull { it.id == id }
+
+    private companion object {
+        const val KEY_DRAFT_ID = "measurement.draftId"
+        const val KEY_IMAGE_URI = "measurement.imageUri"
+        const val KEY_CROP_LEFT = "measurement.crop.left"
+        const val KEY_CROP_TOP = "measurement.crop.top"
+        const val KEY_CROP_RIGHT = "measurement.crop.right"
+        const val KEY_CROP_BOTTOM = "measurement.crop.bottom"
+        const val KEY_CROP_CONFIRMED = "measurement.crop.confirmed"
+        const val KEY_FACTOR = "measurement.factor"
+        const val KEY_ORIGIN = "measurement.origin"
+        const val KEY_SESSION_ID = "measurement.sessionId"
     }
 }

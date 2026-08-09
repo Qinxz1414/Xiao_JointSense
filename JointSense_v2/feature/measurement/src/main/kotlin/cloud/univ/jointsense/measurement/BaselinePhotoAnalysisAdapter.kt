@@ -2,19 +2,23 @@ package cloud.univ.jointsense.measurement
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import cloud.univ.jointsense.analysis.CurveKnot
+import cloud.univ.jointsense.analysis.FactoryCurves
+import cloud.univ.jointsense.analysis.QuantificationResult
+import cloud.univ.jointsense.analysis.StandardCurve
 import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import kotlin.math.sqrt
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 
 interface MeasurementImage {
     val width: Int
     val height: Int
+
+    fun release() = Unit
 }
 
 class BitmapMeasurementImage(
@@ -22,6 +26,10 @@ class BitmapMeasurementImage(
 ) : MeasurementImage {
     override val width: Int = bitmap.width
     override val height: Int = bitmap.height
+
+    override fun release() {
+        if (!bitmap.isRecycled) bitmap.recycle()
+    }
 }
 
 data class CropBounds(
@@ -61,19 +69,20 @@ class AndroidBaselinePhotoAnalysisAdapter(
             ?: error("Android photo analysis requires a BitmapMeasurementImage")
         val calibration = calibrations.observeCalibration(factor).first()
             ?.takeIf { it.status == CalibrationStatus.ACTIVE }
-        return withContext(Dispatchers.Default) {
-            val features = extractFeatures(bitmap, cropBounds)
-            val knots = calibration?.knots
+        val features = extractFeatures(bitmap, cropBounds)
+        val quantification = quantifyMeasurementSignal(
+            factor = factor,
+            signal = features.tealness,
+            calibratedKnots = calibration?.knots
                 ?.sortedBy { it.concentration }
                 ?.map { it.concentration to it.fittedSignal }
-                .orEmpty()
-                .ifEmpty { FACTORY_KNOTS.getValue(factor) }
-            BaselineAnalysisResult(
-                concentration = baselineConcentrationFor(features.tealness, knots),
-                rangeStatus = RangeStatus.UNKNOWN,
-                features = features,
-            )
-        }
+                .orEmpty(),
+        )
+        return BaselineAnalysisResult(
+            concentration = quantification.concentration,
+            rangeStatus = quantification.rangeStatus,
+            features = features,
+        )
     }
 }
 
@@ -115,27 +124,19 @@ private fun extractFeatures(bitmap: Bitmap, bounds: CropBounds): RgbFeatures {
     )
 }
 
-/** Preserves the existing Phase-1 interpolation behavior verbatim for later replacement. */
-private fun baselineConcentrationFor(
+internal fun quantifyMeasurementSignal(
+    factor: InflammationFactor,
     signal: Float,
-    knots: List<Pair<Float, Float>>,
-): Float {
-    if (signal <= knots.first().second) return 0f
-    if (signal >= knots.last().second) return knots.last().first
-    for (index in 1 until knots.size) {
-        if (signal <= knots[index].second) {
-            val (signal0, concentration0) = knots[index - 1]
-            val (signal1, concentration1) = knots[index]
-            if (signal1 == signal0) return concentration1
-            return concentration0 +
-                (concentration1 - concentration0) * (signal - signal0) / (signal1 - signal0)
-        }
+    calibratedKnots: List<Pair<Float, Float>>,
+): QuantificationResult {
+    val curve = if (calibratedKnots.isEmpty()) {
+        FactoryCurves.forFactor(factor)
+    } else {
+        StandardCurve(
+            calibratedKnots.map { (concentration, fittedSignal) ->
+                CurveKnot(concentration = concentration, signal = fittedSignal)
+            },
+        )
     }
-    return knots.last().first
+    return curve.quantify(signal)
 }
-
-private val FACTORY_KNOTS = mapOf(
-    InflammationFactor.TNF_ALPHA to listOf(0f to -8f, 20f to -4f, 50f to 0f, 100f to 20f, 200f to 26f),
-    InflammationFactor.IL6 to listOf(0f to -7f, 50f to -4f, 100f to 0f, 200f to 0f, 500f to 11f),
-    InflammationFactor.IL1_BETA to listOf(0f to -11f, 20f to 17f, 50f to 17f, 100f to 20f, 200f to 33f),
-)
