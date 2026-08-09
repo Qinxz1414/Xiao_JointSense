@@ -1,5 +1,7 @@
 package cloud.univ.jointsense.analysis.calibration
 
+import java.math.BigDecimal
+
 data class CalibrationInput(
     val wellIndex: Int,
     val concentration: Float,
@@ -20,9 +22,20 @@ sealed interface ConcentrationParseResult {
 }
 
 fun parseConcentration(text: String): ConcentrationParseResult {
-    val concentration = text.trim().toFloatOrNull()
-        ?: return ConcentrationParseResult.Invalid
-    return if (concentration.isFinite() && concentration >= 0f) {
+    val exact = try {
+        BigDecimal(text.trim())
+    } catch (_: NumberFormatException) {
+        return ConcentrationParseResult.Invalid
+    }
+    if (exact.signum() < 0) {
+        return ConcentrationParseResult.Invalid
+    }
+    if (exact.signum() == 0) {
+        return ConcentrationParseResult.Valid(0f)
+    }
+
+    val concentration = exact.toFloat()
+    return if (concentration.isFinite() && concentration != 0f) {
         ConcentrationParseResult.Valid(concentration)
     } else {
         ConcentrationParseResult.Invalid

@@ -132,10 +132,33 @@ class CalibrationValidatorTest {
 
     @Test
     fun acceptsDynamicRangeOfExactlyEight() {
-        val result = validator.validate(inputsWithSignals(List(9) { it.toFloat() }))
+        val result = assertValid(validator.validate(inputsWithSignals(List(9) { it.toFloat() })))
 
-        assertTrue(result is CalibrationValidation.Valid)
-        assertEquals(9, (result as CalibrationValidation.Valid).knots.size)
+        assertEquals(9, result.knots.size)
+    }
+
+    @Test
+    fun rejectsPositiveDerivedOverflowFromFiniteFloatInputs() {
+        val inputs = inputsWithSignals(
+            listOf(-Float.MAX_VALUE) + List(8) { Float.MAX_VALUE },
+        )
+
+        assertInvalid(
+            validator.validate(inputs),
+            listOf(CalibrationError.NonFiniteSignal),
+        )
+    }
+
+    @Test
+    fun rejectsNegativeDerivedOverflowFromFiniteFloatInputs() {
+        val inputs = inputsWithSignals(
+            listOf(Float.MAX_VALUE) + List(8) { -Float.MAX_VALUE },
+        )
+
+        assertInvalid(
+            validator.validate(inputs),
+            listOf(CalibrationError.NonFiniteSignal),
+        )
     }
 
     @Test
@@ -156,13 +179,15 @@ class CalibrationValidatorTest {
 
     @Test
     fun acceptsPavaAdjustmentExactlyAtThreeSignalFloorTolerance() {
-        val result = validator.validate(
-            inputsWithSignals(listOf(0f, 6f, 0f, 8f, 9f, 10f, 11f, 12f, 13f)),
+        val result = assertValid(
+            validator.validate(
+                inputsWithSignals(listOf(0f, 6f, 0f, 8f, 9f, 10f, 11f, 12f, 13f)),
+            ),
         )
 
         assertEquals(
             listOf(0f, 3f, 3f, 8f, 9f, 10f, 11f, 12f, 13f),
-            (result as CalibrationValidation.Valid).knots.map(CalibrationKnot::fittedSignal),
+            result.knots.map(CalibrationKnot::fittedSignal),
         )
     }
 
@@ -178,13 +203,15 @@ class CalibrationValidatorTest {
 
     @Test
     fun acceptsPavaAdjustmentExactlyAtFifteenPercentTolerance() {
-        val result = validator.validate(
-            inputsWithSignals(listOf(0f, 45f, 15f, 50f, 60f, 70f, 80f, 90f, 100f)),
+        val result = assertValid(
+            validator.validate(
+                inputsWithSignals(listOf(0f, 45f, 15f, 50f, 60f, 70f, 80f, 90f, 100f)),
+            ),
         )
 
         assertEquals(
             listOf(0f, 30f, 30f, 50f, 60f, 70f, 80f, 90f, 100f),
-            (result as CalibrationValidation.Valid).knots.map(CalibrationKnot::fittedSignal),
+            result.knots.map(CalibrationKnot::fittedSignal),
         )
     }
 
@@ -212,7 +239,7 @@ class CalibrationValidatorTest {
             CalibrationInput(wellIndex = 8, concentration = 30f, rawSignal = 13f),
         )
 
-        val result = validator.validate(unsorted) as CalibrationValidation.Valid
+        val result = assertValid(validator.validate(unsorted))
 
         assertEquals(
             listOf(
@@ -234,6 +261,37 @@ class CalibrationValidatorTest {
     fun parsesTrimmedFiniteNonNegativeConcentration() {
         assertEquals(ConcentrationParseResult.Valid(12.5f), parseConcentration("  12.5  "))
         assertEquals(ConcentrationParseResult.Valid(0f), parseConcentration("0"))
+    }
+
+    @Test
+    fun rejectsPositiveNonZeroDecimalThatUnderflowsFloat() {
+        assertEquals(ConcentrationParseResult.Invalid, parseConcentration("1e-50"))
+    }
+
+    @Test
+    fun rejectsNegativeNonZeroDecimalThatUnderflowsFloat() {
+        assertEquals(ConcentrationParseResult.Invalid, parseConcentration("-1e-50"))
+    }
+
+    @Test
+    fun normalizesNegativeExactZeroToPositiveFloatZero() {
+        val result = parseConcentration("-0.0")
+
+        assertEquals(ConcentrationParseResult.Valid(0f), result)
+        assertEquals(
+            java.lang.Float.floatToRawIntBits(0f),
+            java.lang.Float.floatToRawIntBits((result as ConcentrationParseResult.Valid).concentration),
+        )
+    }
+
+    @Test
+    fun parsesNormalScientificNotation() {
+        assertEquals(ConcentrationParseResult.Valid(125f), parseConcentration("1.25e2"))
+    }
+
+    @Test
+    fun rejectsOverflowingDecimalExponent() {
+        assertEquals(ConcentrationParseResult.Invalid, parseConcentration("1e1000"))
     }
 
     @Test
@@ -270,6 +328,17 @@ class CalibrationValidatorTest {
         validation: CalibrationValidation,
         expectedErrors: List<CalibrationError>,
     ) {
-        assertEquals(expectedErrors, (validation as CalibrationValidation.Invalid).errors)
+        assertEquals(CalibrationValidation.Invalid(expectedErrors), validation)
+    }
+
+    private fun assertValid(validation: CalibrationValidation): CalibrationValidation.Valid {
+        assertTrue(validation is CalibrationValidation.Valid)
+        return (validation as CalibrationValidation.Valid).also { valid ->
+            valid.knots.forEach { knot ->
+                assertTrue("raw signal must be finite: $knot", knot.rawSignal.isFinite())
+                assertTrue("net signal must be finite: $knot", knot.netSignal.isFinite())
+                assertTrue("fitted signal must be finite: $knot", knot.fittedSignal.isFinite())
+            }
+        }
     }
 }

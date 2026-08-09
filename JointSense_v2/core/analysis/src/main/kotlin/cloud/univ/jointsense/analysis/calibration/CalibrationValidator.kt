@@ -32,24 +32,33 @@ class CalibrationValidator {
             return CalibrationValidation.Invalid(structuralErrors)
         }
 
-        val blankSignal = inputs.single { it.concentration == BLANK_CONCENTRATION }.rawSignal
+        val blankSignal = inputs
+            .single { it.concentration == BLANK_CONCENTRATION }
+            .rawSignal
+            .toDouble()
         val sortedKnots = inputs
             .sortedBy(CalibrationInput::concentration)
             .map { input ->
                 NetKnot(
                     input = input,
-                    netSignal = input.rawSignal - blankSignal,
+                    netSignal = input.rawSignal.toDouble() - blankSignal,
                 )
             }
         val netSignals = sortedKnots.map(NetKnot::netSignal)
+        if (netSignals.any { !it.isRepresentableAsFiniteFloat() }) {
+            return CalibrationValidation.Invalid(listOf(CalibrationError.NonFiniteSignal))
+        }
         val netDynamicRange = netSignals.maxOrNull()!! - netSignals.minOrNull()!!
         if (netDynamicRange < MINIMUM_DYNAMIC_RANGE) {
             return CalibrationValidation.Invalid(listOf(CalibrationError.DynamicRangeTooLow))
         }
 
-        val fittedSignals = IsotonicRegression.fit(netSignals)
-        val rawDynamicRange = inputs.maxOf(CalibrationInput::rawSignal) -
-            inputs.minOf(CalibrationInput::rawSignal)
+        val fittedSignals = IsotonicRegression.fitDoubles(netSignals)
+        if (fittedSignals.any { !it.isRepresentableAsFiniteFloat() }) {
+            return CalibrationValidation.Invalid(listOf(CalibrationError.NonFiniteSignal))
+        }
+        val rawDynamicRange = inputs.maxOf { it.rawSignal.toDouble() } -
+            inputs.minOf { it.rawSignal.toDouble() }
         val tolerance = maxOf(ABSOLUTE_CORRECTION_TOLERANCE, rawDynamicRange * RELATIVE_CORRECTION_TOLERANCE)
         if (fittedSignals.indices.any { index ->
                 abs(fittedSignals[index] - netSignals[index]) > tolerance
@@ -64,8 +73,8 @@ class CalibrationValidator {
                     wellIndex = knot.input.wellIndex,
                     concentration = knot.input.concentration,
                     rawSignal = knot.input.rawSignal,
-                    netSignal = knot.netSignal,
-                    fittedSignal = fittedSignals[index],
+                    netSignal = knot.netSignal.toFloat(),
+                    fittedSignal = fittedSignals[index].toFloat(),
                 )
             },
         )
@@ -73,14 +82,20 @@ class CalibrationValidator {
 
     private data class NetKnot(
         val input: CalibrationInput,
-        val netSignal: Float,
+        val netSignal: Double,
     )
+
+    private fun Double.isRepresentableAsFiniteFloat(): Boolean {
+        if (!isFinite()) return false
+        val converted = toFloat()
+        return converted.isFinite() && (this == 0.0 || converted != 0f)
+    }
 
     private companion object {
         const val REQUIRED_READING_COUNT = 9
         const val BLANK_CONCENTRATION = 0f
-        const val MINIMUM_DYNAMIC_RANGE = 8f
-        const val ABSOLUTE_CORRECTION_TOLERANCE = 3f
-        const val RELATIVE_CORRECTION_TOLERANCE = 0.15f
+        const val MINIMUM_DYNAMIC_RANGE = 8.0
+        const val ABSOLUTE_CORRECTION_TOLERANCE = 3.0
+        const val RELATIVE_CORRECTION_TOLERANCE = 0.15
     }
 }
