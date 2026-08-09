@@ -1,5 +1,8 @@
 package cloud.univ.jointsense.image
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
+
 internal class ResourceOwnership<T : Any>(
     initialResource: T,
     private val releaseResource: (T) -> Unit,
@@ -35,5 +38,22 @@ internal fun <T : Any, R> withResourceOwnership(
         block(ownership)
     } finally {
         ownership.release()
+    }
+}
+
+internal suspend fun <T : Any> withContextResourceOwnership(
+    dispatcher: CoroutineDispatcher,
+    acquire: () -> T,
+    release: (T) -> Unit,
+): T {
+    var owned: T? = null
+    return try {
+        val delivered = withContext(dispatcher) {
+            acquire().also { owned = it }
+        }
+        owned = null
+        delivered
+    } finally {
+        owned?.let(release)
     }
 }

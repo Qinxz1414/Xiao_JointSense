@@ -10,7 +10,6 @@ import java.io.InputStream
 import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class SampledBitmapDecoder internal constructor(
     private val streamOpener: ImageStreamOpener,
@@ -29,9 +28,11 @@ class SampledBitmapDecoder internal constructor(
     suspend fun decode(
         uri: Uri,
         maxEdge: Int = DEFAULT_MAX_EDGE,
-    ): DecodedImage = withContext(ioDispatcher) {
-        decodeBlocking(uri, maxEdge)
-    }
+    ): DecodedImage = withContextResourceOwnership(
+        dispatcher = ioDispatcher,
+        acquire = { decodeBlocking(uri, maxEdge) },
+        release = { decoded -> decoded.bitmap.recycle() },
+    )
 
     private fun decodeBlocking(uri: Uri, maxEdge: Int): DecodedImage {
         require(maxEdge > 0) { "maxEdge must be positive" }

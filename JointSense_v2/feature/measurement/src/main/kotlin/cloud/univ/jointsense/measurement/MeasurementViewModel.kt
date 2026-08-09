@@ -57,9 +57,11 @@ class MeasurementViewModel(
     val analysisCompletions: Flow<String> = legacyCompletionChannel.receiveAsFlow()
 
     private var currentSessionId: String? = savedStateHandle[KEY_SESSION_ID]
-    private var pendingResult: NewTestResult? = null
+    private var retryPersistence: PersistenceOperationSnapshot? = null
     private var analysisJob: Job? = null
     private var decodeJob: Job? = null
+    private var nextOperationToken = 0L
+    private var activeOperation: ActiveOperation? = null
     private var cropConfirmed: Boolean = savedStateHandle[KEY_CROP_CONFIRMED] ?: false
     private var nextSessionCreationId = 0L
     private var activeSessionCreationId: Long? = null
@@ -73,20 +75,26 @@ class MeasurementViewModel(
 
     fun onAction(action: MeasurementAction) {
         when (action) {
-            is MeasurementAction.ImageSelected -> decodeImage(action.uri, restoring = false)
-            is MeasurementAction.PermissionDenied -> setRecoverableError(
-                error = MeasurementError.PermissionDenied(action.permanentlyDenied),
-                resumeStage = Stage.AwaitingImage,
-            )
-            is MeasurementAction.CropChanged -> updateCrop(action.bounds)
-            MeasurementAction.CropConfirmed -> confirmCrop()
-            is MeasurementAction.FactorSelected -> updateState {
-                it.copy(factor = action.factor, error = null, errorMessage = null)
+            is MeasurementAction.ImageSelected -> if (!blocksMutuallyExclusiveInputs()) {
+                decodeImage(action.uri, restoring = false)
+            }
+            is MeasurementAction.PermissionDenied -> if (!blocksMutuallyExclusiveInputs()) {
+                setRecoverableError(
+                    error = MeasurementError.PermissionDenied(action.permanentlyDenied),
+                    resumeStage = Stage.AwaitingImage,
+                )
+            }
+            is MeasurementAction.CropChanged -> if (!blocksMutuallyExclusiveInputs()) {
+                updateCrop(action.bounds)
+            }
+            MeasurementAction.CropConfirmed -> if (!blocksMutuallyExclusiveInputs()) confirmCrop()
+            is MeasurementAction.FactorSelected -> if (!blocksMutuallyExclusiveInputs()) {
+                updateState { it.copy(factor = action.factor, error = null, errorMessage = null) }
             }
             MeasurementAction.Analyze -> startAnalysis()
             MeasurementAction.Retry -> retry()
             MeasurementAction.CancelAnalysis -> cancelAnalysis()
-            MeasurementAction.ContinueMeasurement -> beginNewDraft()
+            MeasurementAction.ContinueMeasurement -> if (!blocksMutuallyExclusiveInputs()) beginNewDraft()
         }
     }
 
@@ -168,6 +176,7 @@ class MeasurementViewModel(
     }
 
     fun selectSession(id: String) {
+        if (blocksMutuallyExclusiveInputs()) return
         currentSessionId = id
         savedStateHandle[KEY_SESSION_ID] = id
         updateState { it.copy(resultId = null) }
@@ -175,6 +184,7 @@ class MeasurementViewModel(
     }
 
     fun deleteSession(id: String) {
+        if (blocksMutuallyExclusiveInputs() && currentSessionId == id) return
         viewModelScope.launch {
             withContext(ioDispatcher) { repository.deleteSession(id) }
             if (currentSessionId == id) clearTransient()
@@ -198,9 +208,14 @@ class MeasurementViewModel(
     }
 
     fun setImage(image: MeasurementImage) {
+        if (blocksMutuallyExclusiveInputs()) {
+            image.release()
+            return
+        }
         decodeJob?.cancel()
         state.value.image?.takeIf { it !== image }?.release()
         cropConfirmed = false
+        retryPersistence = null
         updateState {
             it.copy(
                 stage = Stage.ReadyToCrop,
@@ -240,7 +255,7 @@ class MeasurementViewModel(
         if (!restoring) {
             state.value.image?.release()
             cropConfirmed = false
-            pendingResult = null
+            retryPersistence = null
         }
         updateState {
             it.copy(
@@ -255,31 +270,41 @@ class MeasurementViewModel(
             )
         }
         decodeJob = viewModelScope.launch {
+            var ownedImage: MeasurementImage? = null
             try {
-                val decoded = withContext(ioDispatcher) { imageDecoder.decode(uri) }
+                val decoded = withContext(ioDispatcher) {
+                    imageDecoder.decode(uri).also { ownedImage = it }
+                }
                 if (state.value.imageUri != uri) {
-                    decoded.release()
                     return@launch
                 }
                 state.value.image?.takeIf { it !== decoded }?.release()
                 val restoredCrop = state.value.cropRect
+                val restoredCropIsValid = restoring &&
+                    restoredCrop != null &&
+                    isValidCrop(restoredCrop, decoded)
+                val restoredConfirmationIsValid = restoredCropIsValid && cropConfirmed
+                if (!restoredConfirmationIsValid) cropConfirmed = false
                 updateState {
                     it.copy(
-                        stage = if (restoring && restoredCrop != null && cropConfirmed) {
+                        stage = if (restoredConfirmationIsValid) {
                             Stage.ReadyToAnalyze
                         } else {
                             Stage.ReadyToCrop
                         },
                         image = decoded,
-                        cropRect = restoredCrop ?: defaultCrop(decoded),
+                        cropRect = if (restoredCropIsValid) restoredCrop else defaultCrop(decoded),
                     )
                 }
+                ownedImage = null
             } catch (error: CancellationException) {
                 throw error
             } catch (error: MeasurementImageDecodeException) {
                 setRecoverableError(error.error, Stage.AwaitingImage)
             } catch (_: Exception) {
                 setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+            } finally {
+                ownedImage?.release()
             }
         }
     }
@@ -312,12 +337,23 @@ class MeasurementViewModel(
     }
 
     private fun startAnalysis() {
-        if (analysisJob?.isActive == true || state.value.isAnalyzing) return
+        if (activeOperation != null || analysisJob?.isActive == true || state.value.isAnalyzing) return
         val current = state.value
         val image = current.image ?: return
         val crop = current.cropRect ?: return
         val sessionId = currentSessionId ?: return
         if (current.stage != Stage.ReadyToAnalyze) return
+        val snapshot = AnalysisOperationSnapshot(
+            token = ++nextOperationToken,
+            sessionId = sessionId,
+            draftId = current.draftId,
+            image = image,
+            crop = crop,
+            factor = current.factor,
+        )
+        val operation = ActiveOperation(snapshot)
+        activeOperation = operation
+        retryPersistence = null
         updateState {
             it.copy(
                 stage = Stage.Analyzing,
@@ -330,34 +366,48 @@ class MeasurementViewModel(
         analysisJob = viewModelScope.launch {
             try {
                 val analysis = withContext(defaultDispatcher) {
-                    analyzer.analyze(image, crop, current.factor)
+                    analyzer.analyze(snapshot.image, snapshot.crop, snapshot.factor)
                 }
-                pendingResult = NewTestResult(
-                    factor = current.factor,
-                    concentration = analysis.concentration,
-                    rangeStatus = analysis.rangeStatus,
-                    features = analysis.features,
+                if (!isCurrent(operation)) return@launch
+                val persistence = PersistenceOperationSnapshot(
+                    analysis = snapshot,
+                    result = NewTestResult(
+                        factor = snapshot.factor,
+                        concentration = analysis.concentration,
+                        rangeStatus = analysis.rangeStatus,
+                        features = analysis.features,
+                    ),
                 )
-                persistPending(sessionId)
+                persist(operation, persistence)
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                setRecoverableError(MeasurementError.AnalysisFailed, Stage.ReadyToAnalyze)
+                if (isCurrent(operation)) {
+                    setRecoverableError(MeasurementError.AnalysisFailed, Stage.ReadyToAnalyze)
+                }
+            } finally {
+                completeOperation(operation)
             }
         }
     }
 
-    private suspend fun persistPending(sessionId: String) {
-        val result = pendingResult ?: run {
-            setRecoverableError(MeasurementError.AnalysisFailed, Stage.ReadyToAnalyze)
-            return
-        }
+    private suspend fun persist(
+        operation: ActiveOperation,
+        snapshot: PersistenceOperationSnapshot,
+    ) {
+        if (!isCurrent(operation)) return
         updateState { it.copy(stage = Stage.Persisting, error = null, resumeStage = null) }
         try {
             val resultId = withContext(ioDispatcher) {
-                repository.commitResult(sessionId, state.value.draftId, result)
+                repository.commitResult(
+                    snapshot.analysis.sessionId,
+                    snapshot.analysis.draftId,
+                    snapshot.result,
+                )
             }
-            state.value.image?.release()
+            if (!isCurrent(operation)) return
+            retryPersistence = null
+            operation.releaseWhenFinished = true
             updateState {
                 it.copy(
                     stage = Stage.Success,
@@ -366,22 +416,40 @@ class MeasurementViewModel(
                     lastResult = findResult(it.sessions, resultId),
                 )
             }
+            if (!isCurrent(operation)) return
             effectChannel.send(MeasurementEffect.NavigateToResult(resultId))
+            if (!isCurrent(operation)) return
             legacyCompletionChannel.send(resultId)
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
-            setRecoverableError(MeasurementError.PersistenceFailed, Stage.Persisting)
+            if (isCurrent(operation)) {
+                retryPersistence = snapshot
+                setRecoverableError(MeasurementError.PersistenceFailed, Stage.Persisting)
+            }
         }
     }
 
     private fun retry() {
-        if (analysisJob?.isActive == true || state.value.stage != Stage.RecoverableError) return
+        if (activeOperation != null || analysisJob?.isActive == true ||
+            state.value.stage != Stage.RecoverableError
+        ) return
         when (state.value.resumeStage) {
             Stage.Persisting -> {
-                val sessionId = currentSessionId ?: return
+                val failed = retryPersistence ?: return
+                if (state.value.image !== failed.analysis.image) return
+                val retryAnalysis = failed.analysis.copy(token = ++nextOperationToken)
+                val retrySnapshot = failed.copy(analysis = retryAnalysis)
+                val operation = ActiveOperation(retryAnalysis)
+                activeOperation = operation
                 updateState { it.copy(stage = Stage.Persisting, error = null, resumeStage = null) }
-                analysisJob = viewModelScope.launch { persistPending(sessionId) }
+                analysisJob = viewModelScope.launch {
+                    try {
+                        persist(operation, retrySnapshot)
+                    } finally {
+                        completeOperation(operation)
+                    }
+                }
             }
             Stage.ReadyToAnalyze -> {
                 updateState { it.copy(stage = Stage.ReadyToAnalyze, error = null, resumeStage = null) }
@@ -399,8 +467,8 @@ class MeasurementViewModel(
 
     private fun cancelAnalysis() {
         if (state.value.stage != Stage.Analyzing && state.value.stage != Stage.Persisting) return
+        activeOperation?.invalidated = true
         analysisJob?.cancel()
-        analysisJob = null
         updateState {
             it.copy(
                 stage = Stage.ReadyToAnalyze,
@@ -412,10 +480,10 @@ class MeasurementViewModel(
     }
 
     private fun beginNewDraft() {
-        analysisJob?.cancel()
+        invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
-        state.value.image?.release()
-        pendingResult = null
+        releaseStateImageUnlessBorrowed()
+        retryPersistence = null
         cropConfirmed = false
         updateState {
             it.copy(
@@ -434,12 +502,12 @@ class MeasurementViewModel(
     }
 
     private fun clearTransient() {
-        analysisJob?.cancel()
+        invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
-        state.value.image?.release()
+        releaseStateImageUnlessBorrowed()
         currentSessionId = null
         savedStateHandle[KEY_SESSION_ID] = null
-        pendingResult = null
+        retryPersistence = null
         cropConfirmed = false
         val sessions = state.value.sessions
         val origin = state.value.originDestination
@@ -529,18 +597,52 @@ class MeasurementViewModel(
     }
 
     override fun onCleared() {
-        analysisJob?.cancel()
+        invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
-        state.value.image?.release()
+        releaseStateImageUnlessBorrowed()
         super.onCleared()
     }
 
-    private fun defaultCrop(image: MeasurementImage) = CropBounds(
-        left = image.width / 4,
-        top = image.height / 4,
-        right = image.width * 3 / 4,
-        bottom = image.height * 3 / 4,
-    )
+    private fun blocksMutuallyExclusiveInputs(): Boolean = activeOperation?.let {
+        !it.invalidated || !it.releaseWhenFinished
+    } == true
+
+    private fun isCurrent(operation: ActiveOperation): Boolean =
+        activeOperation === operation &&
+            activeOperation?.snapshot?.token == operation.snapshot.token &&
+            !operation.invalidated
+
+    private fun invalidateActiveOperation(releaseImage: Boolean) {
+        activeOperation?.let { operation ->
+            operation.invalidated = true
+            operation.releaseWhenFinished = operation.releaseWhenFinished || releaseImage
+        }
+        analysisJob?.cancel()
+    }
+
+    private fun releaseStateImageUnlessBorrowed() {
+        val image = state.value.image ?: return
+        if (activeOperation?.snapshot?.image !== image) image.release()
+    }
+
+    private fun completeOperation(operation: ActiveOperation) {
+        if (activeOperation === operation) {
+            activeOperation = null
+            analysisJob = null
+        }
+        operation.releaseIfRequested()
+    }
+
+    private fun defaultCrop(image: MeasurementImage): CropBounds {
+        val left = image.width / 4
+        val top = image.height / 4
+        return CropBounds(
+            left = left,
+            top = top,
+            right = maxOf(image.width * 3 / 4, left + 1).coerceAtMost(image.width),
+            bottom = maxOf(image.height * 3 / 4, top + 1).coerceAtMost(image.height),
+        )
+    }
 
     private fun isValidCrop(bounds: CropBounds, image: MeasurementImage?): Boolean =
         image != null &&
@@ -551,6 +653,34 @@ class MeasurementViewModel(
     private fun findResult(sessions: List<TestSession>, id: String) = sessions.asSequence()
         .flatMap { it.results.asSequence() }
         .firstOrNull { it.id == id }
+
+    private data class AnalysisOperationSnapshot(
+        val token: Long,
+        val sessionId: String,
+        val draftId: String,
+        val image: MeasurementImage,
+        val crop: CropBounds,
+        val factor: InflammationFactor,
+    )
+
+    private data class PersistenceOperationSnapshot(
+        val analysis: AnalysisOperationSnapshot,
+        val result: NewTestResult,
+    )
+
+    private class ActiveOperation(
+        val snapshot: AnalysisOperationSnapshot,
+    ) {
+        var invalidated: Boolean = false
+        var releaseWhenFinished: Boolean = false
+        private var imageReleased: Boolean = false
+
+        fun releaseIfRequested() {
+            if (!releaseWhenFinished || imageReleased) return
+            imageReleased = true
+            snapshot.image.release()
+        }
+    }
 
     private companion object {
         const val KEY_DRAFT_ID = "measurement.draftId"

@@ -1,12 +1,41 @@
 package cloud.univ.jointsense.image
 
 import java.io.IOException
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ResourceOwnershipTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancellationAfterDispatcherAllocationReleasesUndeliveredResource() = runTest {
+        val dispatcher = QueueDispatcher()
+        val resource = Releasable("decoded")
+        var delivered: Releasable? = null
+        val job = launch {
+            delivered = withContextResourceOwnership(
+                dispatcher = dispatcher,
+                acquire = { resource },
+                release = Releasable::release,
+            )
+        }
+        runCurrent()
+
+        dispatcher.runNext()
+        job.cancel()
+        runCurrent()
+
+        assertEquals(null, delivered)
+        assertEquals(1, resource.releaseCount)
+    }
+
     @Test
     fun releasesOwnedResourceWhenPostDecodeStepFails() {
         val sampled = Releasable("sampled")
@@ -48,6 +77,18 @@ class ResourceOwnershipTest {
 
         assertEquals(1, sampled.releaseCount)
         assertEquals(1, rotated.releaseCount)
+    }
+}
+
+private class QueueDispatcher : CoroutineDispatcher() {
+    private val tasks = ArrayDeque<Runnable>()
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        tasks += block
+    }
+
+    fun runNext() {
+        tasks.removeFirst().run()
     }
 }
 

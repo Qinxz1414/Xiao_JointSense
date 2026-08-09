@@ -11,11 +11,14 @@ import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
@@ -33,6 +36,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -388,6 +392,21 @@ class MeasurementViewModelTest {
     }
 
     @Test
+    fun onePixelImageGetsAConfirmableDefaultCrop() = runTest(dispatcher) {
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-1" },
+        )
+
+        viewModel.setImage(FakeImage(1, 1))
+
+        assertEquals(CropBounds(0, 0, 1, 1), viewModel.state.value.cropRect)
+        viewModel.onAction(MeasurementAction.CropConfirmed)
+        assertEquals(Stage.ReadyToAnalyze, viewModel.state.value.stage)
+    }
+
+    @Test
     fun temporaryPermissionDenialPreservesDraftAndRecoversToImageSelection() =
         runTest(dispatcher) {
             verifyPermissionDenialRecovery(permanentlyDenied = false)
@@ -397,6 +416,236 @@ class MeasurementViewModelTest {
     fun permanentPermissionDenialPreservesDraftAndRecoversToImageSelection() =
         runTest(dispatcher) {
             verifyPermissionDenialRecovery(permanentlyDenied = true)
+        }
+
+    @Test
+    fun analyzeFlightIgnoresMutuallyExclusiveInputsUntilItCompletes() = runTest(dispatcher) {
+        val analyzer = RecordingAnalyzer().apply { nonCooperativeAnalysis = true }
+        val image = ReleasableImage(800, 600)
+        val replacement = ReleasableImage(400, 300)
+        val viewModel = readyOwnedViewModel(image = image, analyzer = analyzer)
+        val operationData = viewModel.state.value.recoveryData()
+        val sessionId = requireNotNull(viewModel.state.value.currentSession?.id)
+
+        viewModel.onAction(MeasurementAction.Analyze)
+        runCurrent()
+        viewModel.onAction(MeasurementAction.ImageSelected("content://ignored"))
+        viewModel.onAction(MeasurementAction.PermissionDenied(permanentlyDenied = true))
+        viewModel.onAction(MeasurementAction.ContinueMeasurement)
+        viewModel.setImage(replacement)
+        viewModel.selectSession("other-session")
+
+        assertEquals(Stage.Analyzing, viewModel.state.value.stage)
+        assertEquals(operationData, viewModel.state.value.recoveryData())
+        assertEquals(sessionId, viewModel.state.value.currentSession?.id)
+        assertEquals(0, image.releaseCalls)
+        assertEquals(1, replacement.releaseCalls)
+
+        analyzer.releaseAnalysis()
+        advanceUntilIdle()
+        assertEquals(Stage.Success, viewModel.state.value.stage)
+        assertEquals(1, image.releaseCalls)
+    }
+
+    @Test
+    fun busyImageSelectionIsIgnoredDuringPersisting() = runTest(dispatcher) {
+        val repository = RecordingRepository().apply { suspendCommit = true }
+        val image = ReleasableImage(800, 600)
+        val replacement = ReleasableImage(400, 300)
+        val viewModel = readyOwnedViewModel(image = image, repository = repository)
+        val operationData = viewModel.state.value.recoveryData()
+        val sessionId = requireNotNull(viewModel.state.value.currentSession?.id)
+
+        viewModel.onAction(MeasurementAction.Analyze)
+        runCurrent()
+        assertEquals(Stage.Persisting, viewModel.state.value.stage)
+        viewModel.onAction(MeasurementAction.ImageSelected("content://ignored"))
+        viewModel.onAction(MeasurementAction.PermissionDenied(permanentlyDenied = false))
+        viewModel.onAction(MeasurementAction.ContinueMeasurement)
+        viewModel.setImage(replacement)
+        viewModel.deleteSession(sessionId)
+        runCurrent()
+
+        assertEquals(Stage.Persisting, viewModel.state.value.stage)
+        assertEquals(operationData, viewModel.state.value.recoveryData())
+        assertTrue(repository.sessions.value.any { it.id == sessionId })
+        assertEquals(0, image.releaseCalls)
+        assertEquals(1, replacement.releaseCalls)
+        repository.releaseCommit()
+        advanceUntilIdle()
+        assertEquals(Stage.Success, viewModel.state.value.stage)
+    }
+
+    @Test
+    fun abandonDuringPersistingKeepsLateCompletionBoundToCapturedDraft() = runTest(dispatcher) {
+        var draftNumber = 0
+        val repository = RecordingRepository().apply { nonCooperativeCommit = true }
+        val oldImage = ReleasableImage(800, 600)
+        val replacement = ReleasableImage(400, 300)
+        val viewModel = MeasurementViewModel(
+            repository = repository,
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-${++draftNumber}" },
+            savedStateHandle = SavedStateHandle(mapOf("measurement.sessionId" to "session-1")),
+            decoder = RecordingDecoder(),
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        viewModel.setImage(oldImage)
+        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 220)))
+        viewModel.onAction(MeasurementAction.CropConfirmed)
+        val capturedDraft = viewModel.state.value.draftId
+
+        viewModel.onAction(MeasurementAction.Analyze)
+        runCurrent()
+        assertEquals(Stage.Persisting, viewModel.state.value.stage)
+
+        viewModel.abandonMeasurement()
+        val replacementDraft = viewModel.state.value.draftId
+        viewModel.setImage(replacement)
+        repository.releaseCommit("late-result")
+        runCurrent()
+
+        assertEquals(listOf(capturedDraft), repository.committedDrafts)
+        assertNotEquals(capturedDraft, replacementDraft)
+        assertEquals(replacementDraft, viewModel.state.value.draftId)
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
+        assertTrue(viewModel.state.value.image === replacement)
+        assertEquals(1, oldImage.releaseCalls)
+        assertEquals(0, replacement.releaseCalls)
+        assertNull(withTimeoutOrNull(1) { viewModel.effects.first() })
+    }
+
+    @Test
+    fun onClearedDefersOwnedImageReleaseUntilNonCooperativeAnalyzerExits() = runTest(dispatcher) {
+        val analyzer = RecordingAnalyzer().apply { nonCooperativeAnalysis = true }
+        val image = ReleasableImage(800, 600)
+        val viewModel = readyOwnedViewModel(image = image, analyzer = analyzer)
+        viewModel.onAction(MeasurementAction.Analyze)
+        runCurrent()
+        val store = ViewModelStore().apply { put("measurement", viewModel) }
+
+        store.clear()
+        assertEquals(0, image.releaseCalls)
+        analyzer.releaseAnalysis()
+        advanceUntilIdle()
+
+        assertEquals(1, image.releaseCalls)
+    }
+
+    @Test
+    fun cancelledOuterDecodeBoundaryReleasesAllocatedUndeliveredImage() = runTest(dispatcher) {
+        val io = ManualQueueDispatcher()
+        val decoded = ReleasableImage(800, 600)
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-1" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = object : MeasurementImageDecoder {
+                override suspend fun decode(uri: String): MeasurementImage = decoded
+            },
+            ioDispatcher = io,
+            defaultDispatcher = dispatcher,
+        )
+
+        viewModel.onAction(MeasurementAction.ImageSelected("content://queued"))
+        runCurrent()
+        io.runNext()
+        viewModel.onAction(MeasurementAction.ContinueMeasurement)
+        runCurrent()
+
+        assertEquals(1, decoded.releaseCalls)
+        assertEquals(Stage.AwaitingImage, viewModel.state.value.stage)
+    }
+
+    @Test
+    fun restoredConfirmedCropIsRevalidatedAgainstSmallerDecodedImage() = runTest(dispatcher) {
+        val handle = SavedStateHandle(
+            mapOf(
+                "measurement.draftId" to "draft-1",
+                "measurement.imageUri" to "content://restored",
+                "measurement.crop.left" to 0,
+                "measurement.crop.top" to 0,
+                "measurement.crop.right" to 700,
+                "measurement.crop.bottom" to 500,
+                "measurement.crop.confirmed" to true,
+            ),
+        )
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            savedStateHandle = handle,
+            decoder = object : MeasurementImageDecoder {
+                override suspend fun decode(uri: String) = FakeImage(200, 100)
+            },
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        advanceUntilIdle()
+
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
+        assertEquals(CropBounds(50, 25, 150, 75), viewModel.state.value.cropRect)
+    }
+
+    @Test
+    fun partialConfirmedCropStateIsRepairedToUnconfirmedDefault() = runTest(dispatcher) {
+        val handle = SavedStateHandle(
+            mapOf(
+                "measurement.draftId" to "draft-1",
+                "measurement.imageUri" to "content://restored-partial",
+                "measurement.crop.left" to 5,
+                "measurement.crop.top" to 10,
+                "measurement.crop.right" to 700,
+                "measurement.crop.confirmed" to true,
+            ),
+        )
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            savedStateHandle = handle,
+            decoder = object : MeasurementImageDecoder {
+                override suspend fun decode(uri: String) = FakeImage(200, 100)
+            },
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        advanceUntilIdle()
+
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
+        assertEquals(CropBounds(50, 25, 150, 75), viewModel.state.value.cropRect)
+        assertFalse(requireNotNull(handle.get<Boolean>("measurement.crop.confirmed")))
+    }
+
+    @Test
+    fun cancelNonCooperativeAnalysisKeepsImageOwnedUntilOperationActuallyExits() =
+        runTest(dispatcher) {
+            val analyzer = RecordingAnalyzer().apply { nonCooperativeAnalysis = true }
+            val image = ReleasableImage(800, 600)
+            val repository = RecordingRepository()
+            val viewModel = readyOwnedViewModel(
+                image = image,
+                repository = repository,
+                analyzer = analyzer,
+            )
+
+            viewModel.onAction(MeasurementAction.Analyze)
+            runCurrent()
+            viewModel.onAction(MeasurementAction.CancelAnalysis)
+            runCurrent()
+
+            assertEquals(Stage.ReadyToAnalyze, viewModel.state.value.stage)
+            assertEquals(0, image.releaseCalls)
+            viewModel.onAction(MeasurementAction.Analyze)
+            runCurrent()
+            assertEquals(1, analyzer.calls)
+
+            analyzer.releaseAnalysis()
+            advanceUntilIdle()
+
+            assertEquals(Stage.ReadyToAnalyze, viewModel.state.value.stage)
+            assertEquals(0, image.releaseCalls)
+            assertEquals(0, repository.commitCalls)
         }
 
     @Test
@@ -455,6 +704,29 @@ class MeasurementViewModelTest {
         return viewModel
     }
 
+    private fun TestScope.readyOwnedViewModel(
+        image: ReleasableImage,
+        repository: RecordingRepository = RecordingRepository(),
+        analyzer: RecordingAnalyzer = RecordingAnalyzer(),
+    ): MeasurementViewModel {
+        val viewModel = MeasurementViewModel(
+            repository = repository,
+            analyzer = analyzer,
+            draftIdFactory = { "draft-owned" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        viewModel.createNewSession("HOME")
+        testScheduler.advanceUntilIdle()
+        viewModel.acceptCreatedSession()
+        viewModel.setImage(image)
+        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 220)))
+        viewModel.onAction(MeasurementAction.CropConfirmed)
+        return viewModel
+    }
+
     private fun TestScope.verifyPermissionDenialRecovery(permanentlyDenied: Boolean) {
         val viewModel = readyViewModel()
         viewModel.onAction(MeasurementAction.FactorSelected(InflammationFactor.IL1_BETA))
@@ -490,6 +762,9 @@ class MeasurementViewModelTest {
         )
     }
 }
+
+private fun MeasurementUiState.recoveryData(): List<Any?> =
+    listOf(draftId, imageUri, cropRect, factor, originDestination)
 
 private fun MeasurementViewModel.acceptCreatedSession(): String {
     val request = requireNotNull(state.value.sessionCreationRequest)
@@ -531,9 +806,14 @@ private class RecordingAnalyzer(
     var calls = 0
     var failuresRemaining = 0
     var suspendAnalysis = false
+    var nonCooperativeAnalysis = false
     var boundary: String? = null
         private set
     private val analysisGate = CompletableDeferred<Unit>()
+
+    fun releaseAnalysis() {
+        analysisGate.complete(Unit)
+    }
 
     override suspend fun analyze(
         image: MeasurementImage,
@@ -542,7 +822,11 @@ private class RecordingAnalyzer(
     ): BaselineAnalysisResult {
         calls += 1
         boundary = activeBoundary?.get()
-        if (suspendAnalysis) analysisGate.await()
+        if (nonCooperativeAnalysis) {
+            withContext(NonCancellable) { analysisGate.await() }
+        } else if (suspendAnalysis) {
+            analysisGate.await()
+        }
         if (failuresRemaining-- > 0) error("analysis failed")
         return BaselineAnalysisResult(
             concentration = 42f,
@@ -558,17 +842,23 @@ private class RecordingRepository(
     private val nextSession = AtomicInteger(1)
     private val nextResult = AtomicInteger(1)
     private val commitGate = CompletableDeferred<String>()
+    private var commitContinuation: Continuation<String>? = null
     val sessions = MutableStateFlow<List<TestSession>>(emptyList())
     val committedDrafts = mutableListOf<String>()
     var commitCalls = 0
         private set
     var commitFailuresRemaining = 0
     var suspendCommit = false
+    var nonCooperativeCommit = false
     var commitBoundary: String? = null
         private set
 
     fun releaseCommit(id: String = "result-1") {
-        commitGate.complete(id)
+        if (nonCooperativeCommit) {
+            requireNotNull(commitContinuation).resumeWith(Result.success(id))
+        } else {
+            commitGate.complete(id)
+        }
     }
 
     override fun observeSessions(): Flow<List<TestSession>> = sessions
@@ -592,7 +882,11 @@ private class RecordingRepository(
         committedDrafts += draftId
         commitBoundary = activeBoundary?.get()
         if (commitFailuresRemaining-- > 0) error("persistence failed")
-        val id = if (suspendCommit) commitGate.await() else "result-${nextResult.getAndIncrement()}"
+        val id = when {
+            nonCooperativeCommit -> suspendCoroutine { commitContinuation = it }
+            suspendCommit -> commitGate.await()
+            else -> "result-${nextResult.getAndIncrement()}"
+        }
         val stored = TestResult(
             id = id,
             sessionId = sessionId,
@@ -633,5 +927,17 @@ private class BoundaryDispatcher(
                 activeBoundary.set(previous)
             }
         }
+    }
+}
+
+private class ManualQueueDispatcher : CoroutineDispatcher() {
+    private val tasks = ArrayDeque<Runnable>()
+
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        tasks += block
+    }
+
+    fun runNext() {
+        tasks.removeFirst().run()
     }
 }
