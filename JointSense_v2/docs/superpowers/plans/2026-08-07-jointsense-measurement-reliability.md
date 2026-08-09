@@ -365,6 +365,8 @@ git commit -m "feat: add recoverable measurement state machine"
 ### Task 5: Bind camera, Photo Picker, crop, and Back UI to the state machine
 
 **Files:**
+- Modify: `app/build.gradle.kts`
+- Modify: `app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt`
 - Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementScreens.kt`
 - Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementEntry.kt`
 - Modify: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/crop/ImageCropView.kt`
@@ -374,6 +376,8 @@ git commit -m "feat: add recoverable measurement state machine"
 **Interfaces:**
 - Consumes: Task 4 StateFlow/actions; typed navigation from Plan 1.
 - Produces: visible progress/errors; Photo Picker; permission recovery; correct per-step Back.
+
+The app composition root must construct `SampledBitmapDecoder` from the application `ContentResolver` and use the decoder-aware `MeasurementViewModelFactory` overload. Add a direct app dependency on `:core:image`; the legacy two-argument factory intentionally has no decoder and is not valid for the formal URI flow.
 
 - [ ] **Step 1: Write failing Compose flow tests**
 
@@ -398,7 +402,7 @@ Add stable test tags `measurement_progress`, `measurement_error`, `retry_button`
 Run:
 
 ```powershell
-.\gradlew.bat :feature:measurement:compileDebugKotlin :feature:measurement:compileDebugAndroidTestSources
+.\gradlew.bat :feature:measurement:compileDebugKotlin :feature:measurement:compileDebugAndroidTestSources :app:compileDebugKotlin
 .\gradlew.bat :feature:measurement:connectedDebugAndroidTest
 ```
 
@@ -407,7 +411,7 @@ Expected: compilation exits 0; connected flow tests pass when a device exists.
 - [ ] **Step 6: Commit measurement UI integration**
 
 ```powershell
-git add feature/measurement
+git add app/build.gradle.kts app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt feature/measurement
 git commit -m "fix: make measurement flow recoverable"
 ```
 
