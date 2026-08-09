@@ -6,15 +6,26 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import java.io.InputStream
 import java.io.IOException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class SampledBitmapDecoder(
-    private val contentResolver: ContentResolver,
+class SampledBitmapDecoder internal constructor(
+    private val streamOpener: ImageStreamOpener,
+    private val operations: ImageDecodeOperations,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    constructor(
+        contentResolver: ContentResolver,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ) : this(
+        streamOpener = ImageStreamOpener(contentResolver::openInputStream),
+        operations = AndroidImageDecodeOperations,
+        ioDispatcher = ioDispatcher,
+    )
+
     suspend fun decode(
         uri: Uri,
         maxEdge: Int = DEFAULT_MAX_EDGE,
@@ -24,28 +35,26 @@ class SampledBitmapDecoder(
 
     private fun decodeBlocking(uri: Uri, maxEdge: Int): DecodedImage {
         require(maxEdge > 0) { "maxEdge must be positive" }
-        var decodedBitmap: Bitmap? = null
         try {
             val bounds = readBounds(uri)
             val sampleSize = calculateInSampleSize(bounds.width, bounds.height, maxEdge)
-            decodedBitmap = readSampledBitmap(uri, sampleSize)
-            val rotationDegrees = readRotationDegrees(uri)
-            val orientedBitmap = rotate(decodedBitmap, rotationDegrees)
-            if (orientedBitmap !== decodedBitmap) {
-                decodedBitmap.recycle()
+            val decodedBitmap = readSampledBitmap(uri, sampleSize)
+            return withResourceOwnership(decodedBitmap, Bitmap::recycle) { ownership ->
+                val rotationDegrees = readRotationDegrees(uri)
+                ownership.replace(operations.rotate(ownership.current, rotationDegrees))
+                val result = DecodedImage(
+                    bitmap = ownership.current,
+                    sourceWidth = bounds.width,
+                    sourceHeight = bounds.height,
+                    inSampleSize = sampleSize,
+                    rotationDegrees = rotationDegrees,
+                )
+                ownership.transfer()
+                result
             }
-            decodedBitmap = null
-            return DecodedImage(
-                bitmap = orientedBitmap,
-                sourceWidth = bounds.width,
-                sourceHeight = bounds.height,
-                inSampleSize = sampleSize,
-                rotationDegrees = rotationDegrees,
-            )
         } catch (error: ImageDecodeError) {
             throw error
         } catch (error: OutOfMemoryError) {
-            decodedBitmap?.recycle()
             throw ImageDecodeError.OutOfMemory(uri, error)
         } catch (error: SecurityException) {
             throw ImageDecodeError.Unreadable(uri, error)
@@ -57,29 +66,64 @@ class SampledBitmapDecoder(
     }
 
     private fun readBounds(uri: Uri): ImageBounds {
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        open(uri).use { stream -> BitmapFactory.decodeStream(stream, null, options) }
-        if (options.outWidth <= 0 || options.outHeight <= 0) {
-            throw ImageDecodeError.Unsupported(uri)
-        }
-        return ImageBounds(options.outWidth, options.outHeight)
+        return open(uri).use(operations::readBounds) ?: throw ImageDecodeError.Unsupported(uri)
     }
 
     private fun readSampledBitmap(uri: Uri, sampleSize: Int): Bitmap {
-        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        return open(uri).use { stream ->
-            BitmapFactory.decodeStream(stream, null, options)
-        } ?: throw ImageDecodeError.Unsupported(uri)
+        return open(uri).use { stream -> operations.readBitmap(stream, sampleSize) }
+            ?: throw ImageDecodeError.Unsupported(uri)
     }
 
     private fun readRotationDegrees(uri: Uri): Int {
+        return open(uri).use(operations::readRotationDegrees)
+    }
+
+    private fun open(uri: Uri) =
+        streamOpener.open(uri) ?: throw ImageDecodeError.Unreadable(uri)
+
+    private companion object {
+        const val DEFAULT_MAX_EDGE = 2048
+    }
+}
+
+internal fun interface ImageStreamOpener {
+    fun open(uri: Uri): InputStream?
+}
+
+internal interface ImageDecodeOperations {
+    fun readBounds(stream: InputStream): ImageBounds?
+
+    fun readBitmap(stream: InputStream, sampleSize: Int): Bitmap?
+
+    fun readRotationDegrees(stream: InputStream): Int
+
+    fun rotate(bitmap: Bitmap, rotationDegrees: Int): Bitmap
+}
+
+internal data class ImageBounds(val width: Int, val height: Int)
+
+private object AndroidImageDecodeOperations : ImageDecodeOperations {
+    override fun readBounds(stream: InputStream): ImageBounds? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeStream(stream, null, options)
+        return if (options.outWidth > 0 && options.outHeight > 0) {
+            ImageBounds(options.outWidth, options.outHeight)
+        } else {
+            null
+        }
+    }
+
+    override fun readBitmap(stream: InputStream, sampleSize: Int): Bitmap? {
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        return BitmapFactory.decodeStream(stream, null, options)
+    }
+
+    override fun readRotationDegrees(stream: InputStream): Int {
         val orientation = try {
-            open(uri).use { stream ->
-                ExifInterface(stream).getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL,
-                )
-            }
+            ExifInterface(stream).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL,
+            )
         } catch (_: IOException) {
             ExifInterface.ORIENTATION_NORMAL
         }
@@ -91,10 +135,7 @@ class SampledBitmapDecoder(
         }
     }
 
-    private fun open(uri: Uri) =
-        contentResolver.openInputStream(uri) ?: throw ImageDecodeError.Unreadable(uri)
-
-    private fun rotate(bitmap: Bitmap, rotationDegrees: Int): Bitmap {
+    override fun rotate(bitmap: Bitmap, rotationDegrees: Int): Bitmap {
         if (rotationDegrees == 0) return bitmap
         val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
         return Bitmap.createBitmap(
@@ -106,11 +147,5 @@ class SampledBitmapDecoder(
             matrix,
             true,
         )
-    }
-
-    private data class ImageBounds(val width: Int, val height: Int)
-
-    private companion object {
-        const val DEFAULT_MAX_EDGE = 2048
     }
 }

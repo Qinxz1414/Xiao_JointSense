@@ -5,11 +5,15 @@ import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -50,6 +54,38 @@ class SampledBitmapDecoderTest {
         assertThrows(ImageDecodeError.Unreadable::class.java) {
             runBlocking { decoder.decode(Uri.fromFile(source)) }
         }
+    }
+
+    @Test
+    fun recyclesSampledBitmapWhenExifStreamOpenFails() {
+        val sampledBitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        var openCount = 0
+        val decoder = SampledBitmapDecoder(
+            streamOpener = ImageStreamOpener {
+                openCount += 1
+                if (openCount == 3) {
+                    throw SecurityException("EXIF stream denied")
+                }
+                ByteArrayInputStream(byteArrayOf(1))
+            },
+            operations = object : ImageDecodeOperations {
+                override fun readBounds(stream: InputStream): ImageBounds = ImageBounds(8, 8)
+
+                override fun readBitmap(stream: InputStream, sampleSize: Int): Bitmap = sampledBitmap
+
+                override fun readRotationDegrees(stream: InputStream): Int = error("not reached")
+
+                override fun rotate(bitmap: Bitmap, rotationDegrees: Int): Bitmap = error("not reached")
+            },
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        val error = assertThrows(ImageDecodeError.Unreadable::class.java) {
+            runBlocking { decoder.decode(Uri.EMPTY) }
+        }
+
+        assertTrue(error.cause is SecurityException)
+        assertTrue(sampledBitmap.isRecycled)
     }
 
     private fun createJpeg(width: Int, height: Int, orientation: Int): File {
