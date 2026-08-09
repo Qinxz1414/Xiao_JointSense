@@ -18,6 +18,9 @@
 - Do not convert invalid numeric input to zero.
 - Result Back returns to the originating top-level route; Result never navigates back to factor selection.
 - About and exported reports contain the fixed disclaimer; the on-screen Result does not.
+- Shared Android image decoding belongs to a new `:core:image` Android library. `:feature:measurement` and `:feature:calibration` may depend on it; neither feature may depend on the other.
+- Typed route declarations and `NavGraphBuilder` registration remain app-owned. Task 6 is authorized to modify the named app navigation files and tests while calibration state/UI stays feature-owned.
+- When an accepted isotonic curve contains a fitted-signal plateau, inverse quantification is right-continuous: an exact plateau signal returns the highest concentration in the complete equal-signal plateau.
 - Stage only files named by each task.
 
 ---
@@ -53,6 +56,14 @@ private val curve = StandardCurve(listOf(CurveKnot(0f, -8f), CurveKnot(20f, -4f)
     assertEquals(QuantificationResult(0f, RangeStatus.BELOW_RANGE), curve.quantify(-9f))
     assertEquals(QuantificationResult(20f, RangeStatus.ABOVE_RANGE), curve.quantify(-3f))
 }
+
+@Test fun exactPlateauSignalUsesRightContinuousUpperConcentration() {
+    val plateau = StandardCurve(listOf(
+        CurveKnot(0f, -8f), CurveKnot(10f, -4f),
+        CurveKnot(20f, -4f), CurveKnot(30f, 0f),
+    ))
+    assertEquals(20f, plateau.quantify(-4f).concentration, 0.001f)
+}
 ```
 
 - [ ] **Step 2: Run tests and confirm RED**
@@ -87,6 +98,8 @@ class StandardCurve(knots: List<CurveKnot>) {
 ```
 
 Handle an exact first-knot signal as `IN_RANGE` with that knot's concentration; add a dedicated branch before computing `upper` to avoid coercing it into segment 0→1.
+
+For an exact signal shared by two or more consecutive knots, scan the complete equal-signal plateau and return its highest concentration. This right-continuous rule governs PAVA plateaus and must be covered independently from the first-knot branch.
 
 Move the current factory knot constants from the legacy `StandardCurve` into immutable `FactoryCurves`; add a round-trip test for every knot (`quantify(knot.signal) == knot.concentration`) so the migration changes no scientific constants.
 
@@ -181,17 +194,22 @@ git commit -m "fix: validate standard curve calibration"
 ### Task 3: Add sampled, orientation-aware image decoding
 
 **Files:**
-- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/ImageDecodePolicy.kt`
-- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/SampledBitmapDecoder.kt`
-- Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/DecodedImage.kt`
+- Create: `core/image/build.gradle.kts`
+- Create: `core/image/src/main/AndroidManifest.xml`
+- Create: `core/image/src/main/kotlin/cloud/univ/jointsense/image/ImageDecodePolicy.kt`
+- Create: `core/image/src/main/kotlin/cloud/univ/jointsense/image/SampledBitmapDecoder.kt`
+- Create: `core/image/src/main/kotlin/cloud/univ/jointsense/image/DecodedImage.kt`
+- Create: `core/image/src/main/kotlin/cloud/univ/jointsense/image/ImageDecodeError.kt`
 - Create: `feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image/MeasurementTempFileStore.kt`
-- Create: `feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/image/ImageDecodePolicyTest.kt`
+- Create: `core/image/src/test/kotlin/cloud/univ/jointsense/image/ImageDecodePolicyTest.kt`
+- Create: `core/image/src/androidTest/kotlin/cloud/univ/jointsense/image/SampledBitmapDecoderTest.kt`
 - Create: `feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/image/MeasurementTempFileStoreTest.kt`
-- Create: `feature/measurement/src/androidTest/kotlin/cloud/univ/jointsense/measurement/image/SampledBitmapDecoderTest.kt`
+- Modify: `settings.gradle.kts`
+- Modify: `feature/measurement/build.gradle.kts`
 
 **Interfaces:**
 - Consumes: `ContentResolver`, source URI, `Dispatchers.IO`.
-- Produces: `suspend fun decode(uri: Uri, maxEdge: Int = 2048): DecodedImage`; pure `calculateInSampleSize(width, height, maxEdge)`; a temp-file store that owns camera URIs until success or explicit cancellation.
+- Produces: shared `:core:image` API `suspend fun decode(uri: Uri, maxEdge: Int = 2048): DecodedImage`; pure `calculateInSampleSize(width, height, maxEdge)`; a measurement-owned temp-file store that owns camera URIs until success or explicit cancellation.
 
 - [ ] **Step 1: Write failing sample-size tests**
 
@@ -204,13 +222,13 @@ git commit -m "fix: validate standard curve calibration"
 
 - [ ] **Step 2: Run and confirm RED**
 
-Run: `.\gradlew.bat :feature:measurement:testDebugUnitTest --tests "*ImageDecodePolicyTest"`
+Run: `.\gradlew.bat :core:image:testDebugUnitTest --tests "*ImageDecodePolicyTest"`
 
 Expected: function is unresolved.
 
 - [ ] **Step 3: Implement two-pass decoding and EXIF rotation**
 
-Add `implementation(libs.androidx.exifinterface)` to `feature/measurement/build.gradle.kts`. Open the URI once for bounds and once for sampled decode. Use `BitmapFactory.Options.inJustDecodeBounds`, computed power-of-two `inSampleSize`, and `ExifInterface` to rotate 90/180/270 degrees. Throw typed `ImageDecodeError.Unsupported`, `.Unreadable`, or `.OutOfMemory` rather than returning null.
+Register `:core:image`, apply `jointsense.android.library`, and add `implementation(libs.androidx.exifinterface)` there. `:feature:measurement` depends on `:core:image`; Task 6 adds the same dependency to calibration. Open the URI once for bounds and once for sampled decode. Use `BitmapFactory.Options.inJustDecodeBounds`, computed power-of-two `inSampleSize`, and `ExifInterface` to rotate 90/180/270 degrees. Throw typed `ImageDecodeError.Unsupported`, `.Unreadable`, or `.OutOfMemory` rather than returning null.
 
 `MeasurementTempFileStore` creates files only under `context.cacheDir/measurement`, restores an existing pending URI from `SavedStateHandle`, deletes only files it owns, and clears a temp file after successful persistence or explicit flow cancellation. Its unit test verifies that retry/recreation retains the pending file while success/cancel removes it.
 
@@ -219,8 +237,8 @@ Add `implementation(libs.androidx.exifinterface)` to `feature/measurement/build.
 Run:
 
 ```powershell
-.\gradlew.bat :feature:measurement:testDebugUnitTest --tests "*ImageDecodePolicyTest"
-.\gradlew.bat :feature:measurement:compileDebugAndroidTestSources
+.\gradlew.bat :core:image:testDebugUnitTest --tests "*ImageDecodePolicyTest" :feature:measurement:testDebugUnitTest --tests "*MeasurementTempFileStoreTest"
+.\gradlew.bat :core:image:compileDebugAndroidTestSources :feature:measurement:compileDebugKotlin
 ```
 
 Expected: policy tests pass and Android decoder tests compile; run connected test when a device is available.
@@ -228,7 +246,7 @@ Expected: policy tests pass and Android decoder tests compile; run connected tes
 - [ ] **Step 5: Commit image decoding**
 
 ```powershell
-git add feature/measurement
+git add settings.gradle.kts core/image feature/measurement/build.gradle.kts feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/image feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/image
 git commit -m "feat: decode measurement images safely"
 ```
 
@@ -246,7 +264,7 @@ git commit -m "feat: decode measurement images safely"
 - Create: `feature/measurement/src/test/kotlin/cloud/univ/jointsense/measurement/SessionNameGeneratorTest.kt`
 
 **Interfaces:**
-- Consumes: decoder from Task 3, analysis from Task 1, `TestSessionRepository`, SavedStateHandle, injected IO/Default dispatchers.
+- Consumes: shared decoder from `:core:image` Task 3, analysis from Task 1, `TestSessionRepository`, SavedStateHandle, injected IO/Default dispatchers.
 - Produces: `StateFlow<MeasurementUiState>`; `onAction(MeasurementAction)`; one-shot `MeasurementEffect.NavigateToResult(resultId)`.
 
 - [ ] **Step 1: Write failing state-order and double-submit tests**
@@ -403,13 +421,17 @@ git commit -m "fix: make measurement flow recoverable"
 - Create: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/LegacyCalibrationRevalidator.kt`
 - Modify: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationScreens.kt`
 - Modify: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationEntry.kt`
+- Modify: `feature/calibration/build.gradle.kts`
+- Modify: `app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt`
+- Modify: `app/src/main/java/cloud/univ/jointsense/navigation/NavigationActions.kt`
+- Modify: `app/src/androidTest/java/cloud/univ/jointsense/navigation/JointSenseNavigationTest.kt`
 - Create: `feature/calibration/src/test/kotlin/cloud/univ/jointsense/calibration/CalibrationViewModelTest.kt`
 - Create: `feature/calibration/src/androidTest/kotlin/cloud/univ/jointsense/calibration/CalibrationFlowTest.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt`
 
 **Interfaces:**
-- Consumes: sampled decoder, moved grid-signal algorithm, Task 2 validator, CalibrationRepository, typed calibration routes.
+- Consumes: sampled decoder from `:core:image`, moved grid-signal algorithm, Task 2 validator, CalibrationRepository, app-owned typed calibration routes.
 - Produces: SavedStateHandle-backed calibration state; validated `CalibrationStatus.ACTIVE` writes; one-shot review of Phase 1 `NEEDS_REVIEW` records.
 
 - [ ] **Step 1: Write failing ViewModel tests**
@@ -430,7 +452,7 @@ Move the existing 3×3 detector math into `GridSignalDetector` and feed it only 
 
 - [ ] **Step 4: Implement stepwise Back and restore semantics**
 
-Top app bar and system Back pop one calibration route. Done exits the calibration graph. “Restore factory curve” requires confirmation and clears all user calibration through `CalibrationRepository.clearAll()`.
+Replace the current five destinations that all render the same internal flow with real route-specific feature entries. `JointSenseNavHost` owns mapping between `CalibrationSelectRoute`, `CalibrationCropRoute`, `CalibrationAssignRoute`, `CalibrationReviewRoute`, `CalibrationDoneRoute` and feature callbacks; the graph-scoped ViewModel/state survives those destinations without feature→app imports. Top app bar and system/predictive Back both pop exactly one calibration route. Done exits the calibration graph. “Restore factory curve” requires confirmation and clears all user calibration through `CalibrationRepository.clearAll()`.
 
 - [ ] **Step 5: Run calibration tests**
 
@@ -447,7 +469,7 @@ Expected: unit tests pass; connected tests pass with a device.
 - [ ] **Step 6: Commit calibration rebuild**
 
 ```powershell
-git add feature/calibration app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt
+git add feature/calibration app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt app/src/main/java/cloud/univ/jointsense/navigation/NavigationActions.kt app/src/androidTest/java/cloud/univ/jointsense/navigation/JointSenseNavigationTest.kt app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt
 git commit -m "fix: validate and persist calibration safely"
 ```
 
@@ -531,7 +553,7 @@ git commit -m "fix: export complete localized reports"
 - [ ] **Step 1: Run full regression verification**
 
 ```powershell
-.\gradlew.bat :core:analysis:test :feature:measurement:testDebugUnitTest :feature:calibration:testDebugUnitTest :feature:insights:testDebugUnitTest
+.\gradlew.bat :core:analysis:test :core:image:testDebugUnitTest :feature:measurement:testDebugUnitTest :feature:calibration:testDebugUnitTest :feature:insights:testDebugUnitTest
 .\gradlew.bat testDebugUnitTest
 .\gradlew.bat :app:lintDebug :app:assembleDebug
 ```
