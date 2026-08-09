@@ -77,4 +77,20 @@ class StandardCurveTest {
             }
         }
     }
+
+    @Test
+    fun il6LowerPlateauKnotShapesTheSegmentBeforeItsRightContinuousPlateau() {
+        val curve = FactoryCurves.forFactor(InflammationFactor.IL6)
+
+        assertEquals(75f, curve.quantify(-2f).concentration, 0.001f)
+        assertEquals(200f, curve.quantify(0f).concentration, 0.001f)
+    }
+
+    @Test
+    fun il1BetaLowerPlateauKnotShapesTheSegmentBeforeItsRightContinuousPlateau() {
+        val curve = FactoryCurves.forFactor(InflammationFactor.IL1_BETA)
+
+        assertEquals(10f, curve.quantify(3f).concentration, 0.001f)
+        assertEquals(50f, curve.quantify(17f).concentration, 0.001f)
+    }
 }
