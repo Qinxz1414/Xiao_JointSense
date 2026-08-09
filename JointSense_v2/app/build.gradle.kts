@@ -52,6 +52,7 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:domain"))
+    implementation(project(":core:image"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

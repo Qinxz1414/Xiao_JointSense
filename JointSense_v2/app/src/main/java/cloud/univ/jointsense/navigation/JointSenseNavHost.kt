@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,10 +66,12 @@ import cloud.univ.jointsense.insights.InsightsViewModel
 import cloud.univ.jointsense.insights.InsightsViewModelFactory
 import cloud.univ.jointsense.insights.ReportRouteScreen
 import cloud.univ.jointsense.insights.TrendsRouteScreen
+import cloud.univ.jointsense.image.SampledBitmapDecoder
 import cloud.univ.jointsense.measurement.CropRouteScreen
 import cloud.univ.jointsense.measurement.FactorSelectRouteScreen
 import cloud.univ.jointsense.measurement.HistoryRouteScreen
 import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
+import cloud.univ.jointsense.measurement.MeasurementAction
 import cloud.univ.jointsense.measurement.MeasurementViewModel
 import cloud.univ.jointsense.measurement.MeasurementViewModelFactory
 import cloud.univ.jointsense.measurement.ResultRouteScreen
@@ -212,6 +215,14 @@ fun JointSenseNavHost(
                         }
                     }
                     composable<CropRoute> {
+                        if (screenSlot == null) {
+                            BackHandler {
+                                requireNotNull(featureViewModels).measurement.onAction(
+                                    MeasurementAction.BackToImageSelection,
+                                )
+                                actions.navigateBack()
+                            }
+                        }
                         Destination(screenSlot, CropRoute, actions) {
                             CropRouteScreen(
                                 viewModel = requireNotNull(featureViewModels).measurement,
@@ -221,6 +232,14 @@ fun JointSenseNavHost(
                         }
                     }
                     composable<FactorSelectRoute> {
+                        if (screenSlot == null) {
+                            BackHandler {
+                                requireNotNull(featureViewModels).measurement.onAction(
+                                    MeasurementAction.BackToCrop,
+                                )
+                                actions.navigateBack()
+                            }
+                        }
                         Destination(screenSlot, FactorSelectRoute, actions) {
                             FactorSelectRouteScreen(
                                 viewModel = requireNotNull(featureViewModels).measurement,
@@ -234,10 +253,12 @@ fun JointSenseNavHost(
                 composable<ResultRoute> { entry ->
                     val route = entry.toRoute<ResultRoute>()
                     val inMeasurement = actions.isInMeasurement()
-                    BackHandler {
+                    val returnToOrigin: () -> Unit = {
                         if (inMeasurement) featureViewModels?.measurement?.finishMeasurement()
                         actions.exitResult()
+                        Unit
                     }
+                    BackHandler(onBack = returnToOrigin)
                     Destination(screenSlot, route, actions) {
                         val measurement = requireNotNull(featureViewModels).measurement
                         val state = measurement.state.collectAsStateWithLifecycle().value
@@ -245,26 +266,24 @@ fun JointSenseNavHost(
                             candidate.results.any { it.id == route.resultId }
                         }
                         val canContinue = session?.results?.size?.let { it < 5 } == true
+                        val origin = if (inMeasurement) {
+                            state.originDestination?.let { encoded ->
+                                runCatching { TopLevelDestination.valueOf(encoded) }.getOrNull()
+                            } ?: TopLevelDestination.HOME
+                        } else {
+                            TopLevelDestination.PROFILE
+                        }
                         ResultRouteScreen(
                             viewModel = measurement,
                             resultId = route.resultId,
-                            onRetest = {
+                            onContinueMeasurement = {
                                 if (session != null && canContinue) {
                                     measurement.selectSession(session.id)
                                     measurement.startNewTestInSession()
-                                    if (inMeasurement) {
-                                        actions.restartMeasurement()
-                                    } else {
-                                        actions.continueMeasurementFromResult(
-                                            TopLevelDestination.PROFILE,
-                                        )
-                                    }
+                                    actions.continueMeasurementFromResult(origin)
                                 }
                             },
-                            onFinish = {
-                                measurement.finishMeasurement()
-                                actions.goHome()
-                            },
+                            onReturnToOrigin = returnToOrigin,
                         )
                     }
                 }
@@ -327,9 +346,15 @@ private data class FeatureViewModels(
 
 @Composable
 private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModels {
+    val context = LocalContext.current.applicationContext
     val insightsFactory = remember(container) { InsightsViewModelFactory(container.testSessions) }
-    val measurementFactory = remember(container) {
-        MeasurementViewModelFactory(container.testSessions, container.measurementAnalysis)
+    val measurementFactory = remember(container, context) {
+        MeasurementViewModelFactory(
+            repository = container.testSessions,
+            analyzer = container.measurementAnalysis,
+            decoder = SampledBitmapDecoder(context.contentResolver),
+            context = context,
+        )
     }
     val settingsFactory = remember(container) {
         SettingsViewModelFactory(

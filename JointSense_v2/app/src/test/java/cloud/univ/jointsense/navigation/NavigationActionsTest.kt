@@ -108,6 +108,30 @@ class NavigationActionsTest {
         assertEquals(listOf(HomeRoute, ProfileRoute, HistoryRoute), driver.stack)
     }
 
+    @Test
+    fun continuingAnActiveMeasurementReplacesTheCompletedGraphWithAFreshGraph() {
+        val driver = StackNavigationDriver(mutableListOf(HomeRoute))
+        val actions = NavigationActions(driver)
+
+        actions.openTopLevel(TopLevelDestination.TRENDS)
+        actions.startMeasurement(TopLevelDestination.TRENDS)
+        actions.openCrop()
+        actions.openFactorSelect()
+        actions.openResult("completed-result")
+
+        actions.continueMeasurementFromResult(TopLevelDestination.TRENDS)
+
+        assertEquals(
+            listOf(
+                HomeRoute,
+                TrendsRoute,
+                MeasurementGraph(TopLevelDestination.TRENDS),
+                ImageSelectRoute,
+            ),
+            driver.stack,
+        )
+    }
+
     private class StackNavigationDriver(
         val stack: MutableList<NavigationTarget>,
     ) : NavigationDriver {

@@ -53,8 +53,8 @@ private fun ImportedFeatureRouteEntries(
     ResultRouteScreen(
         viewModel = measurement,
         resultId = "result-id",
-        onRetest = {},
-        onFinish = {},
+        onContinueMeasurement = {},
+        onReturnToOrigin = {},
     )
     HistoryRouteScreen(measurement, onOpenResult = {}, onBack = {})
 

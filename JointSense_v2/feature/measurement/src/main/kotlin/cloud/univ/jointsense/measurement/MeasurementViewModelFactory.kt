@@ -1,5 +1,6 @@
 package cloud.univ.jointsense.measurement
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -7,6 +8,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import cloud.univ.jointsense.image.SampledBitmapDecoder
+import cloud.univ.jointsense.measurement.image.MeasurementTempFileStore
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +17,7 @@ class MeasurementViewModelFactory(
     private val repository: TestSessionRepository,
     private val analyzer: BaselinePhotoAnalysisAdapter,
     private val decoder: MeasurementImageDecoder? = null,
+    private val captureStoreFactory: (SavedStateHandle) -> MeasurementCaptureStore? = { null },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val sessionNamePrefix: () -> String = { "Test" },
@@ -24,6 +27,7 @@ class MeasurementViewModelFactory(
         repository: TestSessionRepository,
         analyzer: BaselinePhotoAnalysisAdapter,
         decoder: SampledBitmapDecoder,
+        context: Context,
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
         sessionNamePrefix: () -> String = { "Test" },
@@ -32,6 +36,9 @@ class MeasurementViewModelFactory(
         repository = repository,
         analyzer = analyzer,
         decoder = SampledMeasurementImageDecoder(decoder),
+        captureStoreFactory = { savedStateHandle ->
+            MeasurementTempFileStore(context.applicationContext, savedStateHandle)
+        },
         ioDispatcher = ioDispatcher,
         defaultDispatcher = defaultDispatcher,
         sessionNamePrefix = sessionNamePrefix,
@@ -56,6 +63,7 @@ class MeasurementViewModelFactory(
         draftIdFactory = draftIdFactory,
         savedStateHandle = savedStateHandle,
         decoder = decoder,
+        captureStore = captureStoreFactory(savedStateHandle),
         ioDispatcher = ioDispatcher,
         defaultDispatcher = defaultDispatcher,
         sessionNamePrefix = sessionNamePrefix,

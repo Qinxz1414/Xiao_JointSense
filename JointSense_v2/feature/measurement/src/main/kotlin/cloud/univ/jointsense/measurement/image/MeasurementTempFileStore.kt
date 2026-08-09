@@ -3,6 +3,7 @@ package cloud.univ.jointsense.measurement.image
 import android.content.Context
 import androidx.core.content.FileProvider
 import androidx.lifecycle.SavedStateHandle
+import cloud.univ.jointsense.measurement.MeasurementCaptureStore
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -23,7 +24,7 @@ class MeasurementTempFileStore internal constructor(
     private val pendingState: PendingCaptureState,
     private val uriFactory: (File) -> String,
     private val fileNameFactory: () -> String = { "measurement-${UUID.randomUUID()}.jpg" },
-) {
+) : MeasurementCaptureStore {
     constructor(
         context: Context,
         savedStateHandle: SavedStateHandle,
@@ -53,6 +54,11 @@ class MeasurementTempFileStore internal constructor(
             return PendingMeasurementCapture(uri = uri, file = file.canonicalFile)
         }
 
+    override val pendingCaptureUri: String?
+        get() = pendingCapture?.uri
+
+    override fun createOrRestorePendingUri(): String = createOrRestorePending().uri
+
     fun createOrRestorePending(): PendingMeasurementCapture {
         pendingCapture?.let { return it }
         ensureMeasurementDirectory()
@@ -73,11 +79,11 @@ class MeasurementTempFileStore internal constructor(
         return PendingMeasurementCapture(uri = uri, file = file)
     }
 
-    fun onPersistenceSucceeded() {
+    override fun onPersistenceSucceeded() {
         deleteOwnedPendingAndClearState()
     }
 
-    fun onFlowCancelled() {
+    override fun onFlowCancelled() {
         deleteOwnedPendingAndClearState()
     }
 

@@ -1,11 +1,7 @@
 package cloud.univ.jointsense.measurement
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Rect
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,26 +42,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import cloud.univ.jointsense.designsystem.theme.MedicalBlue
 import cloud.univ.jointsense.designsystem.theme.MedicalGreen
 import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.measurement.crop.ImageCropView
-import java.io.File
+
+const val MEASUREMENT_PROGRESS_TAG = "measurement_progress"
+const val MEASUREMENT_ERROR_TAG = "measurement_error"
+const val RETRY_BUTTON_TAG = "retry_button"
+const val ANALYZE_BUTTON_TAG = "analyze_button"
+const val CONTINUE_MEASUREMENT_TAG = "continue_measurement"
 
 /**
  * Image Selection Screen - Step 1 of the test flow.
@@ -74,69 +70,12 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImageSelectScreen(
-    onImageSelected: (Bitmap) -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickImage: () -> Unit,
     onBack: () -> Unit,
     sessionName: String,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-
-    // Camera capture
-    var photoUri by remember { mutableStateOf<Uri?>(null) }
-    val cameraLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            photoUri?.let { uri ->
-                try {
-                    val inputStream = context.contentResolver.openInputStream(uri)
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                    inputStream?.close()
-                    if (bitmap != null) {
-                        onImageSelected(bitmap)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-    }
-
-    // Gallery picker
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            try {
-                val inputStream = context.contentResolver.openInputStream(it)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream?.close()
-                if (bitmap != null) {
-                    onImageSelected(bitmap)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    // Camera permission
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            // Create temp file for camera capture
-            val photoFile = File(context.cacheDir, "photo_${System.currentTimeMillis()}.jpg")
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                photoFile
-            )
-            photoUri = uri
-            cameraLauncher.launch(uri)
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -191,9 +130,7 @@ fun ImageSelectScreen(
 
             // Camera button
             Button(
-                onClick = {
-                    cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
-                },
+                onClick = onTakePhoto,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
@@ -213,7 +150,7 @@ fun ImageSelectScreen(
 
             // Gallery button
             Button(
-                onClick = { galleryLauncher.launch("image/*") },
+                onClick = onPickImage,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
@@ -462,14 +399,17 @@ fun FactorSelectScreen(
                 onClick = onAnalyze,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .testTag(ANALYZE_BUTTON_TAG),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MedicalBlue),
                 enabled = !isAnalyzing
             ) {
                 if (isAnalyzing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .testTag(MEASUREMENT_PROGRESS_TAG),
                         color = Color.White,
                         strokeWidth = 2.dp
                     )

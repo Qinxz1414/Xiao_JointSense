@@ -32,6 +32,8 @@ sealed interface MeasurementError {
 }
 
 sealed interface MeasurementEffect {
+    data class LaunchCamera(val uri: String) : MeasurementEffect
+
     data class NavigateToResult(val resultId: String) : MeasurementEffect
 }
 

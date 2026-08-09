@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -33,12 +34,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.chart.AiScaleBar
 import cloud.univ.jointsense.designsystem.chart.GradeBar
 import cloud.univ.jointsense.designsystem.component.NavyTopBar
+import cloud.univ.jointsense.designsystem.component.NavyBarAction
 import cloud.univ.jointsense.designsystem.theme.BgLight
 import cloud.univ.jointsense.designsystem.theme.GradeColors
 import cloud.univ.jointsense.designsystem.theme.InkText
@@ -60,8 +63,8 @@ fun ResultScreen(
     session: TestSession?,
     lastResult: TestResult?,
     canAddMore: Boolean,
-    onNewTest: () -> Unit,
-    onGoHome: () -> Unit,
+    onContinueMeasurement: () -> Unit,
+    onReturnToOrigin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val results = session?.results ?: emptyList()
@@ -70,7 +73,18 @@ fun ResultScreen(
     val grade = ai?.let { BaselineMeasurementMetrics.grade(it) }
 
     Scaffold(
-        topBar = { NavyTopBar(title = "Analysis Result") }
+        topBar = {
+            NavyTopBar(
+                title = "Analysis Result",
+                navigationIcon = {
+                    NavyBarAction(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        onClick = onReturnToOrigin,
+                    )
+                },
+            )
+        }
     ) { paddingValues ->
         Column(
             modifier = modifier
@@ -292,10 +306,11 @@ fun ResultScreen(
             // ---- Actions ----
             if (canAddMore) {
                 OutlinedButton(
-                    onClick = onNewTest,
+                    onClick = onContinueMeasurement,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(50.dp)
+                        .testTag(CONTINUE_MEASUREMENT_TAG),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(
@@ -305,7 +320,7 @@ fun ResultScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Retest",
+                        "Continue measurement",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = PrimaryAccent
@@ -315,7 +330,7 @@ fun ResultScreen(
             }
 
             Button(
-                onClick = onGoHome,
+                onClick = onReturnToOrigin,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -325,7 +340,7 @@ fun ResultScreen(
                 Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Save Result",
+                    "Return",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )

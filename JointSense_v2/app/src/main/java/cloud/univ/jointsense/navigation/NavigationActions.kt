@@ -66,7 +66,11 @@ class NavigationActions internal constructor(
     fun restartMeasurement(): Boolean = driver.popToImageSelect()
 
     fun continueMeasurementFromResult(origin: TopLevelDestination) {
-        driver.popOne()
+        if (driver.containsMeasurement()) {
+            driver.popMeasurement()
+        } else {
+            driver.popOne()
+        }
         startMeasurement(origin)
     }
 

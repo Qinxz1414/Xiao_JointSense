@@ -5,6 +5,10 @@ import cloud.univ.jointsense.domain.model.InflammationFactor
 sealed interface MeasurementAction {
     data class ImageSelected(val uri: String) : MeasurementAction
 
+    data object CameraCaptureRequested : MeasurementAction
+
+    data class CameraCaptureCompleted(val success: Boolean) : MeasurementAction
+
     data class PermissionDenied(val permanentlyDenied: Boolean) : MeasurementAction
 
     data class CropChanged(val bounds: CropBounds) : MeasurementAction
@@ -18,6 +22,10 @@ sealed interface MeasurementAction {
     data object Retry : MeasurementAction
 
     data object CancelAnalysis : MeasurementAction
+
+    data object BackToImageSelection : MeasurementAction
+
+    data object BackToCrop : MeasurementAction
 
     data object ContinueMeasurement : MeasurementAction
 }

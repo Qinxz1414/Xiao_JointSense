@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -51,7 +52,9 @@ fun ImageCropView(
     val cornerRadius = 12.dp
 
     BoxWithConstraints(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("crop_view")
     ) {
         val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val maxHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
@@ -80,6 +83,8 @@ fun ImageCropView(
         val latestCropRect = rememberUpdatedState(cropRect)
 
         val cornerTouchRadius = with(LocalDensity.current) { 28.dp.toPx() }
+        val minimumCropWidth = minOf(50, bitmap.width)
+        val minimumCropHeight = minOf(50, bitmap.height)
 
         Canvas(
             modifier = Modifier
@@ -122,8 +127,14 @@ fun ImageCropView(
                                     }
                                     DragMode.TOP_LEFT -> {
                                         Rect(
-                                            (activeRect.left + dx).coerceIn(0, activeRect.right - 50),
-                                            (activeRect.top + dy).coerceIn(0, activeRect.bottom - 50),
+                                            (activeRect.left + dx).coerceIn(
+                                                0,
+                                                activeRect.right - minimumCropWidth,
+                                            ),
+                                            (activeRect.top + dy).coerceIn(
+                                                0,
+                                                activeRect.bottom - minimumCropHeight,
+                                            ),
                                             activeRect.right,
                                             activeRect.bottom
                                         )
@@ -131,25 +142,43 @@ fun ImageCropView(
                                     DragMode.TOP_RIGHT -> {
                                         Rect(
                                             activeRect.left,
-                                            (activeRect.top + dy).coerceIn(0, activeRect.bottom - 50),
-                                            (activeRect.right + dx).coerceIn(activeRect.left + 50, bitmap.width),
+                                            (activeRect.top + dy).coerceIn(
+                                                0,
+                                                activeRect.bottom - minimumCropHeight,
+                                            ),
+                                            (activeRect.right + dx).coerceIn(
+                                                activeRect.left + minimumCropWidth,
+                                                bitmap.width,
+                                            ),
                                             activeRect.bottom
                                         )
                                     }
                                     DragMode.BOTTOM_LEFT -> {
                                         Rect(
-                                            (activeRect.left + dx).coerceIn(0, activeRect.right - 50),
+                                            (activeRect.left + dx).coerceIn(
+                                                0,
+                                                activeRect.right - minimumCropWidth,
+                                            ),
                                             activeRect.top,
                                             activeRect.right,
-                                            (activeRect.bottom + dy).coerceIn(activeRect.top + 50, bitmap.height)
+                                            (activeRect.bottom + dy).coerceIn(
+                                                activeRect.top + minimumCropHeight,
+                                                bitmap.height,
+                                            )
                                         )
                                     }
                                     else -> {
                                         Rect(
                                             activeRect.left,
                                             activeRect.top,
-                                            (activeRect.right + dx).coerceIn(activeRect.left + 50, bitmap.width),
-                                            (activeRect.bottom + dy).coerceIn(activeRect.top + 50, bitmap.height)
+                                            (activeRect.right + dx).coerceIn(
+                                                activeRect.left + minimumCropWidth,
+                                                bitmap.width,
+                                            ),
+                                            (activeRect.bottom + dy).coerceIn(
+                                                activeRect.top + minimumCropHeight,
+                                                bitmap.height,
+                                            )
                                         )
                                     }
                                 }

@@ -680,6 +680,133 @@ class MeasurementViewModelTest {
         assertEquals("IO", repository.commitBoundary)
     }
 
+    @Test
+    fun cameraRequestLaunchesTheStoreOwnedUriAndSuccessfulCaptureDecodesIt() = runTest(dispatcher) {
+        val captureStore = RecordingCaptureStore("content://measurement/camera")
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-camera" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            captureStore = captureStore,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+
+        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+        advanceUntilIdle()
+
+        assertEquals(
+            MeasurementEffect.LaunchCamera("content://measurement/camera"),
+            viewModel.effects.first(),
+        )
+        assertEquals(1, captureStore.createCalls)
+
+        viewModel.onAction(MeasurementAction.CameraCaptureCompleted(success = true))
+        advanceUntilIdle()
+
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
+        assertEquals("content://measurement/camera", viewModel.state.value.imageUri)
+        assertEquals(0, captureStore.cancelCalls)
+    }
+
+    @Test
+    fun abandoningWhileCameraUriIsBeingPreparedCannotLaunchCameraAfterExit() = runTest(dispatcher) {
+        val io = ManualQueueDispatcher()
+        val captureStore = RecordingCaptureStore("content://measurement/camera")
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-camera" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            captureStore = captureStore,
+            ioDispatcher = io,
+            defaultDispatcher = dispatcher,
+        )
+
+        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+        runCurrent()
+        viewModel.abandonMeasurement()
+        io.runNext()
+        advanceUntilIdle()
+
+        assertNull(withTimeoutOrNull(1) { viewModel.effects.first() })
+    }
+
+    @Test
+    fun successfulPersistenceClearsTheOwnedCameraFileOnlyAfterCommit() = runTest(dispatcher) {
+        val repository = RecordingRepository().apply { suspendCommit = true }
+        val captureStore = RecordingCaptureStore("content://measurement/camera")
+        val viewModel = MeasurementViewModel(
+            repository = repository,
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-camera" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            captureStore = captureStore,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        viewModel.createNewSession("HOME")
+        advanceUntilIdle()
+        viewModel.acceptCreatedSession()
+        viewModel.onAction(MeasurementAction.ImageSelected(captureStore.pendingCaptureUri!!))
+        advanceUntilIdle()
+        viewModel.onAction(MeasurementAction.CropConfirmed)
+
+        viewModel.onAction(MeasurementAction.Analyze)
+        runCurrent()
+        assertEquals(Stage.Persisting, viewModel.state.value.stage)
+        assertEquals(0, captureStore.successCalls)
+
+        repository.releaseCommit()
+        advanceUntilIdle()
+
+        assertEquals(Stage.Success, viewModel.state.value.stage)
+        assertEquals(1, captureStore.successCalls)
+    }
+
+    @Test
+    fun backFromCropReturnsToImageSelectionAndExplicitlyCancelsOwnedCapture() = runTest(dispatcher) {
+        val image = ReleasableImage(800, 600)
+        val captureStore = RecordingCaptureStore("content://measurement/camera")
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-back" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            captureStore = captureStore,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        viewModel.setImage(image)
+
+        viewModel.onAction(MeasurementAction.BackToImageSelection)
+        advanceUntilIdle()
+
+        assertEquals(Stage.AwaitingImage, viewModel.state.value.stage)
+        assertNull(viewModel.state.value.image)
+        assertNull(viewModel.state.value.imageUri)
+        assertNull(viewModel.state.value.cropRect)
+        assertEquals(1, image.releaseCalls)
+        assertEquals(1, captureStore.cancelCalls)
+    }
+
+    @Test
+    fun backFromFactorReturnsToCropWithoutDiscardingRecoveryData() = runTest(dispatcher) {
+        val viewModel = readyViewModel()
+        val before = viewModel.state.value.recoveryData()
+
+        viewModel.onAction(MeasurementAction.BackToCrop)
+
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
+        assertEquals(before, viewModel.state.value.recoveryData())
+        assertNull(viewModel.state.value.error)
+    }
+
     private fun TestScope.readyViewModel(
         repository: RecordingRepository = RecordingRepository(),
         analyzer: RecordingAnalyzer = RecordingAnalyzer(),
@@ -780,6 +907,29 @@ private class RecordingDecoder(
     override suspend fun decode(uri: String): MeasurementImage {
         boundary = activeBoundary?.get()
         return FakeImage(width = 800, height = 600)
+    }
+}
+
+private class RecordingCaptureStore(
+    override var pendingCaptureUri: String?,
+) : MeasurementCaptureStore {
+    var createCalls = 0
+    var successCalls = 0
+    var cancelCalls = 0
+
+    override fun createOrRestorePendingUri(): String {
+        createCalls += 1
+        return requireNotNull(pendingCaptureUri)
+    }
+
+    override fun onPersistenceSucceeded() {
+        successCalls += 1
+        pendingCaptureUri = null
+    }
+
+    override fun onFlowCancelled() {
+        cancelCalls += 1
+        pendingCaptureUri = null
     }
 }
 

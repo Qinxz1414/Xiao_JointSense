@@ -29,6 +29,7 @@ class MeasurementViewModel(
     private val draftIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val savedStateHandle: SavedStateHandle,
     private val decoder: MeasurementImageDecoder?,
+    private val captureStore: MeasurementCaptureStore? = null,
     private val ioDispatcher: CoroutineDispatcher,
     private val defaultDispatcher: CoroutineDispatcher,
     private val sessionNamePrefix: () -> String = { "Test" },
@@ -44,6 +45,7 @@ class MeasurementViewModel(
         draftIdFactory = draftIdFactory,
         savedStateHandle = SavedStateHandle(),
         decoder = null,
+        captureStore = null,
         ioDispatcher = Dispatchers.Main.immediate,
         defaultDispatcher = Dispatchers.Main.immediate,
     )
@@ -53,13 +55,12 @@ class MeasurementViewModel(
 
     private val effectChannel = Channel<MeasurementEffect>(Channel.BUFFERED)
     val effects: Flow<MeasurementEffect> = effectChannel.receiveAsFlow()
-    private val legacyCompletionChannel = Channel<String>(Channel.BUFFERED)
-    val analysisCompletions: Flow<String> = legacyCompletionChannel.receiveAsFlow()
 
     private var currentSessionId: String? = savedStateHandle[KEY_SESSION_ID]
     private var retryPersistence: PersistenceOperationSnapshot? = null
     private var analysisJob: Job? = null
     private var decodeJob: Job? = null
+    private var captureRequestJob: Job? = null
     private var nextOperationToken = 0L
     private var activeOperation: ActiveOperation? = null
     private var cropConfirmed: Boolean = savedStateHandle[KEY_CROP_CONFIRMED] ?: false
@@ -84,6 +85,12 @@ class MeasurementViewModel(
                     resumeStage = Stage.AwaitingImage,
                 )
             }
+            MeasurementAction.CameraCaptureRequested -> if (!blocksMutuallyExclusiveInputs()) {
+                requestCameraCapture()
+            }
+            is MeasurementAction.CameraCaptureCompleted -> if (!blocksMutuallyExclusiveInputs()) {
+                completeCameraCapture(action.success)
+            }
             is MeasurementAction.CropChanged -> if (!blocksMutuallyExclusiveInputs()) {
                 updateCrop(action.bounds)
             }
@@ -94,6 +101,10 @@ class MeasurementViewModel(
             MeasurementAction.Analyze -> startAnalysis()
             MeasurementAction.Retry -> retry()
             MeasurementAction.CancelAnalysis -> cancelAnalysis()
+            MeasurementAction.BackToImageSelection -> if (!blocksMutuallyExclusiveInputs()) {
+                returnToImageSelection()
+            }
+            MeasurementAction.BackToCrop -> if (!blocksMutuallyExclusiveInputs()) returnToCrop()
             MeasurementAction.ContinueMeasurement -> if (!blocksMutuallyExclusiveInputs()) beginNewDraft()
         }
     }
@@ -273,6 +284,9 @@ class MeasurementViewModel(
             var ownedImage: MeasurementImage? = null
             try {
                 val decoded = withContext(ioDispatcher) {
+                    captureStore?.pendingCaptureUri
+                        ?.takeIf { pendingUri -> pendingUri != uri }
+                        ?.let { captureStore.onFlowCancelled() }
                     imageDecoder.decode(uri).also { ownedImage = it }
                 }
                 if (state.value.imageUri != uri) {
@@ -403,7 +417,7 @@ class MeasurementViewModel(
                     snapshot.analysis.sessionId,
                     snapshot.analysis.draftId,
                     snapshot.result,
-                )
+                ).also { captureStore?.onPersistenceSucceeded() }
             }
             if (!isCurrent(operation)) return
             retryPersistence = null
@@ -418,8 +432,6 @@ class MeasurementViewModel(
             }
             if (!isCurrent(operation)) return
             effectChannel.send(MeasurementEffect.NavigateToResult(resultId))
-            if (!isCurrent(operation)) return
-            legacyCompletionChannel.send(resultId)
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
@@ -479,6 +491,86 @@ class MeasurementViewModel(
         }
     }
 
+    private fun requestCameraCapture() {
+        val store = captureStore ?: run {
+            setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+            return
+        }
+        if (captureRequestJob?.isActive == true) return
+        captureRequestJob = viewModelScope.launch {
+            try {
+                val uri = withContext(ioDispatcher) { store.createOrRestorePendingUri() }
+                effectChannel.send(MeasurementEffect.LaunchCamera(uri))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+            } finally {
+                captureRequestJob = null
+            }
+        }
+    }
+
+    private fun completeCameraCapture(success: Boolean) {
+        val store = captureStore ?: return
+        if (success) {
+            val uri = store.pendingCaptureUri
+            if (uri == null) {
+                setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+            } else {
+                onAction(MeasurementAction.ImageSelected(uri))
+            }
+        } else {
+            cancelPendingCapture()
+            updateState {
+                it.copy(stage = Stage.AwaitingImage, error = null, resumeStage = null)
+            }
+        }
+    }
+
+    private fun returnToImageSelection() {
+        captureRequestJob?.cancel()
+        captureRequestJob = null
+        decodeJob?.cancel()
+        releaseStateImageUnlessBorrowed()
+        retryPersistence = null
+        cropConfirmed = false
+        updateState {
+            it.copy(
+                stage = Stage.AwaitingImage,
+                imageUri = null,
+                cropRect = null,
+                image = null,
+                error = null,
+                resumeStage = null,
+                resultId = null,
+                errorMessage = null,
+            )
+        }
+        cancelPendingCapture()
+    }
+
+    private fun returnToCrop() {
+        if (state.value.image == null || state.value.cropRect == null) return
+        cropConfirmed = false
+        updateState {
+            it.copy(stage = Stage.ReadyToCrop, error = null, resumeStage = null, errorMessage = null)
+        }
+    }
+
+    private fun cancelPendingCapture() {
+        val store = captureStore ?: return
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) { store.onFlowCancelled() }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+            }
+        }
+    }
+
     private fun beginNewDraft() {
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
@@ -502,6 +594,8 @@ class MeasurementViewModel(
     }
 
     private fun clearTransient() {
+        captureRequestJob?.cancel()
+        captureRequestJob = null
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
         releaseStateImageUnlessBorrowed()
@@ -518,6 +612,7 @@ class MeasurementViewModel(
             originDestination = origin,
         )
         persistFormalState(mutableState.value)
+        cancelPendingCapture()
     }
 
     private fun clearCreationIfOwned(creationId: Long) {
@@ -599,6 +694,7 @@ class MeasurementViewModel(
     override fun onCleared() {
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
+        captureRequestJob?.cancel()
         releaseStateImageUnlessBorrowed()
         super.onCleared()
     }
