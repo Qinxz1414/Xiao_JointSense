@@ -430,7 +430,12 @@ class MeasurementViewModelTest {
         viewModel.onAction(MeasurementAction.Analyze)
         runCurrent()
         viewModel.onAction(MeasurementAction.ImageSelected("content://ignored"))
-        viewModel.onAction(MeasurementAction.PermissionDenied(permanentlyDenied = true))
+        viewModel.onAction(
+            MeasurementAction.CameraPermissionResult(
+                granted = false,
+                shouldShowRationale = false,
+            ),
+        )
         viewModel.onAction(MeasurementAction.ContinueMeasurement)
         viewModel.setImage(replacement)
         viewModel.selectSession("other-session")
@@ -460,7 +465,12 @@ class MeasurementViewModelTest {
         runCurrent()
         assertEquals(Stage.Persisting, viewModel.state.value.stage)
         viewModel.onAction(MeasurementAction.ImageSelected("content://ignored"))
-        viewModel.onAction(MeasurementAction.PermissionDenied(permanentlyDenied = false))
+        viewModel.onAction(
+            MeasurementAction.CameraPermissionResult(
+                granted = false,
+                shouldShowRationale = true,
+            ),
+        )
         viewModel.onAction(MeasurementAction.ContinueMeasurement)
         viewModel.setImage(replacement)
         viewModel.deleteSession(sessionId)
@@ -558,6 +568,42 @@ class MeasurementViewModelTest {
         assertEquals(1, decoded.releaseCalls)
         assertEquals(Stage.AwaitingImage, viewModel.state.value.stage)
     }
+
+    @Test
+    fun abandoningBeforePickedFallbackDecodeDeliveryCleansTheAcquiredOwnedCapture() =
+        runTest(dispatcher) {
+            val io = ManualQueueDispatcher()
+            val owned = MeasurementCapture("content://app/picked", "picked-token")
+            val store = TargetedCaptureStore(null)
+            val viewModel = MeasurementViewModel(
+                repository = RecordingRepository(),
+                analyzer = RecordingAnalyzer(),
+                draftIdFactory = sequenceOf("draft-a", "draft-b").iterator()::next,
+                savedStateHandle = SavedStateHandle(),
+                decoder = RecordingDecoder(),
+                captureStore = store,
+                pickedImageResolver = MeasurementPickedImageResolver {
+                    store.replaceCurrent(owned)
+                    MeasurementImageInput(owned.uri, owned)
+                },
+                ioDispatcher = io,
+                defaultDispatcher = dispatcher,
+            )
+
+            viewModel.onAction(MeasurementAction.PickedImageSelected("content://provider/ephemeral"))
+            runCurrent()
+            io.runNext()
+            assertEquals(owned, store.currentCapture())
+
+            viewModel.abandonMeasurement()
+            runCurrent()
+            io.runNext()
+            runCurrent()
+
+            assertNull(store.currentCapture())
+            assertEquals(listOf("picked-token"), store.clearedTokens)
+            assertEquals(Stage.AwaitingImage, viewModel.state.value.stage)
+        }
 
     @Test
     fun restoredConfirmedCropIsRevalidatedAgainstSmallerDecodedImage() = runTest(dispatcher) {
@@ -697,10 +743,9 @@ class MeasurementViewModelTest {
         viewModel.onAction(MeasurementAction.CameraCaptureRequested)
         advanceUntilIdle()
 
-        assertEquals(
-            MeasurementEffect.LaunchCamera("content://measurement/camera"),
-            viewModel.effects.first(),
-        )
+        val launch = viewModel.effects.first() as MeasurementEffect.LaunchCamera
+        assertEquals("content://measurement/camera", launch.uri)
+        assertEquals("content://measurement/camera", viewModel.consumeCameraLaunch(launch))
         assertEquals(1, captureStore.createCalls)
 
         viewModel.onAction(MeasurementAction.CameraCaptureCompleted(success = true))
@@ -708,7 +753,7 @@ class MeasurementViewModelTest {
 
         assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
         assertEquals("content://measurement/camera", viewModel.state.value.imageUri)
-        assertEquals(0, captureStore.cancelCalls)
+        assertEquals(0, captureStore.clearCalls)
     }
 
     @Test
@@ -736,6 +781,187 @@ class MeasurementViewModelTest {
     }
 
     @Test
+    fun bufferedCameraLaunchIsRejectedAfterAbandonAndFreshDraft() = runTest(dispatcher) {
+        val captureStore = TargetedCaptureStore(MeasurementCapture("content://camera/a", "capture-a"))
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = sequenceOf("draft-a", "draft-b").iterator()::next,
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            captureStore = captureStore,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+        advanceUntilIdle()
+
+        viewModel.abandonMeasurement()
+        advanceUntilIdle()
+        val stale = viewModel.effects.first() as MeasurementEffect.LaunchCamera
+
+        assertNull(viewModel.consumeCameraLaunch(stale))
+        assertEquals("draft-b", viewModel.state.value.draftId)
+    }
+
+    @Test
+    fun unconsumedCameraLaunchIsReissuedAndValidatedAfterViewModelRecreation() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val store = TargetedCaptureStore(MeasurementCapture("content://camera/a", "capture-a"))
+        val first = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-a" },
+            savedStateHandle = handle,
+            decoder = RecordingDecoder(),
+            captureStore = store,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        first.onAction(MeasurementAction.CameraCaptureRequested)
+        advanceUntilIdle()
+        first.effects.first()
+
+        val recreated = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "unexpected-draft" },
+            savedStateHandle = handle,
+            decoder = RecordingDecoder(),
+            captureStore = store,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        val reissued = withTimeoutOrNull(100) {
+            recreated.effects.first() as MeasurementEffect.LaunchCamera
+        }
+
+        assertEquals("content://camera/a", requireNotNull(reissued).uri)
+        assertEquals("content://camera/a", recreated.consumeCameraLaunch(reissued))
+        assertEquals("draft-a", recreated.state.value.draftId)
+    }
+
+    @Test
+    fun repeatedCameraTapCannotReplaceAnOutstandingLaunchToken() = runTest(dispatcher) {
+        val store = TargetedCaptureStore(MeasurementCapture("content://camera/a", "capture-a"))
+        var nextRequest = 0
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-a" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            captureStore = store,
+            captureRequestTokenFactory = { "request-${++nextRequest}" },
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+
+        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+        advanceUntilIdle()
+        val first = viewModel.effects.first() as MeasurementEffect.LaunchCamera
+        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+        advanceUntilIdle()
+
+        assertEquals(1, store.createCalls)
+        assertEquals("content://camera/a", viewModel.consumeCameraLaunch(first))
+        assertNull(withTimeoutOrNull(1) { viewModel.effects.first() })
+    }
+
+    @Test
+    fun cameraCancellationFinishesTargetedCleanupBeforeRetakeCanCreateAnotherUri() = runTest(dispatcher) {
+        val io = ManualQueueDispatcher()
+        val store = TargetedCaptureStore(MeasurementCapture("content://camera/a", "capture-a"))
+        val viewModel = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft" },
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            captureStore = store,
+            ioDispatcher = io,
+            defaultDispatcher = dispatcher,
+        )
+
+        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+        runCurrent()
+        io.runNext()
+        runCurrent()
+        assertEquals(1, store.createCalls)
+
+        viewModel.onAction(MeasurementAction.CameraCaptureCompleted(success = false))
+        runCurrent()
+        assertEquals(Stage.Decoding, viewModel.state.value.stage)
+        viewModel.onAction(MeasurementAction.CameraCaptureRequested)
+        runCurrent()
+
+        assertEquals(1, store.createCalls)
+        io.runNext()
+        advanceUntilIdle()
+        assertEquals(Stage.AwaitingImage, viewModel.state.value.stage)
+        assertEquals(listOf("capture-a"), store.clearedTokens)
+    }
+
+    @Test
+    fun stalePersistenceCannotDeleteTheNewFlowsCapture() = runTest(dispatcher) {
+        val repository = RecordingRepository().apply { nonCooperativeCommit = true }
+        val store = TargetedCaptureStore(MeasurementCapture("content://camera/a", "capture-a"))
+        val viewModel = MeasurementViewModel(
+            repository = repository,
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = sequenceOf("draft-a", "draft-b").iterator()::next,
+            savedStateHandle = SavedStateHandle(mapOf("measurement.sessionId" to "session-1")),
+            decoder = RecordingDecoder(),
+            captureStore = store,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        viewModel.onAction(MeasurementAction.ImageSelected("content://camera/a"))
+        advanceUntilIdle()
+        viewModel.onAction(MeasurementAction.CropConfirmed)
+        viewModel.onAction(MeasurementAction.Analyze)
+        runCurrent()
+
+        viewModel.abandonMeasurement()
+        advanceUntilIdle()
+        store.replaceCurrent(MeasurementCapture("content://camera/b", "capture-b"))
+        repository.releaseCommit()
+        advanceUntilIdle()
+
+        assertEquals("capture-b", store.currentCapture()?.token)
+        assertFalse(store.clearedTokens.contains("capture-b"))
+    }
+
+    @Test
+    fun committedResultRemainsSuccessWhenTempCleanupFailsAndWarningIsAuditable() = runTest(dispatcher) {
+        val repository = RecordingRepository()
+        val store = TargetedCaptureStore(MeasurementCapture("content://camera/a", "capture-a")).apply {
+            cleanupFailure = "cache file remained"
+        }
+        val viewModel = MeasurementViewModel(
+            repository = repository,
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "draft-a" },
+            savedStateHandle = SavedStateHandle(mapOf("measurement.sessionId" to "session-1")),
+            decoder = RecordingDecoder(),
+            captureStore = store,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        viewModel.onAction(MeasurementAction.ImageSelected("content://camera/a"))
+        advanceUntilIdle()
+        viewModel.onAction(MeasurementAction.CropConfirmed)
+
+        viewModel.onAction(MeasurementAction.Analyze)
+        advanceUntilIdle()
+
+        assertEquals(1, repository.commitCalls)
+        assertEquals(Stage.Success, viewModel.state.value.stage)
+        assertEquals("cache file remained", viewModel.state.value.captureCleanupWarning)
+        assertEquals(MeasurementEffect.NavigateToResult("result-1"), viewModel.effects.first())
+    }
+
+    @Test
     fun successfulPersistenceClearsTheOwnedCameraFileOnlyAfterCommit() = runTest(dispatcher) {
         val repository = RecordingRepository().apply { suspendCommit = true }
         val captureStore = RecordingCaptureStore("content://measurement/camera")
@@ -752,20 +978,20 @@ class MeasurementViewModelTest {
         viewModel.createNewSession("HOME")
         advanceUntilIdle()
         viewModel.acceptCreatedSession()
-        viewModel.onAction(MeasurementAction.ImageSelected(captureStore.pendingCaptureUri!!))
+        viewModel.onAction(MeasurementAction.ImageSelected(requireNotNull(captureStore.currentCapture()).uri))
         advanceUntilIdle()
         viewModel.onAction(MeasurementAction.CropConfirmed)
 
         viewModel.onAction(MeasurementAction.Analyze)
         runCurrent()
         assertEquals(Stage.Persisting, viewModel.state.value.stage)
-        assertEquals(0, captureStore.successCalls)
+        assertEquals(0, captureStore.clearCalls)
 
         repository.releaseCommit()
         advanceUntilIdle()
 
         assertEquals(Stage.Success, viewModel.state.value.stage)
-        assertEquals(1, captureStore.successCalls)
+        assertEquals(1, captureStore.clearCalls)
     }
 
     @Test
@@ -777,12 +1003,16 @@ class MeasurementViewModelTest {
             analyzer = RecordingAnalyzer(),
             draftIdFactory = { "draft-back" },
             savedStateHandle = SavedStateHandle(),
-            decoder = RecordingDecoder(),
+            decoder = RecordingDecoder(decodedImage = image),
             captureStore = captureStore,
             ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
         )
-        viewModel.setImage(image)
+        viewModel.onAction(
+            MeasurementAction.ImageSelected(requireNotNull(captureStore.currentCapture()).uri),
+        )
+        advanceUntilIdle()
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
 
         viewModel.onAction(MeasurementAction.BackToImageSelection)
         advanceUntilIdle()
@@ -792,7 +1022,7 @@ class MeasurementViewModelTest {
         assertNull(viewModel.state.value.imageUri)
         assertNull(viewModel.state.value.cropRect)
         assertEquals(1, image.releaseCalls)
-        assertEquals(1, captureStore.cancelCalls)
+        assertEquals(1, captureStore.clearCalls)
     }
 
     @Test
@@ -806,6 +1036,55 @@ class MeasurementViewModelTest {
         assertEquals(before, viewModel.state.value.recoveryData())
         assertNull(viewModel.state.value.error)
     }
+
+    @Test
+    fun priorPermissionRequestHistorySurvivesViewModelRecreationForPermanentDenialTruth() =
+        runTest(dispatcher) {
+            val handle = SavedStateHandle()
+            val repository = RecordingRepository()
+            val first = MeasurementViewModel(
+                repository = repository,
+                analyzer = RecordingAnalyzer(),
+                savedStateHandle = handle,
+                decoder = RecordingDecoder(),
+                ioDispatcher = dispatcher,
+                defaultDispatcher = dispatcher,
+            )
+            first.onAction(MeasurementAction.CameraPermissionRequestStarted)
+            first.onAction(
+                MeasurementAction.CameraPermissionResult(
+                    granted = false,
+                    shouldShowRationale = false,
+                ),
+            )
+            assertEquals(
+                MeasurementError.PermissionDenied(permanentlyDenied = false),
+                first.state.value.error,
+            )
+            first.onAction(MeasurementAction.Retry)
+            first.onAction(MeasurementAction.CameraPermissionRequestStarted)
+
+            val recreated = MeasurementViewModel(
+                repository = repository,
+                analyzer = RecordingAnalyzer(),
+                savedStateHandle = handle,
+                decoder = RecordingDecoder(),
+                ioDispatcher = dispatcher,
+                defaultDispatcher = dispatcher,
+            )
+            recreated.onAction(
+                MeasurementAction.CameraPermissionResult(
+                    granted = false,
+                    shouldShowRationale = false,
+                ),
+            )
+
+            assertTrue(recreated.state.value.hasRequestedCameraPermission)
+            assertEquals(
+                MeasurementError.PermissionDenied(permanentlyDenied = true),
+                recreated.state.value.error,
+            )
+        }
 
     private fun TestScope.readyViewModel(
         repository: RecordingRepository = RecordingRepository(),
@@ -861,7 +1140,23 @@ class MeasurementViewModelTest {
             listOf(it.draftId, it.imageUri, it.cropRect, it.factor, it.originDestination)
         }
 
-        viewModel.onAction(MeasurementAction.PermissionDenied(permanentlyDenied))
+        if (permanentlyDenied) {
+            viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
+            viewModel.onAction(
+                MeasurementAction.CameraPermissionResult(
+                    granted = false,
+                    shouldShowRationale = false,
+                ),
+            )
+            viewModel.onAction(MeasurementAction.Retry)
+        }
+        viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
+        viewModel.onAction(
+            MeasurementAction.CameraPermissionResult(
+                granted = false,
+                shouldShowRationale = !permanentlyDenied,
+            ),
+        )
 
         assertEquals(Stage.RecoverableError, viewModel.state.value.stage)
         assertEquals(
@@ -900,36 +1195,70 @@ private fun MeasurementViewModel.acceptCreatedSession(): String {
 
 private class RecordingDecoder(
     private val activeBoundary: ThreadLocal<String?>? = null,
+    private val decodedImage: MeasurementImage? = null,
 ) : MeasurementImageDecoder {
     var boundary: String? = null
         private set
 
     override suspend fun decode(uri: String): MeasurementImage {
         boundary = activeBoundary?.get()
-        return FakeImage(width = 800, height = 600)
+        return decodedImage ?: FakeImage(width = 800, height = 600)
     }
 }
 
 private class RecordingCaptureStore(
-    override var pendingCaptureUri: String?,
+    pendingCaptureUri: String?,
+) : MeasurementCaptureStore {
+    private var current = pendingCaptureUri?.let { MeasurementCapture(it, "recording-capture") }
+    var createCalls = 0
+    var clearCalls = 0
+
+    override fun currentCapture(): MeasurementCapture? = current
+
+    override fun createOrRestorePending(): MeasurementCapture {
+        createCalls += 1
+        return requireNotNull(current)
+    }
+
+    override fun importOwned(write: (java.io.OutputStream) -> Unit): MeasurementCapture =
+        error("not used")
+
+    override fun clearExpected(expected: MeasurementCapture): CaptureCleanupResult {
+        if (current != expected) return CaptureCleanupResult.NotCurrent
+        clearCalls += 1
+        current = null
+        return CaptureCleanupResult.Removed
+    }
+}
+
+private class TargetedCaptureStore(
+    private var current: MeasurementCapture?,
 ) : MeasurementCaptureStore {
     var createCalls = 0
-    var successCalls = 0
-    var cancelCalls = 0
+    var cleanupFailure: String? = null
+    val clearedTokens = mutableListOf<String>()
 
-    override fun createOrRestorePendingUri(): String {
+    override fun currentCapture(): MeasurementCapture? = current
+
+    override fun createOrRestorePending(): MeasurementCapture {
         createCalls += 1
-        return requireNotNull(pendingCaptureUri)
+        return requireNotNull(current)
     }
 
-    override fun onPersistenceSucceeded() {
-        successCalls += 1
-        pendingCaptureUri = null
+    override fun importOwned(write: (java.io.OutputStream) -> Unit): MeasurementCapture =
+        error("not used")
+
+    override fun clearExpected(expected: MeasurementCapture): CaptureCleanupResult {
+        val failure = cleanupFailure
+        if (failure != null) return CaptureCleanupResult.Failed(failure)
+        if (current != expected) return CaptureCleanupResult.NotCurrent
+        clearedTokens += expected.token
+        current = null
+        return CaptureCleanupResult.Removed
     }
 
-    override fun onFlowCancelled() {
-        cancelCalls += 1
-        pendingCaptureUri = null
+    fun replaceCurrent(capture: MeasurementCapture) {
+        current = capture
     }
 }
 

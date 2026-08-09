@@ -12,6 +12,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class MeasurementViewModel(
@@ -30,6 +33,9 @@ class MeasurementViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val decoder: MeasurementImageDecoder?,
     private val captureStore: MeasurementCaptureStore? = null,
+    private val pickedImageResolver: MeasurementPickedImageResolver =
+        MeasurementPickedImageResolver { MeasurementImageInput(it, null) },
+    private val captureRequestTokenFactory: () -> String = { UUID.randomUUID().toString() },
     private val ioDispatcher: CoroutineDispatcher,
     private val defaultDispatcher: CoroutineDispatcher,
     private val sessionNamePrefix: () -> String = { "Test" },
@@ -61,6 +67,11 @@ class MeasurementViewModel(
     private var analysisJob: Job? = null
     private var decodeJob: Job? = null
     private var captureRequestJob: Job? = null
+    private var captureCleanupJob: Job? = null
+    private val captureMutex = Mutex()
+    private var selectedCapture: MeasurementCapture? = null
+    private var activeCameraRequest: CameraRequestSnapshot? = restoredCameraRequest()
+    private var decodeGeneration = 0L
     private var nextOperationToken = 0L
     private var activeOperation: ActiveOperation? = null
     private var cropConfirmed: Boolean = savedStateHandle[KEY_CROP_CONFIRMED] ?: false
@@ -71,19 +82,19 @@ class MeasurementViewModel(
         viewModelScope.launch {
             repository.observeSessions().collectLatest(::applySessions)
         }
-        state.value.imageUri?.takeIf { decoder != null }?.let { decodeImage(it, restoring = true) }
+        state.value.imageUri?.takeIf { decoder != null }?.let {
+            decodeImage(it, restoring = true, picked = false)
+        }
+        reissueRestoredCameraRequest()
     }
 
     fun onAction(action: MeasurementAction) {
         when (action) {
             is MeasurementAction.ImageSelected -> if (!blocksMutuallyExclusiveInputs()) {
-                decodeImage(action.uri, restoring = false)
+                decodeImage(action.uri, restoring = false, picked = false)
             }
-            is MeasurementAction.PermissionDenied -> if (!blocksMutuallyExclusiveInputs()) {
-                setRecoverableError(
-                    error = MeasurementError.PermissionDenied(action.permanentlyDenied),
-                    resumeStage = Stage.AwaitingImage,
-                )
+            is MeasurementAction.PickedImageSelected -> if (!blocksMutuallyExclusiveInputs()) {
+                decodeImage(action.uri, restoring = false, picked = true)
             }
             MeasurementAction.CameraCaptureRequested -> if (!blocksMutuallyExclusiveInputs()) {
                 requestCameraCapture()
@@ -91,6 +102,8 @@ class MeasurementViewModel(
             is MeasurementAction.CameraCaptureCompleted -> if (!blocksMutuallyExclusiveInputs()) {
                 completeCameraCapture(action.success)
             }
+            MeasurementAction.CameraPermissionRequestStarted -> recordCameraPermissionRequest()
+            is MeasurementAction.CameraPermissionResult -> completeCameraPermissionRequest(action)
             is MeasurementAction.CropChanged -> if (!blocksMutuallyExclusiveInputs()) {
                 updateCrop(action.bounds)
             }
@@ -224,6 +237,7 @@ class MeasurementViewModel(
             return
         }
         decodeJob?.cancel()
+        selectedCapture = null
         state.value.image?.takeIf { it !== image }?.release()
         cropConfirmed = false
         retryPersistence = null
@@ -257,21 +271,23 @@ class MeasurementViewModel(
         onAction(MeasurementAction.ContinueMeasurement)
     }
 
-    private fun decodeImage(uri: String, restoring: Boolean) {
+    private fun decodeImage(uri: String, restoring: Boolean, picked: Boolean) {
         val imageDecoder = decoder ?: run {
             if (!restoring) setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             return
         }
         decodeJob?.cancel()
+        val generation = ++decodeGeneration
         if (!restoring) {
             state.value.image?.release()
+            selectedCapture = null
             cropConfirmed = false
             retryPersistence = null
         }
         updateState {
             it.copy(
                 stage = Stage.Decoding,
-                imageUri = uri,
+                imageUri = if (picked) null else uri,
                 cropRect = if (restoring) it.cropRect else null,
                 image = null,
                 error = null,
@@ -282,17 +298,38 @@ class MeasurementViewModel(
         }
         decodeJob = viewModelScope.launch {
             var ownedImage: MeasurementImage? = null
+            var acquiredCapture: MeasurementCapture? = null
+            var captureAdopted = false
             try {
-                val decoded = withContext(ioDispatcher) {
-                    captureStore?.pendingCaptureUri
-                        ?.takeIf { pendingUri -> pendingUri != uri }
-                        ?.let { captureStore.onFlowCancelled() }
-                    imageDecoder.decode(uri).also { ownedImage = it }
+                val (input, decoded) = withContext(ioDispatcher) {
+                    captureCleanupJob?.join()
+                    captureMutex.withLock {
+                        val resolved = if (picked) {
+                            val existing = captureStore?.currentCapture()
+                            if (existing != null) {
+                                when (val cleanup = captureStore.clearExpected(existing)) {
+                                    CaptureCleanupResult.Removed,
+                                    CaptureCleanupResult.NotCurrent,
+                                    -> Unit
+                                    is CaptureCleanupResult.Failed -> throw CaptureOwnershipException(
+                                        cleanup.reason,
+                                    )
+                                }
+                            }
+                            pickedImageResolver.acquire(uri)
+                        } else {
+                            val capture = captureStore?.currentCapture()?.takeIf { it.uri == uri }
+                            MeasurementImageInput(uri = uri, ownedCapture = capture)
+                        }
+                        acquiredCapture = resolved.ownedCapture
+                        val image = imageDecoder.decode(resolved.uri).also { ownedImage = it }
+                        resolved to image
+                    }
                 }
-                if (state.value.imageUri != uri) {
-                    return@launch
-                }
+                if (decodeGeneration != generation) return@launch
                 state.value.image?.takeIf { it !== decoded }?.release()
+                selectedCapture = input.ownedCapture
+                captureAdopted = true
                 val restoredCrop = state.value.cropRect
                 val restoredCropIsValid = restoring &&
                     restoredCrop != null &&
@@ -307,6 +344,7 @@ class MeasurementViewModel(
                             Stage.ReadyToCrop
                         },
                         image = decoded,
+                        imageUri = input.uri,
                         cropRect = if (restoredCropIsValid) restoredCrop else defaultCrop(decoded),
                     )
                 }
@@ -315,10 +353,30 @@ class MeasurementViewModel(
                 throw error
             } catch (error: MeasurementImageDecodeException) {
                 setRecoverableError(error.error, Stage.AwaitingImage)
+            } catch (error: CaptureOwnershipException) {
+                updateState { it.copy(captureCleanupWarning = error.message) }
+                setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             } catch (_: Exception) {
                 setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             } finally {
                 ownedImage?.release()
+                val orphan = acquiredCapture?.takeUnless { captureAdopted }
+                if (orphan != null) {
+                    val cleanup = withContext(NonCancellable + ioDispatcher) {
+                        captureMutex.withLock {
+                            try {
+                                captureStore?.clearExpected(orphan) ?: CaptureCleanupResult.NotCurrent
+                            } catch (error: Exception) {
+                                CaptureCleanupResult.Failed(
+                                    error.message ?: error::class.java.simpleName,
+                                )
+                            }
+                        }
+                    }
+                    if (cleanup is CaptureCleanupResult.Failed) {
+                        updateState { it.copy(captureCleanupWarning = cleanup.reason) }
+                    }
+                }
             }
         }
     }
@@ -364,6 +422,7 @@ class MeasurementViewModel(
             image = image,
             crop = crop,
             factor = current.factor,
+            capture = selectedCapture,
         )
         val operation = ActiveOperation(snapshot)
         activeOperation = operation
@@ -417,10 +476,25 @@ class MeasurementViewModel(
                     snapshot.analysis.sessionId,
                     snapshot.analysis.draftId,
                     snapshot.result,
-                ).also { captureStore?.onPersistenceSucceeded() }
+                )
+            }
+            if (!isCurrent(operation)) return
+            val cleanup = snapshot.analysis.capture?.let { capture ->
+                withContext(ioDispatcher) {
+                    captureMutex.withLock {
+                        try {
+                            captureStore?.clearExpected(capture) ?: CaptureCleanupResult.NotCurrent
+                        } catch (error: Exception) {
+                            CaptureCleanupResult.Failed(
+                                error.message ?: error::class.java.simpleName,
+                            )
+                        }
+                    }
+                }
             }
             if (!isCurrent(operation)) return
             retryPersistence = null
+            if (cleanup == CaptureCleanupResult.Removed) selectedCapture = null
             operation.releaseWhenFinished = true
             updateState {
                 it.copy(
@@ -428,6 +502,7 @@ class MeasurementViewModel(
                     resultId = resultId,
                     image = null,
                     lastResult = findResult(it.sessions, resultId),
+                    captureCleanupWarning = (cleanup as? CaptureCleanupResult.Failed)?.reason,
                 )
             }
             if (!isCurrent(operation)) return
@@ -491,16 +566,58 @@ class MeasurementViewModel(
         }
     }
 
+    private fun recordCameraPermissionRequest() {
+        if (blocksMutuallyExclusiveInputs()) return
+        savedStateHandle[KEY_PERMISSION_PRIOR_TO_LAUNCH] = state.value.hasRequestedCameraPermission
+        updateState { it.copy(hasRequestedCameraPermission = true) }
+    }
+
+    private fun completeCameraPermissionRequest(action: MeasurementAction.CameraPermissionResult) {
+        if (blocksMutuallyExclusiveInputs()) return
+        val hadPriorRequest = savedStateHandle[KEY_PERMISSION_PRIOR_TO_LAUNCH] ?: false
+        if (action.granted) {
+            requestCameraCapture()
+        } else {
+            setRecoverableError(
+                MeasurementError.PermissionDenied(
+                    permanentlyDenied = classifyPermanentCameraDenial(
+                        wasRequestedBeforeLaunch = hadPriorRequest,
+                        shouldShowRationale = action.shouldShowRationale,
+                    ),
+                ),
+                Stage.AwaitingImage,
+            )
+        }
+    }
+
     private fun requestCameraCapture() {
         val store = captureStore ?: run {
             setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             return
         }
-        if (captureRequestJob?.isActive == true) return
+        if (activeCameraRequest != null || captureRequestJob?.isActive == true ||
+            state.value.stage != Stage.AwaitingImage
+        ) return
+        val requestedDraft = state.value.draftId
+        val requestToken = captureRequestTokenFactory()
         captureRequestJob = viewModelScope.launch {
             try {
-                val uri = withContext(ioDispatcher) { store.createOrRestorePendingUri() }
-                effectChannel.send(MeasurementEffect.LaunchCamera(uri))
+                captureCleanupJob?.join()
+                val capture = withContext(ioDispatcher) {
+                    captureMutex.withLock { store.createOrRestorePending() }
+                }
+                if (state.value.draftId != requestedDraft || state.value.stage != Stage.AwaitingImage) {
+                    return@launch
+                }
+                val snapshot = CameraRequestSnapshot(
+                    requestToken = requestToken,
+                    draftId = requestedDraft,
+                    capture = capture,
+                    consumed = false,
+                )
+                activeCameraRequest = snapshot
+                persistCameraRequest(snapshot)
+                effectChannel.send(snapshot.toEffect())
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
@@ -511,33 +628,94 @@ class MeasurementViewModel(
         }
     }
 
-    private fun completeCameraCapture(success: Boolean) {
+    private fun reissueRestoredCameraRequest() {
+        val restored = activeCameraRequest?.takeUnless { it.consumed } ?: return
         val store = captureStore ?: return
-        if (success) {
-            val uri = store.pendingCaptureUri
-            if (uri == null) {
-                setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
-            } else {
-                onAction(MeasurementAction.ImageSelected(uri))
-            }
-        } else {
-            cancelPendingCapture()
-            updateState {
-                it.copy(stage = Stage.AwaitingImage, error = null, resumeStage = null)
+        captureRequestJob = viewModelScope.launch {
+            try {
+                val current = withContext(ioDispatcher) {
+                    captureMutex.withLock { store.currentCapture() }
+                }
+                if (activeCameraRequest == restored && current == restored.capture &&
+                    state.value.draftId == restored.draftId && state.value.stage == Stage.AwaitingImage
+                ) {
+                    effectChannel.send(restored.toEffect())
+                } else if (activeCameraRequest == restored) {
+                    invalidateCameraRequest()
+                    setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                if (activeCameraRequest == restored) {
+                    invalidateCameraRequest()
+                    setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+                }
+            } finally {
+                captureRequestJob = null
             }
         }
     }
 
+    fun consumeCameraLaunch(effect: MeasurementEffect.LaunchCamera): String? {
+        val active = activeCameraRequest ?: return null
+        if (!active.matches(effect) || active.consumed || state.value.draftId != active.draftId ||
+            state.value.stage != Stage.AwaitingImage
+        ) return null
+        val consumed = active.copy(consumed = true)
+        activeCameraRequest = consumed
+        persistCameraRequest(consumed)
+        return active.capture.uri
+    }
+
+    private fun completeCameraCapture(success: Boolean) {
+        val request = activeCameraRequest ?: return
+        if (success) {
+            captureRequestJob = viewModelScope.launch {
+                val current = withContext(ioDispatcher) {
+                    captureMutex.withLock { captureStore?.currentCapture() }
+                }
+                if (activeCameraRequest != request || current != request.capture ||
+                    state.value.draftId != request.draftId
+                ) return@launch
+                invalidateCameraRequest()
+                onAction(MeasurementAction.ImageSelected(request.capture.uri))
+            }
+        } else {
+            updateState {
+                it.copy(stage = Stage.Decoding, error = null, resumeStage = null)
+            }
+            invalidateCameraRequest()
+            clearCapture(
+                expected = request.capture,
+                after = { outcome ->
+                    if (outcome is CaptureCleanupResult.Failed) {
+                        updateState { it.copy(captureCleanupWarning = outcome.reason) }
+                        setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+                    } else {
+                        updateState {
+                            it.copy(stage = Stage.AwaitingImage, captureCleanupWarning = null)
+                        }
+                    }
+                },
+            )
+        }
+    }
+
     private fun returnToImageSelection() {
+        val expected = selectedCapture ?: activeCameraRequest?.capture
         captureRequestJob?.cancel()
         captureRequestJob = null
+        invalidateCameraRequest()
         decodeJob?.cancel()
+        decodeGeneration += 1
         releaseStateImageUnlessBorrowed()
+        selectedCapture = null
         retryPersistence = null
         cropConfirmed = false
         updateState {
             it.copy(
-                stage = Stage.AwaitingImage,
+                stage = if (expected == null) Stage.AwaitingImage else Stage.Decoding,
                 imageUri = null,
                 cropRect = null,
                 image = null,
@@ -547,7 +725,16 @@ class MeasurementViewModel(
                 errorMessage = null,
             )
         }
-        cancelPendingCapture()
+        if (expected != null) {
+            clearCapture(expected) { outcome ->
+                if (outcome is CaptureCleanupResult.Failed) {
+                    updateState { it.copy(captureCleanupWarning = outcome.reason) }
+                    setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+                } else {
+                    updateState { it.copy(stage = Stage.AwaitingImage, captureCleanupWarning = null) }
+                }
+            }
+        }
     }
 
     private fun returnToCrop() {
@@ -558,23 +745,40 @@ class MeasurementViewModel(
         }
     }
 
-    private fun cancelPendingCapture() {
-        val store = captureStore ?: return
-        viewModelScope.launch {
-            try {
-                withContext(ioDispatcher) { store.onFlowCancelled() }
+    private fun clearCapture(
+        expected: MeasurementCapture,
+        after: (CaptureCleanupResult) -> Unit = {},
+    ) {
+        val store = captureStore ?: return after(CaptureCleanupResult.NotCurrent)
+        val job = viewModelScope.launch {
+            val outcome = try {
+                withContext(ioDispatcher) {
+                    captureMutex.withLock { store.clearExpected(expected) }
+                }
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
-                setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
+            } catch (error: Exception) {
+                CaptureCleanupResult.Failed(error.message ?: error::class.java.simpleName)
             }
+            if (selectedCapture == expected && outcome == CaptureCleanupResult.Removed) {
+                selectedCapture = null
+            }
+            after(outcome)
+        }
+        captureCleanupJob = job
+        job.invokeOnCompletion {
+            if (captureCleanupJob === job) captureCleanupJob = null
         }
     }
 
     private fun beginNewDraft() {
+        val expected = selectedCapture ?: activeCameraRequest?.capture
+        invalidateCameraRequest()
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
+        decodeGeneration += 1
         releaseStateImageUnlessBorrowed()
+        selectedCapture = null
         retryPersistence = null
         cropConfirmed = false
         updateState {
@@ -589,30 +793,46 @@ class MeasurementViewModel(
                 image = null,
                 lastResult = null,
                 errorMessage = null,
+                captureCleanupWarning = null,
             )
+        }
+        if (expected != null) clearCapture(expected) { outcome ->
+            if (outcome is CaptureCleanupResult.Failed) {
+                updateState { it.copy(captureCleanupWarning = outcome.reason) }
+            }
         }
     }
 
     private fun clearTransient() {
+        val expected = selectedCapture ?: activeCameraRequest?.capture
         captureRequestJob?.cancel()
         captureRequestJob = null
+        invalidateCameraRequest()
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
+        decodeGeneration += 1
         releaseStateImageUnlessBorrowed()
+        selectedCapture = null
         currentSessionId = null
         savedStateHandle[KEY_SESSION_ID] = null
         retryPersistence = null
         cropConfirmed = false
         val sessions = state.value.sessions
         val origin = state.value.originDestination
+        val permissionHistory = state.value.hasRequestedCameraPermission
         val draft = draftIdFactory()
         mutableState.value = MeasurementUiState(
             draftId = draft,
             sessions = sessions,
             originDestination = origin,
+            hasRequestedCameraPermission = permissionHistory,
         )
         persistFormalState(mutableState.value)
-        cancelPendingCapture()
+        if (expected != null) clearCapture(expected) { outcome ->
+            if (outcome is CaptureCleanupResult.Failed) {
+                updateState { it.copy(captureCleanupWarning = outcome.reason) }
+            }
+        }
     }
 
     private fun clearCreationIfOwned(creationId: Long) {
@@ -668,6 +888,8 @@ class MeasurementViewModel(
             cropRect = crop,
             factor = factor,
             originDestination = origin,
+            hasRequestedCameraPermission = savedStateHandle[KEY_PERMISSION_REQUESTED] ?: false,
+            captureCleanupWarning = savedStateHandle[KEY_CAPTURE_CLEANUP_WARNING],
         )
     }
 
@@ -689,12 +911,41 @@ class MeasurementViewModel(
         savedStateHandle[KEY_CROP_RIGHT] = state.cropRect?.right
         savedStateHandle[KEY_CROP_BOTTOM] = state.cropRect?.bottom
         savedStateHandle[KEY_CROP_CONFIRMED] = cropConfirmed
+        savedStateHandle[KEY_PERMISSION_REQUESTED] = state.hasRequestedCameraPermission
+        savedStateHandle[KEY_CAPTURE_CLEANUP_WARNING] = state.captureCleanupWarning
+    }
+
+    private fun persistCameraRequest(request: CameraRequestSnapshot?) {
+        savedStateHandle[KEY_CAMERA_REQUEST_TOKEN] = request?.requestToken
+        savedStateHandle[KEY_CAMERA_REQUEST_DRAFT] = request?.draftId
+        savedStateHandle[KEY_CAMERA_CAPTURE_URI] = request?.capture?.uri
+        savedStateHandle[KEY_CAMERA_CAPTURE_TOKEN] = request?.capture?.token
+        savedStateHandle[KEY_CAMERA_REQUEST_CONSUMED] = request?.consumed
+    }
+
+    private fun restoredCameraRequest(): CameraRequestSnapshot? {
+        val requestToken = savedStateHandle.get<String>(KEY_CAMERA_REQUEST_TOKEN) ?: return null
+        val draft = savedStateHandle.get<String>(KEY_CAMERA_REQUEST_DRAFT) ?: return null
+        val uri = savedStateHandle.get<String>(KEY_CAMERA_CAPTURE_URI) ?: return null
+        val captureToken = savedStateHandle.get<String>(KEY_CAMERA_CAPTURE_TOKEN) ?: return null
+        return CameraRequestSnapshot(
+            requestToken = requestToken,
+            draftId = draft,
+            capture = MeasurementCapture(uri, captureToken),
+            consumed = savedStateHandle[KEY_CAMERA_REQUEST_CONSUMED] ?: false,
+        )
+    }
+
+    private fun invalidateCameraRequest() {
+        activeCameraRequest = null
+        persistCameraRequest(null)
     }
 
     override fun onCleared() {
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
         captureRequestJob?.cancel()
+        captureCleanupJob?.cancel()
         releaseStateImageUnlessBorrowed()
         super.onCleared()
     }
@@ -757,7 +1008,28 @@ class MeasurementViewModel(
         val image: MeasurementImage,
         val crop: CropBounds,
         val factor: InflammationFactor,
+        val capture: MeasurementCapture?,
     )
+
+    private data class CameraRequestSnapshot(
+        val requestToken: String,
+        val draftId: String,
+        val capture: MeasurementCapture,
+        val consumed: Boolean,
+    ) {
+        fun toEffect() = MeasurementEffect.LaunchCamera(
+            uri = capture.uri,
+            requestToken = requestToken,
+            draftId = draftId,
+            captureToken = capture.token,
+        )
+
+        fun matches(effect: MeasurementEffect.LaunchCamera): Boolean =
+            requestToken == effect.requestToken &&
+                draftId == effect.draftId &&
+                capture.uri == effect.uri &&
+                capture.token == effect.captureToken
+    }
 
     private data class PersistenceOperationSnapshot(
         val analysis: AnalysisOperationSnapshot,
@@ -789,5 +1061,15 @@ class MeasurementViewModel(
         const val KEY_FACTOR = "measurement.factor"
         const val KEY_ORIGIN = "measurement.origin"
         const val KEY_SESSION_ID = "measurement.sessionId"
+        const val KEY_PERMISSION_REQUESTED = "measurement.permission.camera.requested"
+        const val KEY_PERMISSION_PRIOR_TO_LAUNCH = "measurement.permission.camera.prior"
+        const val KEY_CAPTURE_CLEANUP_WARNING = "measurement.capture.cleanup.warning"
+        const val KEY_CAMERA_REQUEST_TOKEN = "measurement.camera.request.token"
+        const val KEY_CAMERA_REQUEST_DRAFT = "measurement.camera.request.draft"
+        const val KEY_CAMERA_CAPTURE_URI = "measurement.camera.capture.uri"
+        const val KEY_CAMERA_CAPTURE_TOKEN = "measurement.camera.capture.token"
+        const val KEY_CAMERA_REQUEST_CONSUMED = "measurement.camera.request.consumed"
     }
 }
+
+private class CaptureOwnershipException(message: String) : Exception(message)

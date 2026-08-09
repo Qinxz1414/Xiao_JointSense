@@ -71,7 +71,6 @@ import cloud.univ.jointsense.measurement.CropRouteScreen
 import cloud.univ.jointsense.measurement.FactorSelectRouteScreen
 import cloud.univ.jointsense.measurement.HistoryRouteScreen
 import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
-import cloud.univ.jointsense.measurement.MeasurementAction
 import cloud.univ.jointsense.measurement.MeasurementViewModel
 import cloud.univ.jointsense.measurement.MeasurementViewModelFactory
 import cloud.univ.jointsense.measurement.ResultRouteScreen
@@ -215,14 +214,6 @@ fun JointSenseNavHost(
                         }
                     }
                     composable<CropRoute> {
-                        if (screenSlot == null) {
-                            BackHandler {
-                                requireNotNull(featureViewModels).measurement.onAction(
-                                    MeasurementAction.BackToImageSelection,
-                                )
-                                actions.navigateBack()
-                            }
-                        }
                         Destination(screenSlot, CropRoute, actions) {
                             CropRouteScreen(
                                 viewModel = requireNotNull(featureViewModels).measurement,
@@ -232,14 +223,6 @@ fun JointSenseNavHost(
                         }
                     }
                     composable<FactorSelectRoute> {
-                        if (screenSlot == null) {
-                            BackHandler {
-                                requireNotNull(featureViewModels).measurement.onAction(
-                                    MeasurementAction.BackToCrop,
-                                )
-                                actions.navigateBack()
-                            }
-                        }
                         Destination(screenSlot, FactorSelectRoute, actions) {
                             FactorSelectRouteScreen(
                                 viewModel = requireNotNull(featureViewModels).measurement,

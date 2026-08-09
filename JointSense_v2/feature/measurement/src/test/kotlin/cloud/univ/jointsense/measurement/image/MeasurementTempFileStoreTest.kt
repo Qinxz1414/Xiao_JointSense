@@ -1,6 +1,7 @@
 package cloud.univ.jointsense.measurement.image
 
 import androidx.lifecycle.SavedStateHandle
+import cloud.univ.jointsense.measurement.CaptureCleanupResult
 import java.io.File
 import java.net.URI
 import org.junit.Assert.assertEquals
@@ -20,7 +21,7 @@ class MeasurementTempFileStoreTest {
         val cacheDir = temporaryFolder.newFolder("cache")
         val store = store(cacheDir, InMemoryPendingCaptureState(), "capture-a.jpg")
 
-        val capture = store.createOrRestorePending()
+        val capture = store.createOrRestorePendingFile()
 
         assertEquals(
             File(cacheDir, "measurement").canonicalFile,
@@ -39,14 +40,14 @@ class MeasurementTempFileStoreTest {
             SavedStatePendingCaptureState(savedStateHandle),
             "capture-a.jpg",
         )
-        val first = firstStore.createOrRestorePending()
+        val first = firstStore.createOrRestorePendingFile()
 
         val recreatedStore = store(
             cacheDir,
             SavedStatePendingCaptureState(savedStateHandle),
             "capture-b.jpg",
         )
-        val restored = recreatedStore.createOrRestorePending()
+        val restored = recreatedStore.createOrRestorePendingFile()
 
         assertEquals(first, restored)
         assertTrue(first.file.exists())
@@ -54,13 +55,34 @@ class MeasurementTempFileStoreTest {
     }
 
     @Test
+    fun importedPickerFallbackSurvivesStoreRecreationWithItsBytesAndOwnershipToken() {
+        val cacheDir = temporaryFolder.newFolder("cache")
+        val savedStateHandle = SavedStateHandle()
+        val firstStore = store(
+            cacheDir,
+            SavedStatePendingCaptureState(savedStateHandle),
+            "picked-fallback.jpg",
+        )
+
+        val imported = firstStore.importOwned { output -> output.write(byteArrayOf(4, 2, 1)) }
+        val recreatedStore = store(
+            cacheDir,
+            SavedStatePendingCaptureState(savedStateHandle),
+            "unused.jpg",
+        )
+
+        assertEquals(imported, recreatedStore.currentCapture())
+        assertEquals(listOf<Byte>(4, 2, 1), requireNotNull(recreatedStore.pendingCapture).file.readBytes().toList())
+    }
+
+    @Test
     fun successfulPersistenceDeletesOwnedPendingFileAndClearsState() {
         val cacheDir = temporaryFolder.newFolder("cache")
         val savedState = InMemoryPendingCaptureState()
         val store = store(cacheDir, savedState, "capture.jpg")
-        val capture = store.createOrRestorePending()
+        val capture = store.createOrRestorePendingFile()
 
-        store.onPersistenceSucceeded()
+        assertEquals(CaptureCleanupResult.Removed, store.clearExpected(capture.capture))
 
         assertFalse(capture.file.exists())
         assertNull(store.pendingCapture)
@@ -71,9 +93,9 @@ class MeasurementTempFileStoreTest {
     fun explicitCancellationDeletesOwnedPendingFileAndClearsState() {
         val cacheDir = temporaryFolder.newFolder("cache")
         val store = store(cacheDir, InMemoryPendingCaptureState(), "capture.jpg")
-        val capture = store.createOrRestorePending()
+        val capture = store.createOrRestorePendingFile()
 
-        store.onFlowCancelled()
+        assertEquals(CaptureCleanupResult.Removed, store.clearExpected(capture.capture))
 
         assertFalse(capture.file.exists())
         assertNull(store.pendingCapture)
@@ -89,10 +111,34 @@ class MeasurementTempFileStoreTest {
         }
         val store = store(cacheDir, savedState, "capture.jpg")
 
-        store.onFlowCancelled()
+        assertEquals(
+            CaptureCleanupResult.NotCurrent,
+            store.clearExpected(cloud.univ.jointsense.measurement.MeasurementCapture(
+                "content://test/outside.jpg",
+                "outside",
+            )),
+        )
 
         assertTrue(outside.exists())
         assertNull(store.pendingCapture)
+    }
+
+    @Test
+    fun cleanupForOldCaptureDoesNotDeleteOrClearNewCapture() {
+        val cacheDir = temporaryFolder.newFolder("cache")
+        val savedState = InMemoryPendingCaptureState()
+        val store = store(cacheDir, savedState, "capture-a.jpg")
+        val old = store.createOrRestorePendingFile().capture
+        val newFile = File(cacheDir, "measurement/capture-b.jpg").apply { createNewFile() }
+        savedState.write(MeasurementTempFileStore.PENDING_URI_KEY, "content://test/capture-b.jpg")
+        savedState.write(MeasurementTempFileStore.PENDING_PATH_KEY, newFile.absolutePath)
+        savedState.write(MeasurementTempFileStore.PENDING_TOKEN_KEY, "capture-b")
+
+        val outcome = store.clearExpected(old)
+
+        assertEquals(CaptureCleanupResult.NotCurrent, outcome)
+        assertTrue(newFile.exists())
+        assertEquals("capture-b", requireNotNull(store.currentCapture()).token)
     }
 
     private fun store(

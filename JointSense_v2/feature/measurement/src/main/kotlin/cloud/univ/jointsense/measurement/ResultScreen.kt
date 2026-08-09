@@ -63,6 +63,7 @@ fun ResultScreen(
     session: TestSession?,
     lastResult: TestResult?,
     canAddMore: Boolean,
+    cleanupWarning: String? = null,
     onContinueMeasurement: () -> Unit,
     onReturnToOrigin: () -> Unit,
     modifier: Modifier = Modifier
@@ -94,6 +95,17 @@ fun ResultScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            cleanupWarning?.let { warning ->
+                Text(
+                    text = "Temporary image cleanup warning: $warning",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(MEASUREMENT_CLEANUP_WARNING_TAG),
+                    color = Color(0xFF8A4B00),
+                    fontSize = 13.sp,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             // ---- Quantitative analysis card ----
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -360,3 +372,5 @@ fun ResultScreen(
         }
     }
 }
+
+const val MEASUREMENT_CLEANUP_WARNING_TAG = "measurement_cleanup_warning"

@@ -9,15 +9,13 @@ import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -34,7 +32,6 @@ fun ImageSelectRouteScreen(
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val context = LocalContext.current
     val activity = context.findActivity()
-    var permissionWasPreviouslyRequested by rememberSaveable { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
@@ -44,27 +41,28 @@ fun ImageSelectRouteScreen(
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
-        uri?.let { viewModel.onAction(MeasurementAction.ImageSelected(it.toString())) }
+        uri?.let { viewModel.onAction(MeasurementAction.PickedImageSelected(it.toString())) }
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) {
-            viewModel.onAction(MeasurementAction.CameraCaptureRequested)
-        } else {
-            val permanentlyDenied = permissionWasPreviouslyRequested &&
-                activity?.let {
-                    !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
-                } == true
-            permissionWasPreviouslyRequested = true
-            viewModel.onAction(MeasurementAction.PermissionDenied(permanentlyDenied))
-        }
+        val shouldShowRationale = !granted && activity?.let {
+            ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+        } == true
+        viewModel.onAction(
+            MeasurementAction.CameraPermissionResult(
+                granted = granted,
+                shouldShowRationale = shouldShowRationale,
+            ),
+        )
     }
 
     LaunchedEffect(viewModel, cameraLauncher) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                is MeasurementEffect.LaunchCamera -> cameraLauncher.launch(Uri.parse(effect.uri))
+                is MeasurementEffect.LaunchCamera -> viewModel.consumeCameraLaunch(effect)?.let {
+                    cameraLauncher.launch(Uri.parse(it))
+                }
                 is MeasurementEffect.NavigateToResult -> Unit
             }
         }
@@ -83,6 +81,7 @@ fun ImageSelectRouteScreen(
                 ) {
                     viewModel.onAction(MeasurementAction.CameraCaptureRequested)
                 } else {
+                    viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
                     permissionLauncher.launch(Manifest.permission.CAMERA)
                 }
             },
@@ -116,6 +115,11 @@ fun CropRouteScreen(
     onBack: () -> Unit,
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
+    val performBack = {
+        viewModel.onAction(MeasurementAction.BackToImageSelection)
+        onBack()
+    }
+    BackHandler(onBack = performBack)
     LaunchedEffect(state.stage) {
         if (state.stage == Stage.ReadyToAnalyze) onConfirm()
     }
@@ -139,10 +143,7 @@ fun CropRouteScreen(
                         viewModel.onAction(MeasurementAction.CropChanged(it.toBounds()))
                     },
                     onConfirm = { viewModel.onAction(MeasurementAction.CropConfirmed) },
-                    onBack = {
-                        viewModel.onAction(MeasurementAction.BackToImageSelection)
-                        onBack()
-                    },
+                    onBack = performBack,
                 )
             }
         }
@@ -168,6 +169,16 @@ fun FactorSelectRouteScreen(
     onBack: () -> Unit,
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
+    val isBusy = state.stage == Stage.Analyzing || state.stage == Stage.Persisting
+    val canReturnToCrop = state.stage == Stage.ReadyToAnalyze ||
+        state.stage == Stage.RecoverableError
+    val performBack = {
+        if (canReturnToCrop) {
+            viewModel.onAction(MeasurementAction.BackToCrop)
+            if (viewModel.state.value.stage == Stage.ReadyToCrop) onBack()
+        }
+    }
+    BackHandler(onBack = performBack)
     LaunchedEffect(viewModel, onResultReady) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -184,11 +195,9 @@ fun FactorSelectRouteScreen(
             selectedFactor = state.factor,
             onFactorSelected = { viewModel.onAction(MeasurementAction.FactorSelected(it)) },
             onAnalyze = { viewModel.onAction(MeasurementAction.Analyze) },
-            onBack = {
-                viewModel.onAction(MeasurementAction.BackToCrop)
-                onBack()
-            },
-            isAnalyzing = state.stage == Stage.Analyzing || state.stage == Stage.Persisting,
+            onBack = performBack,
+            isAnalyzing = isBusy,
+            backEnabled = canReturnToCrop,
         )
         Stage.RecoverableError -> MeasurementErrorContent(
             error = state.error ?: MeasurementError.AnalysisFailed,
@@ -218,6 +227,7 @@ fun ResultRouteScreen(
         session = session,
         lastResult = session?.results?.firstOrNull { it.id == resultId },
         canAddMore = session?.results?.size?.let { it < 5 } == true,
+        cleanupWarning = state.captureCleanupWarning,
         onContinueMeasurement = onContinueMeasurement,
         onReturnToOrigin = onReturnToOrigin,
     )

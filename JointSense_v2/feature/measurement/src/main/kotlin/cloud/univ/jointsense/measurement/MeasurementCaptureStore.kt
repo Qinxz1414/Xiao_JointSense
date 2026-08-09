@@ -1,12 +1,39 @@
 package cloud.univ.jointsense.measurement
 
-/** Owns a camera output URI for the lifetime of one measurement draft. */
+import java.io.OutputStream
+
+data class MeasurementCapture(
+    val uri: String,
+    val token: String,
+)
+
+sealed interface CaptureCleanupResult {
+    data object Removed : CaptureCleanupResult
+    data object NotCurrent : CaptureCleanupResult
+    data class Failed(val reason: String) : CaptureCleanupResult
+}
+
+/** Owns app-private image inputs for the lifetime of one measurement draft. */
 interface MeasurementCaptureStore {
-    val pendingCaptureUri: String?
+    /** File-system work: call only from the injected IO boundary. */
+    fun currentCapture(): MeasurementCapture?
 
-    fun createOrRestorePendingUri(): String
+    /** File-system work: call only from the injected IO boundary. */
+    fun createOrRestorePending(): MeasurementCapture
 
-    fun onPersistenceSucceeded()
+    /** Copies an ephemeral provider input into an app-owned file on the IO boundary. */
+    fun importOwned(write: (OutputStream) -> Unit): MeasurementCapture
 
-    fun onFlowCancelled()
+    /** Removes only [expected]; a newer capture is never touched. */
+    fun clearExpected(expected: MeasurementCapture): CaptureCleanupResult
+}
+
+data class MeasurementImageInput(
+    val uri: String,
+    val ownedCapture: MeasurementCapture?,
+)
+
+fun interface MeasurementPickedImageResolver {
+    /** Permission/file work: call only from the injected IO boundary. */
+    fun acquire(uri: String): MeasurementImageInput
 }

@@ -32,7 +32,12 @@ sealed interface MeasurementError {
 }
 
 sealed interface MeasurementEffect {
-    data class LaunchCamera(val uri: String) : MeasurementEffect
+    class LaunchCamera internal constructor(
+        val uri: String,
+        internal val requestToken: String,
+        internal val draftId: String,
+        internal val captureToken: String,
+    ) : MeasurementEffect
 
     data class NavigateToResult(val resultId: String) : MeasurementEffect
 }
@@ -47,6 +52,8 @@ data class MeasurementUiState(
     val resumeStage: Stage? = null,
     val resultId: String? = null,
     val originDestination: String? = null,
+    val hasRequestedCameraPermission: Boolean = false,
+    val captureCleanupWarning: String? = null,
     // Transitional Phase-1 surface. Task 5 moves callers to the formal fields above.
     val sessions: List<TestSession> = emptyList(),
     val currentSession: TestSession? = null,

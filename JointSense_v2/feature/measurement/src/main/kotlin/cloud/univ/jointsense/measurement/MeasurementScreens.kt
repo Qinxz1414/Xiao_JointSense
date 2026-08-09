@@ -284,6 +284,7 @@ fun FactorSelectScreen(
     onAnalyze: () -> Unit,
     onBack: () -> Unit,
     isAnalyzing: Boolean,
+    backEnabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -291,7 +292,7 @@ fun FactorSelectScreen(
             TopAppBar(
                 title = { Text("Select Detection Factor", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, enabled = backEnabled) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },

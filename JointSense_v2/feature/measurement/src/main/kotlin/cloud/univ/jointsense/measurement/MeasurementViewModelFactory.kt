@@ -8,6 +8,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import cloud.univ.jointsense.image.SampledBitmapDecoder
+import cloud.univ.jointsense.measurement.image.DurablePickedImageResolver
 import cloud.univ.jointsense.measurement.image.MeasurementTempFileStore
 import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,6 +19,9 @@ class MeasurementViewModelFactory(
     private val analyzer: BaselinePhotoAnalysisAdapter,
     private val decoder: MeasurementImageDecoder? = null,
     private val captureStoreFactory: (SavedStateHandle) -> MeasurementCaptureStore? = { null },
+    private val pickedImageResolverFactory: (MeasurementCaptureStore?) -> MeasurementPickedImageResolver = {
+        MeasurementPickedImageResolver { uri -> MeasurementImageInput(uri, null) }
+    },
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val sessionNamePrefix: () -> String = { "Test" },
@@ -39,6 +43,12 @@ class MeasurementViewModelFactory(
         captureStoreFactory = { savedStateHandle ->
             MeasurementTempFileStore(context.applicationContext, savedStateHandle)
         },
+        pickedImageResolverFactory = { captureStore ->
+            DurablePickedImageResolver(
+                contentResolver = context.applicationContext.contentResolver,
+                captureStore = requireNotNull(captureStore),
+            )
+        },
         ioDispatcher = ioDispatcher,
         defaultDispatcher = defaultDispatcher,
         sessionNamePrefix = sessionNamePrefix,
@@ -57,15 +67,19 @@ class MeasurementViewModelFactory(
         return create(extras.createSavedStateHandle()) as T
     }
 
-    fun create(savedStateHandle: SavedStateHandle) = MeasurementViewModel(
-        repository = repository,
-        analyzer = analyzer,
-        draftIdFactory = draftIdFactory,
-        savedStateHandle = savedStateHandle,
-        decoder = decoder,
-        captureStore = captureStoreFactory(savedStateHandle),
-        ioDispatcher = ioDispatcher,
-        defaultDispatcher = defaultDispatcher,
-        sessionNamePrefix = sessionNamePrefix,
-    )
+    fun create(savedStateHandle: SavedStateHandle): MeasurementViewModel {
+        val captureStore = captureStoreFactory(savedStateHandle)
+        return MeasurementViewModel(
+            repository = repository,
+            analyzer = analyzer,
+            draftIdFactory = draftIdFactory,
+            savedStateHandle = savedStateHandle,
+            decoder = decoder,
+            captureStore = captureStore,
+            pickedImageResolver = pickedImageResolverFactory(captureStore),
+            ioDispatcher = ioDispatcher,
+            defaultDispatcher = defaultDispatcher,
+            sessionNamePrefix = sessionNamePrefix,
+        )
+    }
 }
