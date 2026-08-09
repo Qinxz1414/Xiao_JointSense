@@ -74,6 +74,10 @@ class MeasurementViewModel(
     fun onAction(action: MeasurementAction) {
         when (action) {
             is MeasurementAction.ImageSelected -> decodeImage(action.uri, restoring = false)
+            is MeasurementAction.PermissionDenied -> setRecoverableError(
+                error = MeasurementError.PermissionDenied(action.permanentlyDenied),
+                resumeStage = Stage.AwaitingImage,
+            )
             is MeasurementAction.CropChanged -> updateCrop(action.bounds)
             MeasurementAction.CropConfirmed -> confirmCrop()
             is MeasurementAction.FactorSelected -> updateState {

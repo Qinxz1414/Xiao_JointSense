@@ -388,6 +388,18 @@ class MeasurementViewModelTest {
     }
 
     @Test
+    fun temporaryPermissionDenialPreservesDraftAndRecoversToImageSelection() =
+        runTest(dispatcher) {
+            verifyPermissionDenialRecovery(permanentlyDenied = false)
+        }
+
+    @Test
+    fun permanentPermissionDenialPreservesDraftAndRecoversToImageSelection() =
+        runTest(dispatcher) {
+            verifyPermissionDenialRecovery(permanentlyDenied = true)
+        }
+
+    @Test
     fun decoderAnalyzerAndRepositoryUseTheirInjectedDispatcherBoundaries() = runTest(dispatcher) {
         val activeBoundary = ThreadLocal<String?>()
         val io = BoundaryDispatcher("IO", activeBoundary, dispatcher)
@@ -441,6 +453,41 @@ class MeasurementViewModelTest {
         viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 220)))
         viewModel.onAction(MeasurementAction.CropConfirmed)
         return viewModel
+    }
+
+    private fun TestScope.verifyPermissionDenialRecovery(permanentlyDenied: Boolean) {
+        val viewModel = readyViewModel()
+        viewModel.onAction(MeasurementAction.FactorSelected(InflammationFactor.IL1_BETA))
+        val recoveryData = viewModel.state.value.let {
+            listOf(it.draftId, it.imageUri, it.cropRect, it.factor, it.originDestination)
+        }
+
+        viewModel.onAction(MeasurementAction.PermissionDenied(permanentlyDenied))
+
+        assertEquals(Stage.RecoverableError, viewModel.state.value.stage)
+        assertEquals(
+            MeasurementError.PermissionDenied(permanentlyDenied),
+            viewModel.state.value.error,
+        )
+        assertEquals(Stage.AwaitingImage, viewModel.state.value.resumeStage)
+        assertEquals(
+            recoveryData,
+            viewModel.state.value.let {
+                listOf(it.draftId, it.imageUri, it.cropRect, it.factor, it.originDestination)
+            },
+        )
+
+        viewModel.onAction(MeasurementAction.Retry)
+
+        assertEquals(Stage.AwaitingImage, viewModel.state.value.stage)
+        assertNull(viewModel.state.value.error)
+        assertNull(viewModel.state.value.resumeStage)
+        assertEquals(
+            recoveryData,
+            viewModel.state.value.let {
+                listOf(it.draftId, it.imageUri, it.cropRect, it.factor, it.originDestination)
+            },
+        )
     }
 }
 
