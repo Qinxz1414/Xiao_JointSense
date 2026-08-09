@@ -9,10 +9,17 @@ fun calculateInSampleSize(
     require(height > 0) { "height must be positive" }
     require(maxEdge > 0) { "maxEdge must be positive" }
 
-    val longestEdge = maxOf(width, height)
-    var sampleSize = 1
-    while (longestEdge / sampleSize > maxEdge) {
-        sampleSize *= 2
+    val longestEdge = maxOf(width, height).toLong()
+    val edgeLimit = maxEdge.toLong()
+    var sampleSize = 1L
+    while (ceilingDivide(longestEdge, sampleSize) > edgeLimit) {
+        sampleSize *= 2L
     }
-    return sampleSize
+    require(sampleSize <= Int.MAX_VALUE.toLong()) {
+        "Required sample size cannot be represented as a positive Int"
+    }
+    return sampleSize.toInt()
 }
+
+private fun ceilingDivide(value: Long, divisor: Long): Long =
+    value / divisor + if (value % divisor == 0L) 0L else 1L

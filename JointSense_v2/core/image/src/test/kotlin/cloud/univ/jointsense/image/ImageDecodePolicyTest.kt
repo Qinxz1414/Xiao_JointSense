@@ -22,6 +22,19 @@ class ImageDecodePolicyTest {
     }
 
     @Test
+    fun roundsUpScaledEdgeBeforeAcceptingSampleSize() {
+        assertEquals(4, calculateInSampleSize(4097, 2048, 2048))
+        assertEquals(2, calculateInSampleSize(2049, 1024, 2048))
+    }
+
+    @Test
+    fun rejectsLimitThatNeedsAnUnrepresentablePowerOfTwo() {
+        assertThrows(IllegalArgumentException::class.java) {
+            calculateInSampleSize(Int.MAX_VALUE, 1, 1)
+        }
+    }
+
+    @Test
     fun rejectsInvalidDimensionsAndLimit() {
         assertThrows(IllegalArgumentException::class.java) {
             calculateInSampleSize(0, 720, 2048)
