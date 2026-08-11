@@ -428,11 +428,16 @@ git commit -m "fix: make measurement flow recoverable"
 - Modify: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationScreens.kt`
 - Modify: `feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationEntry.kt`
 - Modify: `feature/calibration/build.gradle.kts`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsViewModel.kt`
+- Modify: `feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/ProfileScreen.kt`
 - Modify: `app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt`
 - Modify: `app/src/main/java/cloud/univ/jointsense/navigation/NavigationActions.kt`
 - Modify: `app/src/androidTest/java/cloud/univ/jointsense/navigation/JointSenseNavigationTest.kt`
 - Create: `feature/calibration/src/test/kotlin/cloud/univ/jointsense/calibration/CalibrationViewModelTest.kt`
+- Create: `feature/calibration/src/test/kotlin/cloud/univ/jointsense/calibration/GridSignalDetectorTest.kt`
+- Create: `feature/calibration/src/test/kotlin/cloud/univ/jointsense/calibration/LegacyCalibrationRevalidatorTest.kt`
 - Create: `feature/calibration/src/androidTest/kotlin/cloud/univ/jointsense/calibration/CalibrationFlowTest.kt`
+- Modify: `feature/settings/src/test/kotlin/cloud/univ/jointsense/settings/SettingsViewModelTest.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/data/BuiltInData.kt`
 - Delete after replacement: `app/src/main/java/cloud/univ/jointsense/model/Calibration.kt`
@@ -478,7 +483,7 @@ Expected: unit tests pass; connected tests pass with a device.
 - [ ] **Step 6: Commit calibration rebuild**
 
 ```powershell
-git add feature/calibration app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt app/src/main/java/cloud/univ/jointsense/navigation/NavigationActions.kt app/src/androidTest/java/cloud/univ/jointsense/navigation/JointSenseNavigationTest.kt app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt app/src/main/java/cloud/univ/jointsense/data/BuiltInData.kt app/src/main/java/cloud/univ/jointsense/model/Calibration.kt app/src/main/java/cloud/univ/jointsense/model/StandardCurve.kt app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt
+git add feature/calibration feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/SettingsViewModel.kt feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/ProfileScreen.kt feature/settings/src/test/kotlin/cloud/univ/jointsense/settings/SettingsViewModelTest.kt app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt app/src/main/java/cloud/univ/jointsense/navigation/NavigationActions.kt app/src/androidTest/java/cloud/univ/jointsense/navigation/JointSenseNavigationTest.kt app/src/main/java/cloud/univ/jointsense/data/CalibrationManager.kt app/src/main/java/cloud/univ/jointsense/data/BuiltInData.kt app/src/main/java/cloud/univ/jointsense/model/Calibration.kt app/src/main/java/cloud/univ/jointsense/model/StandardCurve.kt app/src/main/java/cloud/univ/jointsense/model/CalibrationDetector.kt
 git commit -m "fix: validate and persist calibration safely"
 ```
 
