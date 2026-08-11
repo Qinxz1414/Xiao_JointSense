@@ -16,9 +16,13 @@ data class SettingsUiState(
     val sessionCount: Int = 0,
     val measurementCount: Int = 0,
     val calibrationCount: Int = 0,
+    val calibrationReviewCount: Int = 0,
 ) {
     val hasCalibration: Boolean
         get() = calibrationCount > 0
+
+    val hasCalibrationNeedingReview: Boolean
+        get() = calibrationReviewCount > 0
 }
 
 class SettingsViewModel(
@@ -35,6 +39,9 @@ class SettingsViewModel(
             measurementCount = observedSessions.sumOf { it.results.size },
             calibrationCount = observedCalibrations.count {
                 it.status == CalibrationStatus.ACTIVE
+            },
+            calibrationReviewCount = observedCalibrations.count {
+                it.status == CalibrationStatus.NEEDS_REVIEW
             },
         )
     }.stateIn(

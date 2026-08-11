@@ -161,11 +161,7 @@ internal fun SettingsScreen(
                         icon = Icons.Default.Science,
                         tint = MedicalGreen,
                         title = "Calibrate Standard Curve",
-                        subtitle = if (state.hasCalibration) {
-                            "User curve active (${state.calibrationCount} factor(s))"
-                        } else {
-                            "Capture a standard plate to improve accuracy"
-                        },
+                        subtitle = calibrationSubtitle(state),
                         onClick = onCalibrate
                     )
                     HorizontalDivider(color = StructureGray, thickness = 1.dp)
@@ -241,6 +237,13 @@ internal fun SettingsScreen(
             }
         )
     }
+}
+
+internal fun calibrationSubtitle(state: SettingsUiState): String = when {
+    state.hasCalibrationNeedingReview ->
+        "Calibration needs review (${state.calibrationReviewCount} factor(s))"
+    state.hasCalibration -> "User curve active (${state.calibrationCount} factor(s))"
+    else -> "Capture a standard plate to improve accuracy"
 }
 
 @Composable

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -55,7 +56,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import cloud.univ.jointsense.calibration.CalibrationRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationAssignRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationCropRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationDoneRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationReviewRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationSelectRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationViewModel
+import cloud.univ.jointsense.calibration.CalibrationViewModelFactory
 import cloud.univ.jointsense.designsystem.theme.BgLight
 import cloud.univ.jointsense.designsystem.theme.BgWhite
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
@@ -309,20 +316,35 @@ private fun JointSenseNavHostContent(
                 }
 
                 navigation<CalibrationGraph>(startDestination = CalibrationSelectRoute) {
-                    composable<CalibrationSelectRoute> {
-                        CalibrationDestination(screenSlot, CalibrationSelectRoute, actions, appContainer)
+                    composable<CalibrationSelectRoute> { entry ->
+                        CalibrationDestination(
+                            screenSlot, CalibrationSelectRoute, actions, appContainer,
+                            navController, entry,
+                        )
                     }
-                    composable<CalibrationCropRoute> {
-                        CalibrationDestination(screenSlot, CalibrationCropRoute, actions, appContainer)
+                    composable<CalibrationCropRoute> { entry ->
+                        CalibrationDestination(
+                            screenSlot, CalibrationCropRoute, actions, appContainer,
+                            navController, entry,
+                        )
                     }
-                    composable<CalibrationAssignRoute> {
-                        CalibrationDestination(screenSlot, CalibrationAssignRoute, actions, appContainer)
+                    composable<CalibrationAssignRoute> { entry ->
+                        CalibrationDestination(
+                            screenSlot, CalibrationAssignRoute, actions, appContainer,
+                            navController, entry,
+                        )
                     }
-                    composable<CalibrationReviewRoute> {
-                        CalibrationDestination(screenSlot, CalibrationReviewRoute, actions, appContainer)
+                    composable<CalibrationReviewRoute> { entry ->
+                        CalibrationDestination(
+                            screenSlot, CalibrationReviewRoute, actions, appContainer,
+                            navController, entry,
+                        )
                     }
-                    composable<CalibrationDoneRoute> {
-                        CalibrationDestination(screenSlot, CalibrationDoneRoute, actions, appContainer)
+                    composable<CalibrationDoneRoute> { entry ->
+                        CalibrationDestination(
+                            screenSlot, CalibrationDoneRoute, actions, appContainer,
+                            navController, entry,
+                        )
                     }
                 }
             }
@@ -406,12 +428,55 @@ private fun CalibrationDestination(
     route: JointSenseRoute,
     actions: NavigationActions,
     appContainer: AppContainer?,
+    navController: NavHostController,
+    entry: NavBackStackEntry,
 ) {
-    Destination(screenSlot, route, actions) {
-        CalibrationRouteScreen(
-            repository = requireNotNull(appContainer).calibrations,
-            onExit = actions::exitCalibration,
+    if (screenSlot != null) {
+        screenSlot(route, actions)
+        return
+    }
+    val container = requireNotNull(appContainer)
+    val context = LocalContext.current.applicationContext
+    val graphEntry = remember(entry) { navController.getBackStackEntry<CalibrationGraph>() }
+    val factory = remember(container, context) {
+        CalibrationViewModelFactory(
+            repository = container.calibrations,
+            decoder = SampledBitmapDecoder(context.contentResolver),
         )
+    }
+    val calibration: CalibrationViewModel = viewModel(
+        viewModelStoreOwner = graphEntry,
+        key = "calibration-graph",
+        factory = factory,
+    )
+    when (route) {
+        CalibrationSelectRoute -> CalibrationSelectRouteScreen(
+            calibration,
+            onImageReady = actions::openCalibrationCrop,
+            onBack = { actions.navigateBack() },
+        )
+        CalibrationCropRoute -> CalibrationCropRouteScreen(
+            calibration,
+            onSignalsReady = actions::openCalibrationAssign,
+            onBack = { actions.navigateBack() },
+        )
+        CalibrationAssignRoute -> CalibrationAssignRouteScreen(
+            calibration,
+            onReviewReady = actions::openCalibrationReview,
+            onBack = { actions.navigateBack() },
+        )
+        CalibrationReviewRoute -> CalibrationReviewRouteScreen(
+            calibration,
+            onSaved = actions::openCalibrationDone,
+            onBack = { actions.navigateBack() },
+        )
+        CalibrationDoneRoute -> CalibrationDoneRouteScreen(
+            calibration,
+            onDone = { actions.exitCalibration() },
+            onAnother = actions::restartCalibration,
+            onBack = { actions.navigateBack() },
+        )
+        else -> error("Unsupported calibration route: $route")
     }
 }
 

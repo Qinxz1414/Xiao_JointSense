@@ -1,7 +1,12 @@
 package cloud.univ.jointsense
 
 import androidx.compose.runtime.Composable
-import cloud.univ.jointsense.calibration.CalibrationRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationAssignRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationCropRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationDoneRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationReviewRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationSelectRouteScreen
+import cloud.univ.jointsense.calibration.CalibrationViewModel
 import cloud.univ.jointsense.di.AppContainer
 import cloud.univ.jointsense.insights.HomeRouteScreen
 import cloud.univ.jointsense.insights.InsightsViewModel
@@ -38,6 +43,7 @@ class ModuleBoundarySmokeTest {
 @Composable
 private fun ImportedFeatureRouteEntries(
     container: AppContainer,
+    calibration: CalibrationViewModel,
     insights: InsightsViewModel,
     measurement: MeasurementViewModel,
     settings: SettingsViewModel,
@@ -58,7 +64,11 @@ private fun ImportedFeatureRouteEntries(
     )
     HistoryRouteScreen(measurement, onOpenResult = {}, onBack = {})
 
-    CalibrationRouteScreen(repository = container.calibrations, onExit = {})
+    CalibrationSelectRouteScreen(calibration, onImageReady = {}, onBack = {})
+    CalibrationCropRouteScreen(calibration, onSignalsReady = {}, onBack = {})
+    CalibrationAssignRouteScreen(calibration, onReviewReady = {}, onBack = {})
+    CalibrationReviewRouteScreen(calibration, onSaved = {}, onBack = {})
+    CalibrationDoneRouteScreen(calibration, onDone = {}, onAnother = {}, onBack = {})
     SettingsRouteScreen(
         viewModel = settings,
         languageController = languageController,

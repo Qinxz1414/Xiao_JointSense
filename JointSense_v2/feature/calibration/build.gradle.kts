@@ -10,6 +10,7 @@ android {
 dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:analysis"))
+    implementation(project(":core:image"))
     implementation(project(":core:designsystem"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -18,6 +19,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.kotlinx.coroutines.android)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -51,6 +51,27 @@ class NavigationActions internal constructor(
         driver.navigate(CalibrationGraph, launchSingleTop = true)
     }
 
+    fun openCalibrationCrop() {
+        driver.navigate(CalibrationCropRoute, launchSingleTop = true)
+    }
+
+    fun openCalibrationAssign() {
+        driver.navigate(CalibrationAssignRoute, launchSingleTop = true)
+    }
+
+    fun openCalibrationReview() {
+        driver.navigate(CalibrationReviewRoute, launchSingleTop = true)
+    }
+
+    fun openCalibrationDone() {
+        driver.navigate(CalibrationDoneRoute, launchSingleTop = true)
+    }
+
+    fun restartCalibration() {
+        driver.popCalibration()
+        driver.navigate(CalibrationGraph, launchSingleTop = true)
+    }
+
     /** Natural back for ordinary destinations, including Crop and FactorSelect. */
     fun navigateBack(): Boolean = driver.popOne()
 

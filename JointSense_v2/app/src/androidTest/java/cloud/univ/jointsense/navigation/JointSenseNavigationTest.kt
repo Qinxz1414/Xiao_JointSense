@@ -128,6 +128,41 @@ class JointSenseNavigationTest {
     }
 
     @Test
+    fun calibrationSystemBackPopsExactlyOneRouteAtATime() {
+        composeRule.onNodeWithTag("go:profile").performClick()
+        composeRule.onNodeWithTag("go:calibration").performClick()
+        composeRule.onNodeWithTag("go:calibration-crop").performClick()
+        composeRule.onNodeWithTag("go:calibration-assign").performClick()
+        composeRule.onNodeWithTag("go:calibration-review").performClick()
+        composeRule.onNodeWithTag("go:calibration-done").performClick()
+
+        listOf("calibration-review", "calibration-assign", "calibration-crop", "calibration-select", "profile")
+            .forEach { expected ->
+                pressActivityBack()
+                composeRule.onNodeWithTag("screen:$expected").assertIsDisplayed()
+                check(!composeRule.activity.isFinishing)
+            }
+    }
+
+    @Test
+    fun calibrationTopBackPopsOneRouteAndDoneExitsTheGraph() {
+        composeRule.onNodeWithTag("go:profile").performClick()
+        composeRule.onNodeWithTag("go:calibration").performClick()
+        composeRule.onNodeWithTag("go:calibration-crop").performClick()
+        composeRule.onNodeWithTag("back:calibration").performClick()
+        composeRule.onNodeWithTag("screen:calibration-select").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("go:calibration-crop").performClick()
+        composeRule.onNodeWithTag("go:calibration-assign").performClick()
+        composeRule.onNodeWithTag("go:calibration-review").performClick()
+        composeRule.onNodeWithTag("go:calibration-done").performClick()
+        composeRule.onNodeWithTag("finish:calibration").performClick()
+
+        composeRule.onNodeWithTag("screen:profile").assertIsDisplayed()
+        check(!composeRule.activity.isFinishing)
+    }
+
+    @Test
     fun mainActivityStartsWithTheAppCompatTheme() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
@@ -179,6 +214,7 @@ class JointSenseNavigationTest {
                 ProfileRoute -> {
                     ScreenMarker("profile")
                     NavButton("go:history", actions::openHistory)
+                    NavButton("go:calibration", actions::startCalibration)
                 }
                 HistoryRoute -> {
                     ScreenMarker("history")
@@ -212,11 +248,27 @@ class JointSenseNavigationTest {
                         }
                     }
                 }
-                CalibrationSelectRoute -> ScreenMarker("calibration-select")
-                CalibrationCropRoute -> ScreenMarker("calibration-crop")
-                CalibrationAssignRoute -> ScreenMarker("calibration-assign")
-                CalibrationReviewRoute -> ScreenMarker("calibration-review")
-                CalibrationDoneRoute -> ScreenMarker("calibration-done")
+                CalibrationSelectRoute -> {
+                    ScreenMarker("calibration-select")
+                    NavButton("go:calibration-crop", actions::openCalibrationCrop)
+                }
+                CalibrationCropRoute -> {
+                    ScreenMarker("calibration-crop")
+                    NavButton("go:calibration-assign", actions::openCalibrationAssign)
+                    NavButton("back:calibration", actions::navigateBack)
+                }
+                CalibrationAssignRoute -> {
+                    ScreenMarker("calibration-assign")
+                    NavButton("go:calibration-review", actions::openCalibrationReview)
+                }
+                CalibrationReviewRoute -> {
+                    ScreenMarker("calibration-review")
+                    NavButton("go:calibration-done", actions::openCalibrationDone)
+                }
+                CalibrationDoneRoute -> {
+                    ScreenMarker("calibration-done")
+                    NavButton("finish:calibration", actions::exitCalibration)
+                }
             }
         }
     }
