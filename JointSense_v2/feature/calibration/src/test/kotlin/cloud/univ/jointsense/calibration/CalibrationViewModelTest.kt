@@ -144,6 +144,60 @@ class CalibrationViewModelTest {
     }
 
     @Test
+    fun legacyPromotionAlreadySavingMakesConcurrentViewModelSaveWaitAndUserCurveWin() = runTest(dispatcher) {
+        val legacySaveEntered = CompletableDeferred<Unit>()
+        val allowLegacySave = CompletableDeferred<Unit>()
+        val otherFactor = needsReviewCalibration(InflammationFactor.IL6).copy(
+            createdAt = 2L,
+            status = CalibrationStatus.ACTIVE,
+        )
+        val repository = ViewModelCalibrationRepository(
+            gatedSaveCreatedAt = 1L,
+            gatedSaveEntered = legacySaveEntered,
+            allowGatedSave = allowLegacySave,
+        ).apply {
+            calibrations.value = listOf(needsReviewCalibration(), otherFactor)
+        }
+        val processRevalidator = LegacyCalibrationRevalidator(repository)
+        val viewModel = viewModel(
+            repository = repository,
+            legacyRevalidator = processRevalidator,
+        )
+        runCurrent()
+        legacySaveEntered.await()
+        viewModel.setDetectedSignals(validSignals)
+        assertTrue(viewModel.review())
+
+        viewModel.save()
+        viewModel.save()
+        runCurrent()
+
+        assertTrue(viewModel.state.value.isSaving)
+        assertTrue(repository.saved.isEmpty())
+
+        allowLegacySave.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L, 456L), repository.saved.map(Calibration::createdAt))
+        val finalUserCurve = repository.calibrations.value.single {
+            it.factor == InflammationFactor.TNF_ALPHA
+        }
+        assertEquals(456L, finalUserCurve.createdAt)
+        assertEquals(CalibrationStatus.ACTIVE, finalUserCurve.status)
+        assertEquals(9, finalUserCurve.knots.size)
+        assertEquals(10f, finalUserCurve.knots.first().rawSignal)
+        assertEquals(0f, finalUserCurve.knots.first().netSignal)
+        assertEquals(0f, finalUserCurve.knots.first().fittedSignal)
+        assertEquals(58f, finalUserCurve.knots.last().rawSignal)
+        assertEquals(48f, finalUserCurve.knots.last().netSignal)
+        assertEquals(48f, finalUserCurve.knots.last().fittedSignal)
+        assertEquals(otherFactor, repository.calibrations.value.single {
+            it.factor == InflammationFactor.IL6
+        })
+        assertTrue(viewModel.state.value.saveCompleted)
+    }
+
+    @Test
     fun savedStateRestoresFactorTextsAndSignals() {
         val handle = SavedStateHandle()
         val original = viewModel(savedStateHandle = handle)
@@ -846,7 +900,7 @@ class CalibrationViewModelTest {
     }
 
     @Test
-    fun lateLegacyFailureDoesNotOverwriteAPersistenceError() = runTest(dispatcher) {
+    fun queuedPersistenceFailureAndLegacyFailureRemainIndependent() = runTest(dispatcher) {
         val legacyGate = CompletableDeferred<Unit>()
         val repository = ViewModelCalibrationRepository(observeGate = legacyGate).apply {
             calibrations.value = listOf(needsReviewCalibration())
@@ -860,7 +914,8 @@ class CalibrationViewModelTest {
         assertTrue(viewModel.review())
         viewModel.save()
         runCurrent()
-        assertEquals("save exploded", viewModel.state.value.errorMessage)
+        assertTrue(viewModel.state.value.isSaving)
+        assertNull(viewModel.state.value.errorMessage)
 
         legacyGate.complete(Unit)
         advanceUntilIdle()
@@ -919,11 +974,10 @@ class CalibrationViewModelTest {
         defaultDispatcher: kotlinx.coroutines.CoroutineDispatcher = dispatcher,
         legacyRevalidator: LegacyCalibrationRevalidator? = null,
     ) = CalibrationViewModel(
-        repository = repository,
         savedStateHandle = savedStateHandle,
         decoder = decoder,
         detector = detector,
-        legacyRevalidator = legacyRevalidator,
+        legacyRevalidator = legacyRevalidator ?: LegacyCalibrationRevalidator(repository),
         clock = { 456L },
         ioDispatcher = dispatcher,
         defaultDispatcher = defaultDispatcher,
@@ -954,10 +1008,12 @@ class CalibrationViewModelTest {
     private companion object {
         val validSignals = listOf(10f, 12f, 15f, 18f, 22f, 28f, 36f, 46f, 58f)
 
-        fun needsReviewCalibration(): Calibration {
-            val concentrations = FACTORY_LADDER.getValue(InflammationFactor.TNF_ALPHA)
+        fun needsReviewCalibration(
+            factor: InflammationFactor = InflammationFactor.TNF_ALPHA,
+        ): Calibration {
+            val concentrations = FACTORY_LADDER.getValue(factor)
             return Calibration(
-                factor = InflammationFactor.TNF_ALPHA,
+                factor = factor,
                 createdAt = 1L,
                 version = 1,
                 status = CalibrationStatus.NEEDS_REVIEW,
@@ -982,6 +1038,9 @@ private class ViewModelCalibrationRepository(
     private val saveGate: CompletableDeferred<Unit>? = null,
     private val clearGate: CompletableDeferred<Unit>? = null,
     private val observeGate: CompletableDeferred<Unit>? = null,
+    private val gatedSaveCreatedAt: Long? = null,
+    private val gatedSaveEntered: CompletableDeferred<Unit>? = null,
+    private val allowGatedSave: CompletableDeferred<Unit>? = null,
 ) : CalibrationRepository {
     val calibrations = MutableStateFlow<List<Calibration>>(emptyList())
     val saved = mutableListOf<Calibration>()
@@ -1004,6 +1063,10 @@ private class ViewModelCalibrationRepository(
     override suspend fun save(calibration: Calibration) {
         saveFailure?.let { throw it }
         saveGate?.await()
+        if (calibration.createdAt == gatedSaveCreatedAt) {
+            gatedSaveEntered?.complete(Unit)
+            allowGatedSave?.await()
+        }
         saved += calibration
         calibrations.value = calibrations.value.filterNot { it.factor == calibration.factor } + calibration
     }

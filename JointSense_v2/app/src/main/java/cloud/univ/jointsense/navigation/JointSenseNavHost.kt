@@ -442,7 +442,6 @@ private fun CalibrationDestination(
     val graphEntry = remember(entry) { navController.getBackStackEntry<CalibrationGraph>() }
     val factory = remember(container, context, legacyRevalidator) {
         CalibrationViewModelFactory(
-            repository = container.calibrations,
             decoder = SampledBitmapDecoder(context.contentResolver),
             legacyRevalidator = requireNotNull(legacyRevalidator),
         )

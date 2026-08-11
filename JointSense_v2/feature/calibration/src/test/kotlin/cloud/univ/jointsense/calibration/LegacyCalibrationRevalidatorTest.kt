@@ -186,6 +186,76 @@ class LegacyCalibrationRevalidatorTest {
     }
 
     @Test
+    fun userSaveCompletedBeforeLegacyScanMakesScanObserveActiveAndNeverOverwriteIt() = runTest {
+        val legacy = calibration(InflammationFactor.TNF_ALPHA, validSignals)
+        val user = legacy.copy(
+            createdAt = 999L,
+            status = CalibrationStatus.ACTIVE,
+            knots = legacy.knots.map { knot ->
+                knot.copy(
+                    rawSignal = knot.rawSignal + 100f,
+                    netSignal = knot.netSignal + 100f,
+                    fittedSignal = knot.fittedSignal + 100f,
+                )
+            },
+        )
+        val repository = RevalidationRepository(listOf(legacy))
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        revalidator.saveUserCalibration(user)
+        val summary = revalidator.revalidateNeedsReview()
+
+        assertEquals(0, summary.attempted)
+        assertEquals(listOf(user), repository.saved)
+        assertEquals(listOf(user), repository.current.value)
+    }
+
+    @Test
+    fun cancelledUserSaveReleasesCoordinatorForLegacyScan() = runTest {
+        val legacy = calibration(InflammationFactor.TNF_ALPHA, validSignals)
+        val user = legacy.copy(createdAt = 999L, status = CalibrationStatus.ACTIVE)
+        val saveEntered = CompletableDeferred<Unit>()
+        val repository = RevalidationRepository(
+            initial = listOf(legacy),
+            saveEntered = saveEntered,
+            allowSave = CompletableDeferred(),
+            gatedSaveCreatedAt = user.createdAt,
+        )
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        val userSave = async { revalidator.saveUserCalibration(user) }
+        saveEntered.await()
+        userSave.cancelAndJoin()
+        val summary = revalidator.revalidateNeedsReview()
+
+        assertEquals(1, summary.promoted)
+        assertEquals(listOf(legacy.createdAt), repository.saved.map(Calibration::createdAt))
+        assertEquals(CalibrationStatus.ACTIVE, repository.current.value.single().status)
+    }
+
+    @Test
+    fun cancelledLegacyScanReleasesCoordinatorForUserSave() = runTest {
+        val legacy = calibration(InflammationFactor.TNF_ALPHA, validSignals)
+        val user = legacy.copy(createdAt = 999L, status = CalibrationStatus.ACTIVE)
+        val saveEntered = CompletableDeferred<Unit>()
+        val repository = RevalidationRepository(
+            initial = listOf(legacy),
+            saveEntered = saveEntered,
+            allowSave = CompletableDeferred(),
+            gatedSaveCreatedAt = legacy.createdAt,
+        )
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        val scan = async { revalidator.revalidateNeedsReview() }
+        saveEntered.await()
+        scan.cancelAndJoin()
+        revalidator.saveUserCalibration(user)
+
+        assertEquals(listOf(user), repository.saved)
+        assertEquals(listOf(user), repository.current.value)
+    }
+
+    @Test
     fun clearWaitsForInFlightLegacySaveThenLeavesRepositoryEmpty() = runTest {
         val saveEntered = CompletableDeferred<Unit>()
         val allowSave = CompletableDeferred<Unit>()
@@ -309,6 +379,7 @@ private class RevalidationRepository(
     private val saveFailures: MutableSet<InflammationFactor> = mutableSetOf(),
     private val saveEntered: CompletableDeferred<Unit>? = null,
     private val allowSave: CompletableDeferred<Unit>? = null,
+    private val gatedSaveCreatedAt: Long? = null,
     private val clearEntered: CompletableDeferred<Unit>? = null,
     private val allowClear: CompletableDeferred<Unit>? = null,
 ) : CalibrationRepository {
@@ -322,8 +393,10 @@ private class RevalidationRepository(
 
     override suspend fun save(calibration: Calibration) {
         if (saveFailures.remove(calibration.factor)) error("save exploded")
-        saveEntered?.complete(Unit)
-        allowSave?.await()
+        if (gatedSaveCreatedAt == null || calibration.createdAt == gatedSaveCreatedAt) {
+            saveEntered?.complete(Unit)
+            allowSave?.await()
+        }
         saved += calibration
         current.value = current.value.map { existing ->
             if (existing.factor == calibration.factor) calibration else existing

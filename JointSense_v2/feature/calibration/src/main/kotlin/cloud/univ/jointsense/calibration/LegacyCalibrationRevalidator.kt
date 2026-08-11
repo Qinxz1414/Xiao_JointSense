@@ -82,6 +82,10 @@ class LegacyCalibrationRevalidator(
     suspend fun clearAllUserCalibrations() = mutex.withLock {
         repository.clearAll()
     }
+
+    suspend fun saveUserCalibration(calibration: Calibration) = mutex.withLock {
+        repository.save(calibration)
+    }
 }
 
 private fun Calibration.toValidationInputs(): List<CalibrationInput> =

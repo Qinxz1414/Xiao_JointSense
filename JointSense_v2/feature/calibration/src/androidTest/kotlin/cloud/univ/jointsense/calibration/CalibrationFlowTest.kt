@@ -147,10 +147,9 @@ class CalibrationFlowTest {
         repository: AndroidCalibrationRepository = AndroidCalibrationRepository(),
         legacyRevalidator: LegacyCalibrationRevalidator? = null,
     ) = CalibrationViewModel(
-        repository = repository,
         savedStateHandle = SavedStateHandle(),
         decoder = null,
-        legacyRevalidator = legacyRevalidator,
+        legacyRevalidator = legacyRevalidator ?: LegacyCalibrationRevalidator(repository),
         ioDispatcher = Dispatchers.Main.immediate,
         defaultDispatcher = Dispatchers.Main.immediate,
     )

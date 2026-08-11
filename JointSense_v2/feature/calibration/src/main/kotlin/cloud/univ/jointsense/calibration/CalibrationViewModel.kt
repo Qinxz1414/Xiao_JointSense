@@ -14,7 +14,6 @@ import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
-import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -54,7 +53,6 @@ internal class BitmapCalibrationImage(
 }
 
 class CalibrationViewModel internal constructor(
-    private val repository: CalibrationRepository,
     private val savedStateHandle: SavedStateHandle,
     private val decoder: CalibrationBitmapDecoder?,
     private val detector: CalibrationSignalDetector = CalibrationSignalDetector { bitmap, crop ->
@@ -63,7 +61,7 @@ class CalibrationViewModel internal constructor(
         GridSignalDetector.detectGridSignals(androidImage.bitmap, crop)
     },
     private val validator: CalibrationValidator = CalibrationValidator(),
-    private val legacyRevalidator: LegacyCalibrationRevalidator?,
+    private val legacyRevalidator: LegacyCalibrationRevalidator,
     private val clock: () -> Long = System::currentTimeMillis,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -288,7 +286,7 @@ class CalibrationViewModel internal constructor(
         updateState { it.copy(isSaving = true, errorMessage = null) }
         viewModelScope.launch {
             try {
-                withContext(ioDispatcher) { repository.save(calibration) }
+                withContext(ioDispatcher) { legacyRevalidator.saveUserCalibration(calibration) }
                 if (generation == persistenceGeneration) {
                     updateState {
                         it.copy(
@@ -360,7 +358,7 @@ class CalibrationViewModel internal constructor(
         viewModelScope.launch {
             try {
                 withContext(ioDispatcher) {
-                    legacyRevalidator?.clearAllUserCalibrations() ?: repository.clearAll()
+                    legacyRevalidator.clearAllUserCalibrations()
                 }
                 if (generation == persistenceGeneration) {
                     invalidateActiveDetection(releaseImage = true)
@@ -405,12 +403,13 @@ class CalibrationViewModel internal constructor(
     }
 
     private fun startLegacyRevalidation() {
-        val revalidator = legacyRevalidator ?: return
         if (legacyRevalidationJob?.isActive == true) return
         updateState { it.copy(isRevalidatingLegacy = true) }
         legacyRevalidationJob = viewModelScope.launch {
             try {
-                val summary = withContext(ioDispatcher) { revalidator.revalidateNeedsReview() }
+                val summary = withContext(ioDispatcher) {
+                    legacyRevalidator.revalidateNeedsReview()
+                }
                 updateState {
                     it.copy(
                         legacyRevalidationSummary = summary,
