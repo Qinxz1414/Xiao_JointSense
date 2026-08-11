@@ -92,11 +92,6 @@ fun CalibrationDoneRouteScreen(
     LaunchedEffect(Unit) {
         viewModel.acknowledgeSaveDestination()
     }
-    LaunchedEffect(state.factoryRestoreCompleted) {
-        if (viewModel.claimFactoryRestoreNavigation()) {
-            onAnother()
-        }
-    }
     CalibrationDoneScreen(
         state = state,
         onDone = onDone,

@@ -31,6 +31,7 @@ class ModuleBoundarySmokeTest {
         assertNotNull(AppContainer::calibrations)
         assertNotNull(AppContainer::dataManagement)
         assertNotNull(AppContainer::migrationCoordinator)
+        assertNotNull(AppContainer::legacyCalibrationRevalidator)
     }
 }
 

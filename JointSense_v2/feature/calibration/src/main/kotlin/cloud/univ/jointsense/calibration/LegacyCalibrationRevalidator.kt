@@ -28,6 +28,13 @@ data class LegacyRevalidationSummary(
     val failures: List<LegacyRevalidationFailure> = emptyList(),
 )
 
+enum class LegacyRevalidationWarningKind { CANCELLED, RECORD_FAILURE, UNEXPECTED_FAILURE }
+
+data class LegacyRevalidationWarning(
+    val kind: LegacyRevalidationWarningKind,
+    val message: String,
+)
+
 class LegacyCalibrationRevalidator(
     private val repository: CalibrationRepository,
     private val validate: (List<CalibrationInput>) -> CalibrationValidation =
@@ -72,6 +79,9 @@ class LegacyCalibrationRevalidator(
         LegacyRevalidationSummary(attempted, promoted, retained, failures)
     }
 
+    suspend fun clearAllUserCalibrations() = mutex.withLock {
+        repository.clearAll()
+    }
 }
 
 private fun Calibration.toValidationInputs(): List<CalibrationInput> =

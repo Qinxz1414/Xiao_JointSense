@@ -10,7 +10,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.navigation.compose.rememberNavController
 import androidx.appcompat.app.AppCompatActivity
 import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import cloud.univ.jointsense.JointSenseApplication
 import cloud.univ.jointsense.MainActivity
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import androidx.compose.ui.test.assertIsDisplayed
@@ -20,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertSame
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
@@ -55,6 +58,18 @@ class JointSenseNavigationTest {
         pressActivityBack()
         composeRule.onNodeWithTag("screen:home").assertIsDisplayed()
         check(!composeRule.activity.isFinishing)
+    }
+
+    @Test
+    fun activityRecreationKeepsTheApplicationContainerLegacyRevalidator() {
+        val application = ApplicationProvider.getApplicationContext<JointSenseApplication>()
+        val container = application.container
+        val revalidator = container.legacyCalibrationRevalidator
+
+        composeRule.activityRule.scenario.recreate()
+
+        assertSame(container, application.container)
+        assertSame(revalidator, application.container.legacyCalibrationRevalidator)
     }
 
     @Test

@@ -6,6 +6,7 @@ import cloud.univ.jointsense.data.RoomCalibrationRepository
 import cloud.univ.jointsense.data.RoomDataManagementRepository
 import cloud.univ.jointsense.data.RoomTestSessionRepository
 import cloud.univ.jointsense.data.legacy.LegacyMigrationCoordinator
+import cloud.univ.jointsense.calibration.LegacyCalibrationRevalidator
 import cloud.univ.jointsense.database.JointSenseDatabase
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import cloud.univ.jointsense.domain.repository.DataManagementRepository
@@ -29,6 +30,8 @@ class AppContainer(application: Application) {
 
     val testSessions: TestSessionRepository = RoomTestSessionRepository(database)
     val calibrations: CalibrationRepository = RoomCalibrationRepository(database)
+    val legacyCalibrationRevalidator: LegacyCalibrationRevalidator =
+        LegacyCalibrationRevalidator(calibrations)
     val dataManagement: DataManagementRepository = RoomDataManagementRepository(database)
     val migrationCoordinator: LegacyMigrationCoordinator =
         LegacyMigrationCoordinator(application, database)

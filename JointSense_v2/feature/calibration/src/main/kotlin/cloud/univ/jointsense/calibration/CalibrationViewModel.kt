@@ -63,7 +63,7 @@ class CalibrationViewModel internal constructor(
         GridSignalDetector.detectGridSignals(androidImage.bitmap, crop)
     },
     private val validator: CalibrationValidator = CalibrationValidator(),
-    private val legacyRevalidator: LegacyCalibrationRevalidator? = LegacyCalibrationRevalidator(repository),
+    private val legacyRevalidator: LegacyCalibrationRevalidator?,
     private val clock: () -> Long = System::currentTimeMillis,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -79,7 +79,6 @@ class CalibrationViewModel internal constructor(
     private var legacyRevalidationJob: Job? = null
     private var activeDetection: ActiveDetection? = null
     private var saveNavigationClaimed = false
-    private var factoryRestoreNavigationClaimed = false
 
     init {
         startLegacyRevalidation()
@@ -90,7 +89,7 @@ class CalibrationViewModel internal constructor(
     }
 
     fun retryLegacyRevalidation() {
-        if (state.value.legacyRevalidationSummary?.failures.isNullOrEmpty()) return
+        if (state.value.legacyWarning == null || state.value.isPersistenceBusy) return
         startLegacyRevalidation()
     }
 
@@ -346,7 +345,6 @@ class CalibrationViewModel internal constructor(
         invalidateActiveDetection(releaseImage = true)
         releaseStateImageUnlessBorrowed()
         saveNavigationClaimed = false
-        factoryRestoreNavigationClaimed = false
         updateState {
             CalibrationUiState(
                 factor = InflammationFactor.TNF_ALPHA,
@@ -361,12 +359,13 @@ class CalibrationViewModel internal constructor(
         updateState { it.copy(isRestoringFactory = true, errorMessage = null) }
         viewModelScope.launch {
             try {
-                withContext(ioDispatcher) { repository.clearAll() }
+                withContext(ioDispatcher) {
+                    legacyRevalidator?.clearAllUserCalibrations() ?: repository.clearAll()
+                }
                 if (generation == persistenceGeneration) {
                     invalidateActiveDetection(releaseImage = true)
                     releaseStateImageUnlessBorrowed()
                     saveNavigationClaimed = false
-                    factoryRestoreNavigationClaimed = false
                     updateState {
                         CalibrationUiState(
                             factor = InflammationFactor.TNF_ALPHA,
@@ -398,12 +397,6 @@ class CalibrationViewModel internal constructor(
         }
     }
 
-    fun claimFactoryRestoreNavigation(): Boolean {
-        if (!state.value.factoryRestoreCompleted || factoryRestoreNavigationClaimed) return false
-        factoryRestoreNavigationClaimed = true
-        return true
-    }
-
     override fun onCleared() {
         decodeJob?.cancel()
         invalidateActiveDetection(releaseImage = true)
@@ -421,20 +414,36 @@ class CalibrationViewModel internal constructor(
                 updateState {
                     it.copy(
                         legacyRevalidationSummary = summary,
+                        legacyWarning = summary.failures.takeIf { failures -> failures.isNotEmpty() }
+                            ?.let {
+                                LegacyRevalidationWarning(
+                                    kind = LegacyRevalidationWarningKind.RECORD_FAILURE,
+                                    message = "Some legacy calibrations could not be reviewed automatically",
+                                )
+                            },
                         isRevalidatingLegacy = false,
-                        errorMessage = if (summary.failures.isEmpty()) null else {
-                            "Some legacy calibrations could not be reviewed automatically"
-                        },
                     )
                 }
             } catch (error: CancellationException) {
-                throw error
+                if (viewModelScope.coroutineContext[Job]?.isActive != true) throw error
+                updateState {
+                    it.copy(
+                        isRevalidatingLegacy = false,
+                        legacyWarning = LegacyRevalidationWarning(
+                            kind = LegacyRevalidationWarningKind.CANCELLED,
+                            message = error.message ?: "Legacy calibration review was cancelled",
+                        ),
+                    )
+                }
             } catch (error: Exception) {
                 updateState {
                     it.copy(
                         isRevalidatingLegacy = false,
-                        errorMessage = error.message
-                            ?: "Unable to review legacy calibrations automatically",
+                        legacyWarning = LegacyRevalidationWarning(
+                            kind = LegacyRevalidationWarningKind.UNEXPECTED_FAILURE,
+                            message = error.message
+                                ?: "Unable to review legacy calibrations automatically",
+                        ),
                     )
                 }
             }

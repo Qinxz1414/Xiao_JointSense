@@ -8,13 +8,20 @@ import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LegacyCalibrationRevalidatorTest {
     @Test
     fun scansEachNeedsReviewRecordOncePromotingOnlyValidatorApprovedRecords() = runTest {
@@ -178,6 +185,95 @@ class LegacyCalibrationRevalidatorTest {
         assertEquals(1, changed.promoted)
     }
 
+    @Test
+    fun clearWaitsForInFlightLegacySaveThenLeavesRepositoryEmpty() = runTest {
+        val saveEntered = CompletableDeferred<Unit>()
+        val allowSave = CompletableDeferred<Unit>()
+        val repository = RevalidationRepository(
+            initial = listOf(calibration(InflammationFactor.TNF_ALPHA, validSignals)),
+            saveEntered = saveEntered,
+            allowSave = allowSave,
+        )
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        val scan = async { revalidator.revalidateNeedsReview() }
+        saveEntered.await()
+        val clear = async { revalidator.clearAllUserCalibrations() }
+        runCurrent()
+        assertFalse(clear.isCompleted)
+
+        allowSave.complete(Unit)
+        scan.await()
+        clear.await()
+
+        assertTrue(repository.current.value.isEmpty())
+    }
+
+    @Test
+    fun legacyScanStartedBehindClearSeesTheEmptyPostClearSnapshot() = runTest {
+        val clearEntered = CompletableDeferred<Unit>()
+        val allowClear = CompletableDeferred<Unit>()
+        val repository = RevalidationRepository(
+            initial = listOf(calibration(InflammationFactor.TNF_ALPHA, validSignals)),
+            clearEntered = clearEntered,
+            allowClear = allowClear,
+        )
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        val clear = async { revalidator.clearAllUserCalibrations() }
+        clearEntered.await()
+        val scan = async { revalidator.revalidateNeedsReview() }
+        runCurrent()
+        assertFalse(scan.isCompleted)
+
+        allowClear.complete(Unit)
+        clear.await()
+        val summary = scan.await()
+
+        assertEquals(0, summary.attempted)
+        assertTrue(repository.saved.isEmpty())
+        assertTrue(repository.current.value.isEmpty())
+    }
+
+    @Test
+    fun cancelledLegacySaveReleasesCoordinatorForFactoryClear() = runTest {
+        val saveEntered = CompletableDeferred<Unit>()
+        val repository = RevalidationRepository(
+            initial = listOf(calibration(InflammationFactor.TNF_ALPHA, validSignals)),
+            saveEntered = saveEntered,
+            allowSave = CompletableDeferred(),
+        )
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        val scan = async { revalidator.revalidateNeedsReview() }
+        saveEntered.await()
+        scan.cancelAndJoin()
+
+        revalidator.clearAllUserCalibrations()
+
+        assertTrue(repository.current.value.isEmpty())
+    }
+
+    @Test
+    fun cancelledFactoryClearReleasesCoordinatorForLegacyScan() = runTest {
+        val clearEntered = CompletableDeferred<Unit>()
+        val repository = RevalidationRepository(
+            initial = listOf(calibration(InflammationFactor.TNF_ALPHA, validSignals)),
+            clearEntered = clearEntered,
+            allowClear = CompletableDeferred(),
+        )
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        val clear = async { revalidator.clearAllUserCalibrations() }
+        clearEntered.await()
+        clear.cancelAndJoin()
+
+        val summary = revalidator.revalidateNeedsReview()
+
+        assertEquals(1, summary.promoted)
+        assertEquals(CalibrationStatus.ACTIVE, repository.current.value.single().status)
+    }
+
     private fun calibration(
         factor: InflammationFactor,
         signals: List<Float>,
@@ -211,6 +307,10 @@ class LegacyCalibrationRevalidatorTest {
 private class RevalidationRepository(
     initial: List<Calibration>,
     private val saveFailures: MutableSet<InflammationFactor> = mutableSetOf(),
+    private val saveEntered: CompletableDeferred<Unit>? = null,
+    private val allowSave: CompletableDeferred<Unit>? = null,
+    private val clearEntered: CompletableDeferred<Unit>? = null,
+    private val allowClear: CompletableDeferred<Unit>? = null,
 ) : CalibrationRepository {
     val current = MutableStateFlow(initial)
     val saved = mutableListOf<Calibration>()
@@ -222,6 +322,8 @@ private class RevalidationRepository(
 
     override suspend fun save(calibration: Calibration) {
         if (saveFailures.remove(calibration.factor)) error("save exploded")
+        saveEntered?.complete(Unit)
+        allowSave?.await()
         saved += calibration
         current.value = current.value.map { existing ->
             if (existing.factor == calibration.factor) calibration else existing
@@ -229,6 +331,8 @@ private class RevalidationRepository(
     }
 
     override suspend fun clearAll() {
+        clearEntered?.complete(Unit)
+        allowClear?.await()
         current.value = emptyList()
     }
 }

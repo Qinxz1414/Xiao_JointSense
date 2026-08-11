@@ -2,6 +2,7 @@ package cloud.univ.jointsense.calibration
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -79,6 +80,43 @@ class CalibrationFlowTest {
 
         assertEquals(1, repository.clearCalls)
         composeRule.onAllNodesWithText("Restore factory curves?").assertCountEquals(0)
+    }
+
+    @Test
+    fun restoredFactoryStaysOnDoneAcrossHostRecreationUntilExplicitBack() {
+        val repository = AndroidCalibrationRepository()
+        val viewModel = viewModel(repository)
+        var anotherCalls = 0
+        var backCalls = 0
+        val hostGeneration = mutableIntStateOf(0)
+        composeRule.setContent {
+            JointSenseTheme {
+                key(hostGeneration.intValue) {
+                    CalibrationDoneRouteScreen(
+                        viewModel = viewModel,
+                        onDone = {},
+                        onAnother = { anotherCalls += 1 },
+                        onBack = { backCalls += 1 },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Restore factory curve").performClick()
+        composeRule.onNodeWithText("Restore", substring = false).performClick()
+        composeRule.waitUntil { viewModel.state.value.factoryRestoreCompleted }
+        composeRule.onNodeWithText("Factory curves restored").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Calibration saved").assertCountEquals(0)
+        assertEquals(0, anotherCalls)
+
+        composeRule.runOnUiThread { hostGeneration.intValue += 1 }
+        composeRule.onNodeWithTag("calibration:done").assertIsDisplayed()
+        composeRule.onNodeWithText("Factory curves restored").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Calibration saved").assertCountEquals(0)
+        assertEquals(0, anotherCalls)
+
+        composeRule.onNodeWithTag("calibration:top-back").performClick()
+        assertEquals(1, backCalls)
     }
 
     @Test

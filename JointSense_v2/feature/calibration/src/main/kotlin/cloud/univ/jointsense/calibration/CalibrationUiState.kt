@@ -24,6 +24,7 @@ internal data class CalibrationUiState(
     val isRestoringFactory: Boolean = false,
     val factoryRestoreCompleted: Boolean = false,
     val legacyRevalidationSummary: LegacyRevalidationSummary? = null,
+    val legacyWarning: LegacyRevalidationWarning? = null,
     val isRevalidatingLegacy: Boolean = false,
     val errorMessage: String? = null,
 ) {

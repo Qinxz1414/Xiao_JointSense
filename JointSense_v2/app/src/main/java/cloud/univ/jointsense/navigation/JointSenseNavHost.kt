@@ -320,31 +320,31 @@ private fun JointSenseNavHostContent(
                     composable<CalibrationSelectRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationSelectRoute, actions, appContainer,
-                            navController, entry, featureViewModels?.calibrationRevalidator,
+                            navController, entry, appContainer?.legacyCalibrationRevalidator,
                         )
                     }
                     composable<CalibrationCropRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationCropRoute, actions, appContainer,
-                            navController, entry, featureViewModels?.calibrationRevalidator,
+                            navController, entry, appContainer?.legacyCalibrationRevalidator,
                         )
                     }
                     composable<CalibrationAssignRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationAssignRoute, actions, appContainer,
-                            navController, entry, featureViewModels?.calibrationRevalidator,
+                            navController, entry, appContainer?.legacyCalibrationRevalidator,
                         )
                     }
                     composable<CalibrationReviewRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationReviewRoute, actions, appContainer,
-                            navController, entry, featureViewModels?.calibrationRevalidator,
+                            navController, entry, appContainer?.legacyCalibrationRevalidator,
                         )
                     }
                     composable<CalibrationDoneRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationDoneRoute, actions, appContainer,
-                            navController, entry, featureViewModels?.calibrationRevalidator,
+                            navController, entry, appContainer?.legacyCalibrationRevalidator,
                         )
                     }
                 }
@@ -385,7 +385,6 @@ private data class FeatureViewModels(
     val insights: InsightsViewModel,
     val measurement: MeasurementViewModel,
     val settings: SettingsViewModel,
-    val calibrationRevalidator: LegacyCalibrationRevalidator,
 )
 
 @Composable
@@ -407,14 +406,10 @@ private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModel
             container.dataManagement,
         )
     }
-    val calibrationRevalidator = remember(container) {
-        LegacyCalibrationRevalidator(container.calibrations)
-    }
     return FeatureViewModels(
         insights = viewModel(key = "insights", factory = insightsFactory),
         measurement = viewModel(key = "measurement", factory = measurementFactory),
         settings = viewModel(key = "settings", factory = settingsFactory),
-        calibrationRevalidator = calibrationRevalidator,
     )
 }
 

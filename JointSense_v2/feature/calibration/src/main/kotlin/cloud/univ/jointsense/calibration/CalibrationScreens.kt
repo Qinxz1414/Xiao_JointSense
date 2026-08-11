@@ -133,10 +133,11 @@ internal fun CalibrationSelectScreen(
                 Text("From Gallery")
             }
             state.errorMessage?.let { ErrorText(it) }
-            if (state.legacyRevalidationSummary?.failures?.isNotEmpty() == true) {
+            state.legacyWarning?.let { warning ->
+                ErrorText(warning.message)
                 TextButton(
                     onClick = onRetryLegacyReview,
-                    enabled = !state.isRevalidatingLegacy,
+                    enabled = !state.isRevalidatingLegacy && !state.isPersistenceBusy,
                 ) {
                     Text(if (state.isRevalidatingLegacy) "Retrying…" else "Retry legacy review")
                 }
@@ -318,10 +319,17 @@ internal fun CalibrationDoneScreen(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.CheckCircle, null, Modifier.size(72.dp), tint = MedicalGreen)
             Spacer(Modifier.height(16.dp))
-            Text("Calibration saved", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Text(
-                state.savedFactor?.let { "The ${it.shortName} user curve is active." }
-                    ?: "Your calibration flow is complete.",
+                if (state.factoryRestoreCompleted) "Factory curves restored" else "Calibration saved",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                when {
+                    state.factoryRestoreCompleted -> "All user calibration curves were removed."
+                    state.savedFactor != null -> "The ${state.savedFactor.shortName} user curve is active."
+                    else -> "Your calibration flow is complete."
+                },
                 color = TextSecondary,
                 textAlign = TextAlign.Center,
             )

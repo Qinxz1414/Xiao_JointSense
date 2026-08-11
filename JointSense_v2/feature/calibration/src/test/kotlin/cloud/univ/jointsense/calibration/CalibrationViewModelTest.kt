@@ -19,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -379,18 +380,20 @@ class CalibrationViewModelTest {
     }
 
     @Test
-    fun factoryRestoreNavigationClaimSurvivesRecreationGap() = runTest(dispatcher) {
+    fun factoryRestoreCompletionSurvivesRecreationUntilAnExplicitDoneAction() = runTest(dispatcher) {
         val handle = SavedStateHandle()
         val repository = ViewModelCalibrationRepository()
         val original = viewModel(repository, handle)
         original.confirmRestoreFactory()
         advanceUntilIdle()
 
-        assertTrue(original.claimFactoryRestoreNavigation())
-        val recreatedBeforeNavigation = viewModel(repository, handle)
-        assertTrue(recreatedBeforeNavigation.claimFactoryRestoreNavigation())
-        assertTrue(recreatedBeforeNavigation.state.value.factoryRestoreCompleted)
-        assertFalse(recreatedBeforeNavigation.claimFactoryRestoreNavigation())
+        assertTrue(original.state.value.factoryRestoreCompleted)
+        val recreatedOnDone = viewModel(repository, handle)
+        advanceUntilIdle()
+        assertTrue(recreatedOnDone.state.value.factoryRestoreCompleted)
+
+        recreatedOnDone.resetForAnotherFactor()
+        assertFalse(recreatedOnDone.state.value.factoryRestoreCompleted)
     }
 
     @Test
@@ -731,7 +734,8 @@ class CalibrationViewModelTest {
         val summary = viewModel.state.value.legacyRevalidationSummary
         assertEquals(1, summary?.failures?.size)
         assertEquals(LegacyRevalidationStage.VALIDATE, summary?.failures?.single()?.stage)
-        assertTrue(viewModel.state.value.errorMessage?.contains("legacy", ignoreCase = true) == true)
+        assertEquals(LegacyRevalidationWarningKind.RECORD_FAILURE, viewModel.state.value.legacyWarning?.kind)
+        assertNull(viewModel.state.value.errorMessage)
 
         fail = false
         viewModel.retryLegacyRevalidation()
@@ -739,7 +743,172 @@ class CalibrationViewModelTest {
 
         assertFalse(viewModel.state.value.isRevalidatingLegacy)
         assertTrue(viewModel.state.value.legacyRevalidationSummary?.failures?.isEmpty() == true)
+        assertNull(viewModel.state.value.legacyWarning)
         assertEquals(1, repository.saved.size)
+    }
+
+    @Test
+    fun initialLegacyCancellationShowsRetryAndThenSucceeds() = runTest(dispatcher) {
+        val repository = ViewModelCalibrationRepository()
+        repository.calibrations.value = listOf(needsReviewCalibration())
+        var cancel = true
+        val validator = cloud.univ.jointsense.analysis.calibration.CalibrationValidator()
+        val revalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            if (cancel) throw CancellationException("legacy cancelled")
+            validator.validate(inputs)
+        }
+
+        val viewModel = viewModel(repository = repository, legacyRevalidator = revalidator)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.isRevalidatingLegacy)
+        assertEquals(LegacyRevalidationWarningKind.CANCELLED, viewModel.state.value.legacyWarning?.kind)
+        assertNull(viewModel.state.value.errorMessage)
+
+        cancel = false
+        viewModel.retryLegacyRevalidation()
+        advanceUntilIdle()
+
+        assertEquals(1, repository.saved.size)
+        assertNull(viewModel.state.value.legacyWarning)
+    }
+
+    @Test
+    fun viewModelTeardownCancellationDoesNotPublishALegacyWarning() = runTest(dispatcher) {
+        val saveGate = CompletableDeferred<Unit>()
+        val repository = ViewModelCalibrationRepository(saveGate = saveGate)
+        repository.calibrations.value = listOf(needsReviewCalibration())
+        val viewModel = viewModel(
+            repository = repository,
+            legacyRevalidator = LegacyCalibrationRevalidator(repository),
+        )
+        val store = ViewModelStore().apply { put("calibration", viewModel) }
+        runCurrent()
+        assertTrue(viewModel.state.value.isRevalidatingLegacy)
+
+        store.clear()
+        runCurrent()
+
+        assertNull(viewModel.state.value.legacyWarning)
+        assertNull(viewModel.state.value.errorMessage)
+    }
+
+    @Test
+    fun lateLegacySuccessDoesNotClearAnImageError() = runTest(dispatcher) {
+        val legacyGate = CompletableDeferred<Unit>()
+        val repository = ViewModelCalibrationRepository(observeGate = legacyGate)
+        val viewModel = viewModel(
+            repository = repository,
+            decoder = CalibrationBitmapDecoder { error("image exploded") },
+            legacyRevalidator = LegacyCalibrationRevalidator(repository),
+        )
+        viewModel.onImageSelected("content://broken")
+        runCurrent()
+        assertEquals("image exploded", viewModel.state.value.errorMessage)
+
+        legacyGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("image exploded", viewModel.state.value.errorMessage)
+        assertNull(viewModel.state.value.legacyWarning)
+    }
+
+    @Test
+    fun lateLegacyFailureAndSuccessfulRetryNeverOverwriteTheImageError() = runTest(dispatcher) {
+        val legacyGate = CompletableDeferred<Unit>()
+        val repository = ViewModelCalibrationRepository(observeGate = legacyGate)
+        repository.calibrations.value = listOf(needsReviewCalibration())
+        var fail = true
+        val validator = cloud.univ.jointsense.analysis.calibration.CalibrationValidator()
+        val revalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            if (fail) error("legacy exploded")
+            validator.validate(inputs)
+        }
+        val viewModel = viewModel(
+            repository = repository,
+            decoder = CalibrationBitmapDecoder { error("image exploded") },
+            legacyRevalidator = revalidator,
+        )
+        viewModel.onImageSelected("content://broken")
+        runCurrent()
+        legacyGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("image exploded", viewModel.state.value.errorMessage)
+        assertEquals(LegacyRevalidationWarningKind.RECORD_FAILURE, viewModel.state.value.legacyWarning?.kind)
+
+        fail = false
+        viewModel.retryLegacyRevalidation()
+        advanceUntilIdle()
+
+        assertEquals("image exploded", viewModel.state.value.errorMessage)
+        assertNull(viewModel.state.value.legacyWarning)
+    }
+
+    @Test
+    fun lateLegacyFailureDoesNotOverwriteAPersistenceError() = runTest(dispatcher) {
+        val legacyGate = CompletableDeferred<Unit>()
+        val repository = ViewModelCalibrationRepository(observeGate = legacyGate).apply {
+            calibrations.value = listOf(needsReviewCalibration())
+            saveFailure = IllegalStateException("save exploded")
+        }
+        val revalidator = LegacyCalibrationRevalidator(repository) {
+            error("legacy exploded")
+        }
+        val viewModel = viewModel(repository = repository, legacyRevalidator = revalidator)
+        viewModel.setDetectedSignals(validSignals)
+        assertTrue(viewModel.review())
+        viewModel.save()
+        runCurrent()
+        assertEquals("save exploded", viewModel.state.value.errorMessage)
+
+        legacyGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("save exploded", viewModel.state.value.errorMessage)
+        assertEquals(LegacyRevalidationWarningKind.RECORD_FAILURE, viewModel.state.value.legacyWarning?.kind)
+    }
+
+    @Test
+    fun factoryRestoreWaitsForSharedLegacyPromotionAndFinishesEmpty() = runTest(dispatcher) {
+        val legacySaveGate = CompletableDeferred<Unit>()
+        val repository = ViewModelCalibrationRepository(saveGate = legacySaveGate).apply {
+            calibrations.value = listOf(needsReviewCalibration())
+        }
+        val revalidator = LegacyCalibrationRevalidator(repository)
+        val viewModel = viewModel(repository = repository, legacyRevalidator = revalidator)
+        runCurrent()
+
+        viewModel.confirmRestoreFactory()
+        runCurrent()
+        assertTrue(viewModel.state.value.isRestoringFactory)
+        assertEquals(0, repository.clearCalls)
+
+        legacySaveGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.factoryRestoreCompleted)
+        assertTrue(repository.calibrations.value.isEmpty())
+        assertEquals(1, repository.clearCalls)
+    }
+
+    @Test
+    fun sharedProcessRevalidatorDoesNotRepeatDeterministicInvalidAcrossViewModels() = runTest(dispatcher) {
+        val repository = ViewModelCalibrationRepository()
+        repository.calibrations.value = listOf(needsReviewCalibration().copy(knots = needsReviewCalibration().knots.take(3)))
+        var validations = 0
+        val validator = cloud.univ.jointsense.analysis.calibration.CalibrationValidator()
+        val processRevalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            validations += 1
+            validator.validate(inputs)
+        }
+
+        viewModel(repository = repository, legacyRevalidator = processRevalidator)
+        advanceUntilIdle()
+        viewModel(repository = repository, legacyRevalidator = processRevalidator)
+        advanceUntilIdle()
+
+        assertEquals(1, validations)
     }
 
     private fun viewModel(
@@ -812,6 +981,7 @@ class CalibrationViewModelTest {
 private class ViewModelCalibrationRepository(
     private val saveGate: CompletableDeferred<Unit>? = null,
     private val clearGate: CompletableDeferred<Unit>? = null,
+    private val observeGate: CompletableDeferred<Unit>? = null,
 ) : CalibrationRepository {
     val calibrations = MutableStateFlow<List<Calibration>>(emptyList())
     val saved = mutableListOf<Calibration>()
@@ -819,7 +989,14 @@ private class ViewModelCalibrationRepository(
     var saveFailure: Throwable? = null
     var clearFailure: Throwable? = null
 
-    override fun observeCalibrations(): Flow<List<Calibration>> = calibrations
+    override fun observeCalibrations(): Flow<List<Calibration>> = if (observeGate == null) {
+        calibrations
+    } else {
+        flow {
+            observeGate.await()
+            emit(calibrations.value)
+        }
+    }
 
     override fun observeCalibration(factor: InflammationFactor): Flow<Calibration?> =
         MutableStateFlow(calibrations.value.firstOrNull { it.factor == factor })
@@ -828,12 +1005,14 @@ private class ViewModelCalibrationRepository(
         saveFailure?.let { throw it }
         saveGate?.await()
         saved += calibration
+        calibrations.value = calibrations.value.filterNot { it.factor == calibration.factor } + calibration
     }
 
     override suspend fun clearAll() {
         clearCalls += 1
         clearFailure?.let { throw it }
         clearGate?.await()
+        calibrations.value = emptyList()
     }
 }
 
