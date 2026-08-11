@@ -8,7 +8,6 @@ import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
-import java.util.WeakHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -35,7 +34,7 @@ class LegacyCalibrationRevalidator(
         CalibrationValidator()::validate,
 ) {
     private val mutex = Mutex()
-    private val attemptedRecords = mutableSetOf<LegacyRecordKey>()
+    private val completedRecords = mutableSetOf<Calibration>()
 
     suspend fun revalidateNeedsReview(): LegacyRevalidationSummary = mutex.withLock {
         val failures = mutableListOf<LegacyRevalidationFailure>()
@@ -45,7 +44,7 @@ class LegacyCalibrationRevalidator(
         repository.observeCalibrations().first()
             .filter { it.status == CalibrationStatus.NEEDS_REVIEW }
             .forEach { calibration ->
-                if (!attemptedRecords.add(calibration.legacyRecordKey())) return@forEach
+                if (calibration in completedRecords) return@forEach
                 attempted += 1
                 val validation = try {
                     validate(calibration.toValidationInputs())
@@ -56,11 +55,13 @@ class LegacyCalibrationRevalidator(
                     return@forEach
                 }
                 if (validation !is CalibrationValidation.Valid) {
+                    completedRecords += calibration
                     retained += 1
                     return@forEach
                 }
                 try {
                     repository.save(calibration.promotedWith(validation))
+                    completedRecords += calibration
                     promoted += 1
                 } catch (error: CancellationException) {
                     throw error
@@ -71,23 +72,7 @@ class LegacyCalibrationRevalidator(
         LegacyRevalidationSummary(attempted, promoted, retained, failures)
     }
 
-    companion object {
-        private val processInstances = WeakHashMap<CalibrationRepository, LegacyCalibrationRevalidator>()
-
-        fun processScoped(repository: CalibrationRepository): LegacyCalibrationRevalidator =
-            synchronized(processInstances) {
-                processInstances.getOrPut(repository) { LegacyCalibrationRevalidator(repository) }
-            }
-    }
 }
-
-private data class LegacyRecordKey(
-    val factor: InflammationFactor,
-    val createdAt: Long,
-    val version: Int,
-)
-
-private fun Calibration.legacyRecordKey() = LegacyRecordKey(factor, createdAt, version)
 
 private fun Calibration.toValidationInputs(): List<CalibrationInput> =
     knots.sortedBy(CalibrationKnot::position).map { knot ->

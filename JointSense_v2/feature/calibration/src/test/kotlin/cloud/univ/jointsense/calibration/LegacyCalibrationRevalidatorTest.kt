@@ -7,6 +7,7 @@ import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -70,21 +71,6 @@ class LegacyCalibrationRevalidatorTest {
     }
 
     @Test
-    fun processScopedProviderSharesOnceStateAcrossGraphFactories() = runTest {
-        val invalid = calibration(InflammationFactor.IL6, listOf(10f, 12f, 15f))
-        val repository = RevalidationRepository(listOf(invalid))
-
-        val firstGraph = LegacyCalibrationRevalidator.processScoped(repository)
-        val secondGraph = LegacyCalibrationRevalidator.processScoped(repository)
-        val first = firstGraph.revalidateNeedsReview()
-        val second = secondGraph.revalidateNeedsReview()
-
-        assertTrue(firstGraph === secondGraph)
-        assertEquals(1, first.attempted)
-        assertEquals(0, second.attempted)
-    }
-
-    @Test
     fun validatorFailureIsReportedAndDoesNotAbortLaterRecords() = runTest {
         val first = calibration(InflammationFactor.TNF_ALPHA, validSignals)
         val second = calibration(InflammationFactor.IL6, validSignals)
@@ -110,7 +96,7 @@ class LegacyCalibrationRevalidatorTest {
     }
 
     @Test
-    fun saveFailureIsReportedAndDoesNotAbortLaterRecordsOrRetryAutomatically() = runTest {
+    fun saveFailureIsReportedThenExplicitRetryCanPromoteTheRecord() = runTest {
         val first = calibration(InflammationFactor.TNF_ALPHA, validSignals)
         val second = calibration(InflammationFactor.IL6, validSignals)
         val repository = RevalidationRepository(
@@ -122,9 +108,74 @@ class LegacyCalibrationRevalidatorTest {
         val firstRun = revalidator.revalidateNeedsReview()
         val secondRun = revalidator.revalidateNeedsReview()
 
-        assertEquals(listOf(InflammationFactor.IL6), repository.saved.map { it.factor })
+        assertEquals(
+            listOf(InflammationFactor.IL6, InflammationFactor.TNF_ALPHA),
+            repository.saved.map { it.factor },
+        )
         assertEquals(LegacyRevalidationStage.SAVE, firstRun.failures.single().stage)
-        assertEquals(0, secondRun.attempted)
+        assertEquals(1, secondRun.attempted)
+        assertEquals(1, secondRun.promoted)
+    }
+
+    @Test
+    fun validatorFailureCanBeRetriedExplicitlyAndThenCompletesExactlyOnce() = runTest {
+        val record = calibration(InflammationFactor.TNF_ALPHA, validSignals)
+        val repository = RevalidationRepository(listOf(record))
+        var fail = true
+        val validator = CalibrationValidator()
+        val revalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            if (fail) error("transient validator failure")
+            validator.validate(inputs)
+        }
+
+        val failed = revalidator.revalidateNeedsReview()
+        fail = false
+        val retried = revalidator.revalidateNeedsReview()
+        val afterSuccess = revalidator.revalidateNeedsReview()
+
+        assertEquals(1, failed.failures.size)
+        assertEquals(1, retried.promoted)
+        assertEquals(0, afterSuccess.attempted)
+        assertEquals(1, repository.saved.size)
+    }
+
+    @Test
+    fun cancellationDoesNotConsumeRecordAndLaterRetryCanPromoteIt() = runTest {
+        val record = calibration(InflammationFactor.TNF_ALPHA, validSignals)
+        val repository = RevalidationRepository(listOf(record))
+        var cancel = true
+        val validator = CalibrationValidator()
+        val revalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            if (cancel) throw CancellationException("cancelled")
+            validator.validate(inputs)
+        }
+
+        try {
+            revalidator.revalidateNeedsReview()
+            throw AssertionError("Expected cancellation")
+        } catch (_: CancellationException) {
+            // Expected: cancellation must leave the record retryable.
+        }
+        cancel = false
+        val retried = revalidator.revalidateNeedsReview()
+
+        assertEquals(1, retried.promoted)
+        assertEquals(1, repository.saved.size)
+    }
+
+    @Test
+    fun changedContentWithSameMetadataIsTreatedAsANewRecord() = runTest {
+        val invalid = calibration(InflammationFactor.TNF_ALPHA, validSignals.take(3))
+        val repository = RevalidationRepository(listOf(invalid))
+        val revalidator = LegacyCalibrationRevalidator(repository)
+        val first = revalidator.revalidateNeedsReview()
+        repository.current.value = listOf(calibration(InflammationFactor.TNF_ALPHA, validSignals))
+
+        val changed = revalidator.revalidateNeedsReview()
+
+        assertEquals(1, first.retained)
+        assertEquals(1, changed.attempted)
+        assertEquals(1, changed.promoted)
     }
 
     private fun calibration(

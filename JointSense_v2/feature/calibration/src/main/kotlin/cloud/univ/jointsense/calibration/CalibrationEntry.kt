@@ -19,7 +19,12 @@ fun CalibrationSelectRouteScreen(
             onImageReady()
         }
     }
-    CalibrationSelectScreen(state, viewModel::onImageSelected, onBack)
+    CalibrationSelectScreen(
+        state = state,
+        onImageSelected = viewModel::onImageSelected,
+        onRetryLegacyReview = viewModel::retryLegacyRevalidation,
+        onBack = onBack,
+    )
 }
 
 @Composable
@@ -84,9 +89,11 @@ fun CalibrationDoneRouteScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     BackHandler(enabled = state.isPersistenceBusy) { }
+    LaunchedEffect(Unit) {
+        viewModel.acknowledgeSaveDestination()
+    }
     LaunchedEffect(state.factoryRestoreCompleted) {
-        if (state.factoryRestoreCompleted) {
-            viewModel.consumeFactoryRestoreCompleted()
+        if (viewModel.claimFactoryRestoreNavigation()) {
             onAnother()
         }
     }

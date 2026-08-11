@@ -7,6 +7,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.domain.model.Calibration
+import cloud.univ.jointsense.domain.model.CalibrationKnot
+import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import kotlinx.coroutines.Dispatchers
@@ -79,27 +81,77 @@ class CalibrationFlowTest {
         composeRule.onAllNodesWithText("Restore factory curves?").assertCountEquals(0)
     }
 
+    @Test
+    fun legacyFailureShowsRetryAndExplicitRetryPromotesRecord() {
+        val repository = AndroidCalibrationRepository(listOf(needsReviewCalibration()))
+        var fail = true
+        val validator = cloud.univ.jointsense.analysis.calibration.CalibrationValidator()
+        val revalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            if (fail) error("temporary legacy failure")
+            validator.validate(inputs)
+        }
+        val viewModel = viewModel(repository, revalidator)
+        composeRule.setContent {
+            JointSenseTheme {
+                CalibrationSelectRouteScreen(viewModel, onImageReady = {}, onBack = {})
+            }
+        }
+        composeRule.waitUntil { viewModel.state.value.legacyRevalidationSummary?.failures?.size == 1 }
+        composeRule.onNodeWithText("Retry legacy review").assertIsDisplayed()
+
+        fail = false
+        composeRule.onNodeWithText("Retry legacy review").performClick()
+        composeRule.waitUntil { repository.savedCount == 1 }
+        composeRule.onAllNodesWithText("Retry legacy review").assertCountEquals(0)
+    }
+
     private fun viewModel(
         repository: AndroidCalibrationRepository = AndroidCalibrationRepository(),
+        legacyRevalidator: LegacyCalibrationRevalidator? = null,
     ) = CalibrationViewModel(
         repository = repository,
         savedStateHandle = SavedStateHandle(),
         decoder = null,
-        legacyRevalidator = null,
+        legacyRevalidator = legacyRevalidator,
         ioDispatcher = Dispatchers.Main.immediate,
         defaultDispatcher = Dispatchers.Main.immediate,
     )
+
+    private fun needsReviewCalibration(): Calibration {
+        val concentrations = FACTORY_LADDER.getValue(InflammationFactor.TNF_ALPHA)
+        val signals = listOf(10f, 12f, 15f, 18f, 22f, 28f, 36f, 46f, 58f)
+        return Calibration(
+            factor = InflammationFactor.TNF_ALPHA,
+            createdAt = 1L,
+            version = 1,
+            status = CalibrationStatus.NEEDS_REVIEW,
+            kitName = null,
+            kitLot = null,
+            knots = signals.mapIndexed { index, signal ->
+                CalibrationKnot(
+                    position = index,
+                    concentration = concentrations[index],
+                    rawSignal = signal,
+                    netSignal = signal,
+                    fittedSignal = signal,
+                    isBlank = index == 0,
+                )
+            },
+        )
+    }
 }
 
-private class AndroidCalibrationRepository : CalibrationRepository {
-    private val calibrations = MutableStateFlow<List<Calibration>>(emptyList())
+private class AndroidCalibrationRepository(initial: List<Calibration> = emptyList()) : CalibrationRepository {
+    private val calibrations = MutableStateFlow(initial)
     var clearCalls = 0
+    var savedCount = 0
 
     override fun observeCalibrations(): Flow<List<Calibration>> = calibrations
     override fun observeCalibration(factor: InflammationFactor): Flow<Calibration?> =
         MutableStateFlow(calibrations.value.firstOrNull { it.factor == factor })
 
     override suspend fun save(calibration: Calibration) {
+        savedCount += 1
         calibrations.value = calibrations.value.filterNot { it.factor == calibration.factor } + calibration
     }
 

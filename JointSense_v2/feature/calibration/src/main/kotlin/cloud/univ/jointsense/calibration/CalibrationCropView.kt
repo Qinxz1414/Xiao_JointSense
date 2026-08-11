@@ -32,6 +32,7 @@ internal fun CalibrationCropView(
     bitmap: Bitmap,
     cropRect: Rect,
     onCropRectChanged: (Rect) -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val image = remember(bitmap) { bitmap.asImageBitmap() }
@@ -60,7 +61,8 @@ internal fun CalibrationCropView(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(bitmap, scaleX, scaleY, offsetX, offsetY) {
+                .pointerInput(bitmap, scaleX, scaleY, offsetX, offsetY, enabled) {
+                    if (!enabled) return@pointerInput
                     var activeRect = cropRect
                     detectDragGestures(
                         onDragStart = { point ->

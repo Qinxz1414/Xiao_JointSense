@@ -74,6 +74,7 @@ import java.io.File
 internal fun CalibrationSelectScreen(
     state: CalibrationUiState,
     onImageSelected: (String) -> Unit,
+    onRetryLegacyReview: () -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -132,6 +133,14 @@ internal fun CalibrationSelectScreen(
                 Text("From Gallery")
             }
             state.errorMessage?.let { ErrorText(it) }
+            if (state.legacyRevalidationSummary?.failures?.isNotEmpty() == true) {
+                TextButton(
+                    onClick = onRetryLegacyReview,
+                    enabled = !state.isRevalidatingLegacy,
+                ) {
+                    Text(if (state.isRevalidatingLegacy) "Retrying…" else "Retry legacy review")
+                }
+            }
         }
     }
 }
@@ -168,6 +177,7 @@ internal fun CalibrationCropScreen(
                     onCropRectChanged = { rect ->
                         onCropChanged(CalibrationIntBounds(rect.left, rect.top, rect.right, rect.bottom))
                     },
+                    enabled = !state.isDetecting,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

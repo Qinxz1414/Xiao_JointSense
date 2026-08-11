@@ -63,6 +63,7 @@ import cloud.univ.jointsense.calibration.CalibrationReviewRouteScreen
 import cloud.univ.jointsense.calibration.CalibrationSelectRouteScreen
 import cloud.univ.jointsense.calibration.CalibrationViewModel
 import cloud.univ.jointsense.calibration.CalibrationViewModelFactory
+import cloud.univ.jointsense.calibration.LegacyCalibrationRevalidator
 import cloud.univ.jointsense.designsystem.theme.BgLight
 import cloud.univ.jointsense.designsystem.theme.BgWhite
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
@@ -319,31 +320,31 @@ private fun JointSenseNavHostContent(
                     composable<CalibrationSelectRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationSelectRoute, actions, appContainer,
-                            navController, entry,
+                            navController, entry, featureViewModels?.calibrationRevalidator,
                         )
                     }
                     composable<CalibrationCropRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationCropRoute, actions, appContainer,
-                            navController, entry,
+                            navController, entry, featureViewModels?.calibrationRevalidator,
                         )
                     }
                     composable<CalibrationAssignRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationAssignRoute, actions, appContainer,
-                            navController, entry,
+                            navController, entry, featureViewModels?.calibrationRevalidator,
                         )
                     }
                     composable<CalibrationReviewRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationReviewRoute, actions, appContainer,
-                            navController, entry,
+                            navController, entry, featureViewModels?.calibrationRevalidator,
                         )
                     }
                     composable<CalibrationDoneRoute> { entry ->
                         CalibrationDestination(
                             screenSlot, CalibrationDoneRoute, actions, appContainer,
-                            navController, entry,
+                            navController, entry, featureViewModels?.calibrationRevalidator,
                         )
                     }
                 }
@@ -384,6 +385,7 @@ private data class FeatureViewModels(
     val insights: InsightsViewModel,
     val measurement: MeasurementViewModel,
     val settings: SettingsViewModel,
+    val calibrationRevalidator: LegacyCalibrationRevalidator,
 )
 
 @Composable
@@ -405,10 +407,14 @@ private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModel
             container.dataManagement,
         )
     }
+    val calibrationRevalidator = remember(container) {
+        LegacyCalibrationRevalidator(container.calibrations)
+    }
     return FeatureViewModels(
         insights = viewModel(key = "insights", factory = insightsFactory),
         measurement = viewModel(key = "measurement", factory = measurementFactory),
         settings = viewModel(key = "settings", factory = settingsFactory),
+        calibrationRevalidator = calibrationRevalidator,
     )
 }
 
@@ -430,6 +436,7 @@ private fun CalibrationDestination(
     appContainer: AppContainer?,
     navController: NavHostController,
     entry: NavBackStackEntry,
+    legacyRevalidator: LegacyCalibrationRevalidator?,
 ) {
     if (screenSlot != null) {
         screenSlot(route, actions)
@@ -438,10 +445,11 @@ private fun CalibrationDestination(
     val container = requireNotNull(appContainer)
     val context = LocalContext.current.applicationContext
     val graphEntry = remember(entry) { navController.getBackStackEntry<CalibrationGraph>() }
-    val factory = remember(container, context) {
+    val factory = remember(container, context, legacyRevalidator) {
         CalibrationViewModelFactory(
             repository = container.calibrations,
             decoder = SampledBitmapDecoder(context.contentResolver),
+            legacyRevalidator = requireNotNull(legacyRevalidator),
         )
     }
     val calibration: CalibrationViewModel = viewModel(

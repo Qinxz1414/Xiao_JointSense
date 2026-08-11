@@ -76,38 +76,22 @@ class CalibrationViewModel internal constructor(
     private var persistenceGeneration = 0L
     private var decodeJob: Job? = null
     private var detectionJob: Job? = null
+    private var legacyRevalidationJob: Job? = null
     private var activeDetection: ActiveDetection? = null
     private var saveNavigationClaimed = false
+    private var factoryRestoreNavigationClaimed = false
 
     init {
-        legacyRevalidator?.let { revalidator ->
-            viewModelScope.launch {
-                try {
-                    val summary = withContext(ioDispatcher) { revalidator.revalidateNeedsReview() }
-                    updateState {
-                        it.copy(
-                            legacyRevalidationSummary = summary,
-                            errorMessage = if (summary.failures.isEmpty()) it.errorMessage else {
-                                "Some legacy calibrations could not be reviewed automatically"
-                            },
-                        )
-                    }
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Exception) {
-                    updateState {
-                        it.copy(
-                            errorMessage = error.message
-                                ?: "Unable to review legacy calibrations automatically",
-                        )
-                    }
-                }
-            }
-        }
+        startLegacyRevalidation()
         val restoredUri = state.value.imageUri
         if (restoredUri != null && decoder != null) {
             decodeImage(restoredUri, restoring = true)
         }
+    }
+
+    fun retryLegacyRevalidation() {
+        if (state.value.legacyRevalidationSummary?.failures.isNullOrEmpty()) return
+        startLegacyRevalidation()
     }
 
     fun onImageSelected(uri: String) {
@@ -120,12 +104,22 @@ class CalibrationViewModel internal constructor(
     }
 
     internal fun updateCrop(bounds: CalibrationIntBounds) {
-        if (state.value.isPersistenceBusy) return
+        if (state.value.isPersistenceBusy || state.value.isDetecting) return
         val image = state.value.image ?: return
         if (bounds.left < 0 || bounds.top < 0 || bounds.right > image.width ||
             bounds.bottom > image.height || bounds.right <= bounds.left || bounds.bottom <= bounds.top
         ) return
-        updateState { it.copy(cropBounds = bounds, signals = emptyList(), validation = null) }
+        if (bounds == state.value.cropBounds) return
+        updateState {
+            it.copy(
+                cropBounds = bounds,
+                signals = emptyList(),
+                validation = null,
+                saveCompleted = false,
+                saveDestinationAcknowledged = false,
+                savedFactor = null,
+            )
+        }
     }
 
     fun detectSignals() {
@@ -137,7 +131,7 @@ class CalibrationViewModel internal constructor(
         val operation = ActiveDetection(generation, image)
         activeDetection = operation
         updateState { it.copy(isDetecting = true, errorMessage = null) }
-        detectionJob = viewModelScope.launch {
+        val job = viewModelScope.launch {
             try {
                 val readings = withContext(defaultDispatcher) { detector.detect(image, crop) }
                 if (!isCurrent(operation)) return@launch
@@ -154,10 +148,10 @@ class CalibrationViewModel internal constructor(
                         )
                     }
                 }
-            } finally {
-                completeDetection(operation)
             }
         }
+        detectionJob = job
+        job.invokeOnCompletion { completeDetection(operation) }
     }
 
     fun consumeSignalsReady() {
@@ -166,12 +160,14 @@ class CalibrationViewModel internal constructor(
 
     internal fun setDetectedSignals(signals: List<Float>) {
         if (state.value.isPersistenceBusy) return
+        if (signals == state.value.signals) return
         updateState {
             it.copy(
                 signals = signals,
                 validation = null,
                 concentrationFieldErrors = emptySet(),
                 saveCompleted = false,
+                saveDestinationAcknowledged = false,
                 savedFactor = null,
             )
         }
@@ -187,6 +183,7 @@ class CalibrationViewModel internal constructor(
                 concentrationFieldErrors = emptySet(),
                 validation = null,
                 saveCompleted = false,
+                saveDestinationAcknowledged = false,
                 savedFactor = null,
             )
         }
@@ -195,6 +192,7 @@ class CalibrationViewModel internal constructor(
     fun updateConcentration(index: Int, text: String) {
         if (state.value.isPersistenceBusy) return
         if (index !in state.value.concentrationTexts.indices) return
+        if (text == state.value.concentrationTexts[index]) return
         updateState { current ->
             current.copy(
                 concentrationTexts = current.concentrationTexts.toMutableList().also {
@@ -203,6 +201,7 @@ class CalibrationViewModel internal constructor(
                 concentrationFieldErrors = current.concentrationFieldErrors - index,
                 validation = null,
                 saveCompleted = false,
+                saveDestinationAcknowledged = false,
             )
         }
     }
@@ -250,7 +249,6 @@ class CalibrationViewModel internal constructor(
             it.copy(
                 concentrationFieldErrors = emptySet(),
                 validation = validation,
-                saveCompleted = false,
             )
         }
         val blockingErrors = setOf(
@@ -297,12 +295,21 @@ class CalibrationViewModel internal constructor(
                         it.copy(
                             isSaving = false,
                             saveCompleted = true,
+                            saveDestinationAcknowledged = false,
                             savedFactor = factor,
                         )
                     }
                 }
             } catch (error: CancellationException) {
-                throw error
+                if (viewModelScope.coroutineContext[Job]?.isActive != true) throw error
+                if (generation == persistenceGeneration) {
+                    updateState {
+                        it.copy(
+                            isSaving = false,
+                            errorMessage = error.message ?: "Calibration save was cancelled",
+                        )
+                    }
+                }
             } catch (error: Exception) {
                 if (generation == persistenceGeneration) {
                     updateState {
@@ -317,9 +324,17 @@ class CalibrationViewModel internal constructor(
     }
 
     fun claimSaveNavigation(): Boolean {
-        if (!state.value.saveCompleted || saveNavigationClaimed) return false
+        if (!state.value.saveCompleted || state.value.saveDestinationAcknowledged || saveNavigationClaimed) {
+            return false
+        }
         saveNavigationClaimed = true
         return true
+    }
+
+    fun acknowledgeSaveDestination() {
+        if (!state.value.saveCompleted || state.value.saveDestinationAcknowledged) return
+        saveNavigationClaimed = true
+        updateState { it.copy(saveDestinationAcknowledged = true) }
     }
 
     fun resetForAnotherFactor() {
@@ -331,6 +346,7 @@ class CalibrationViewModel internal constructor(
         invalidateActiveDetection(releaseImage = true)
         releaseStateImageUnlessBorrowed()
         saveNavigationClaimed = false
+        factoryRestoreNavigationClaimed = false
         updateState {
             CalibrationUiState(
                 factor = InflammationFactor.TNF_ALPHA,
@@ -350,6 +366,7 @@ class CalibrationViewModel internal constructor(
                     invalidateActiveDetection(releaseImage = true)
                     releaseStateImageUnlessBorrowed()
                     saveNavigationClaimed = false
+                    factoryRestoreNavigationClaimed = false
                     updateState {
                         CalibrationUiState(
                             factor = InflammationFactor.TNF_ALPHA,
@@ -359,7 +376,15 @@ class CalibrationViewModel internal constructor(
                     }
                 }
             } catch (error: CancellationException) {
-                throw error
+                if (viewModelScope.coroutineContext[Job]?.isActive != true) throw error
+                if (generation == persistenceGeneration) {
+                    updateState {
+                        it.copy(
+                            isRestoringFactory = false,
+                            errorMessage = error.message ?: "Factory restore was cancelled",
+                        )
+                    }
+                }
             } catch (error: Exception) {
                 if (generation == persistenceGeneration) {
                     updateState {
@@ -373,8 +398,10 @@ class CalibrationViewModel internal constructor(
         }
     }
 
-    fun consumeFactoryRestoreCompleted() {
-        updateState { it.copy(factoryRestoreCompleted = false) }
+    fun claimFactoryRestoreNavigation(): Boolean {
+        if (!state.value.factoryRestoreCompleted || factoryRestoreNavigationClaimed) return false
+        factoryRestoreNavigationClaimed = true
+        return true
     }
 
     override fun onCleared() {
@@ -382,6 +409,36 @@ class CalibrationViewModel internal constructor(
         invalidateActiveDetection(releaseImage = true)
         releaseStateImageUnlessBorrowed()
         super.onCleared()
+    }
+
+    private fun startLegacyRevalidation() {
+        val revalidator = legacyRevalidator ?: return
+        if (legacyRevalidationJob?.isActive == true) return
+        updateState { it.copy(isRevalidatingLegacy = true) }
+        legacyRevalidationJob = viewModelScope.launch {
+            try {
+                val summary = withContext(ioDispatcher) { revalidator.revalidateNeedsReview() }
+                updateState {
+                    it.copy(
+                        legacyRevalidationSummary = summary,
+                        isRevalidatingLegacy = false,
+                        errorMessage = if (summary.failures.isEmpty()) null else {
+                            "Some legacy calibrations could not be reviewed automatically"
+                        },
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                updateState {
+                    it.copy(
+                        isRevalidatingLegacy = false,
+                        errorMessage = error.message
+                            ?: "Unable to review legacy calibrations automatically",
+                    )
+                }
+            }
+        }
     }
 
     private fun decodeImage(uri: String, restoring: Boolean) {
@@ -398,8 +455,17 @@ class CalibrationViewModel internal constructor(
                 cropBounds = if (restoring) it.cropBounds else null,
                 signals = if (restoring) it.signals else emptyList(),
                 validation = if (restoring) it.validation else null,
+                saveCompleted = if (restoring) it.saveCompleted else false,
+                saveDestinationAcknowledged = if (restoring) {
+                    it.saveDestinationAcknowledged
+                } else {
+                    false
+                },
+                savedFactor = if (restoring) it.savedFactor else null,
                 isDecoding = true,
+                isDetecting = false,
                 imageReadyToOpenCrop = false,
+                signalsReadyToOpenAssign = false,
                 errorMessage = null,
             )
         }
@@ -439,6 +505,7 @@ class CalibrationViewModel internal constructor(
                     updateState {
                         it.copy(
                             isDecoding = false,
+                            validation = null,
                             errorMessage = error.message ?: "Unable to read calibration image",
                         )
                     }
@@ -463,13 +530,10 @@ class CalibrationViewModel internal constructor(
     private fun isCurrent(operation: ActiveDetection): Boolean =
         activeDetection === operation &&
             operation.generation == detectionGeneration &&
-            !operation.invalidated
+            !operation.isInvalidated()
 
     private fun invalidateActiveDetection(releaseImage: Boolean) {
-        activeDetection?.let { operation ->
-            operation.invalidated = true
-            operation.releaseWhenFinished = operation.releaseWhenFinished || releaseImage
-        }
+        activeDetection?.invalidate(releaseImage)
         detectionJob?.cancel()
     }
 
@@ -517,25 +581,35 @@ class CalibrationViewModel internal constructor(
             imageUri = savedStateHandle[KEY_IMAGE_URI],
             cropBounds = crop,
             saveCompleted = savedStateHandle.get<Boolean>(KEY_SAVE_COMPLETED) ?: false,
+            saveDestinationAcknowledged =
+                savedStateHandle.get<Boolean>(KEY_SAVE_DESTINATION_ACKNOWLEDGED) ?: false,
             savedFactor = savedFactor,
+            factoryRestoreCompleted =
+                savedStateHandle.get<Boolean>(KEY_FACTORY_RESTORE_COMPLETED) ?: false,
         )
         if (savedStateHandle.get<Boolean>(KEY_REVIEWED) != true) return base
         val parsed = texts.map(::parseConcentration)
         val fieldErrors = parsed.mapIndexedNotNull { index, result ->
             index.takeIf { result is ConcentrationParseResult.Invalid }
         }.toSet()
-        val validation = if (fieldErrors.isNotEmpty()) {
-            CalibrationValidation.Invalid(listOf(CalibrationError.InvalidConcentration))
-        } else {
+        val validation = when {
+            signals.size != REQUIRED_READING_COUNT ->
+                CalibrationValidation.Invalid(listOf(CalibrationError.WrongReadingCount))
+            signals.any { !it.isFinite() } ->
+                CalibrationValidation.Invalid(listOf(CalibrationError.NonFiniteSignal))
+            fieldErrors.isNotEmpty() ->
+                CalibrationValidation.Invalid(listOf(CalibrationError.InvalidConcentration))
+            else -> {
             validator.validate(
                 parsed.mapIndexed { index, result ->
                     CalibrationInput(
                         wellIndex = index,
                         concentration = (result as ConcentrationParseResult.Valid).concentration,
-                        rawSignal = signals.getOrElse(index) { Float.NaN },
+                        rawSignal = signals[index],
                     )
                 },
             )
+            }
         }
         return base.copy(
             concentrationFieldErrors = fieldErrors,
@@ -555,7 +629,9 @@ class CalibrationViewModel internal constructor(
         savedStateHandle[KEY_IMAGE_URI] = state.imageUri
         savedStateHandle[KEY_REVIEWED] = state.validation != null
         savedStateHandle[KEY_SAVE_COMPLETED] = state.saveCompleted
+        savedStateHandle[KEY_SAVE_DESTINATION_ACKNOWLEDGED] = state.saveDestinationAcknowledged
         savedStateHandle[KEY_SAVED_FACTOR] = state.savedFactor?.name
+        savedStateHandle[KEY_FACTORY_RESTORE_COMPLETED] = state.factoryRestoreCompleted
         state.cropBounds?.let { crop ->
             savedStateHandle[KEY_CROP_LEFT] = crop.left
             savedStateHandle[KEY_CROP_TOP] = crop.top
@@ -577,7 +653,9 @@ class CalibrationViewModel internal constructor(
         const val KEY_IMAGE_URI = "calibration.imageUri"
         const val KEY_REVIEWED = "calibration.reviewed"
         const val KEY_SAVE_COMPLETED = "calibration.saveCompleted"
+        const val KEY_SAVE_DESTINATION_ACKNOWLEDGED = "calibration.saveDestinationAcknowledged"
         const val KEY_SAVED_FACTOR = "calibration.savedFactor"
+        const val KEY_FACTORY_RESTORE_COMPLETED = "calibration.factoryRestoreCompleted"
         const val KEY_CROP_LEFT = "calibration.crop.left"
         const val KEY_CROP_TOP = "calibration.crop.top"
         const val KEY_CROP_RIGHT = "calibration.crop.right"
@@ -588,10 +666,20 @@ class CalibrationViewModel internal constructor(
         val generation: Long,
         val image: CalibrationImage,
     ) {
-        var invalidated = false
-        var releaseWhenFinished = false
+        private var invalidated = false
+        private var releaseWhenFinished = false
         private var imageReleased = false
 
+        @Synchronized
+        fun invalidate(releaseImage: Boolean) {
+            invalidated = true
+            releaseWhenFinished = releaseWhenFinished || releaseImage
+        }
+
+        @Synchronized
+        fun isInvalidated(): Boolean = invalidated
+
+        @Synchronized
         fun releaseIfRequested() {
             if (!releaseWhenFinished || imageReleased) return
             imageReleased = true
