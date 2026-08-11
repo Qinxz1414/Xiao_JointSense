@@ -500,11 +500,13 @@ git commit -m "fix: validate and persist calibration safely"
 - Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/report/LocalizedReportFormatter.kt`
 - Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/report/PdfReportExporter.kt`
 - Create: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/report/TextLayout.kt`
+- Modify: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/ReportScreen.kt`
 - Create/modify: `feature/insights/src/main/res/values/strings.xml`
 - Create: `feature/insights/src/main/res/values-zh-rCN/strings.xml`
 - Create: `feature/insights/src/test/kotlin/cloud/univ/jointsense/insights/report/TextLayoutTest.kt`
+- Create: `feature/insights/src/test/kotlin/cloud/univ/jointsense/insights/report/LocalizedReportFormatterTest.kt`
 - Create: `feature/insights/src/androidTest/kotlin/cloud/univ/jointsense/insights/report/PdfReportExporterTest.kt`
-- Delete after replacement: `app/src/main/java/cloud/univ/jointsense/data/ReportExporter.kt`
+- Delete after replacement: `feature/insights/src/main/kotlin/cloud/univ/jointsense/insights/BaselineReportExporter.kt`
 
 **Interfaces:**
 - Consumes: localized Resources/Locale and `ReportModel`.
@@ -536,7 +538,7 @@ Use `Paint.breakText` for PDF line splitting, preserve explicit paragraphs, repe
 
 - [ ] **Step 4: Implement share failure feedback**
 
-Catch `ActivityNotFoundException` and file errors, map them to localized user-visible report errors, and never leave a Success state without an existing non-empty file.
+Catch `ActivityNotFoundException` and file errors in the real `ReportScreen` share actions, map them to localized user-visible report errors, and never leave a Success state without an existing non-empty file. The earlier architecture phase already removed `app/src/main/java/cloud/univ/jointsense/data/ReportExporter.kt`; replace the currently invoked feature-local `BaselineReportExporter` instead.
 
 - [ ] **Step 5: Run report verification**
 
@@ -552,7 +554,7 @@ Expected: wrapping and formatter tests pass; PDF instrumentation compiles.
 - [ ] **Step 6: Commit report reliability**
 
 ```powershell
-git add core/domain feature/insights app/src/main/java/cloud/univ/jointsense/data/ReportExporter.kt
+git add core/domain feature/insights
 git commit -m "fix: export complete localized reports"
 ```
 
