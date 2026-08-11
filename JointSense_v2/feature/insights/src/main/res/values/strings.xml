@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_title">JointSense Research Trend Report</string>
+    <string name="report_page_header">Longitudinal inflammatory biomarker summary</string>
+    <string name="report_generated">Generated</string>
+    <string name="report_oa_index">OA inflammation index (AI)</string>
+    <string name="report_grade">grade</string>
+    <string name="report_risk">14-day progression risk</string>
+    <string name="report_latest_values">Latest quantitative values</string>
+    <string name="report_week_changes">Change vs previous week</string>
+    <string name="report_oa_week_change">OA index change vs previous week</string>
+    <string name="report_recommendations">Research trend observations</string>
+    <string name="report_not_measured">not measured</string>
+    <string name="report_no_comparison">no comparison</string>
+    <string name="report_disclaimer_label">Research-use statement</string>
+    <string name="report_disclaimer">Results in this report are estimates derived from smartphone-photo colorimetry for research and longitudinal trend observation only. They are not intended for clinical diagnosis, treatment decisions, or as a substitute for validated laboratory testing.</string>
+    <string name="report_grade_0">No risk</string>
+    <string name="report_grade_1">Mild</string>
+    <string name="report_grade_2">Moderate</string>
+    <string name="report_grade_3">Severe</string>
+    <string name="report_grade_4">Very severe</string>
+    <string name="report_recommend_continue_monitoring">Continue the current care and monitoring plan.</string>
+    <string name="report_recommend_low_impact_exercise">Maintain regular, low-impact joint-friendly exercise.</string>
+    <string name="report_recommend_discuss_with_clinician">Discuss the trend with your clinician at the next visit.</string>
+    <string name="report_recommend_avoid_overload">Prefer low-impact activity and avoid joint overloading.</string>
+    <string name="report_recommend_regular_monitoring">Keep a regular monitoring cadence (2–3 times per week).</string>
+    <string name="report_recommend_seek_clinical_review">Seek clinical review promptly for assessment of this trend.</string>
+    <string name="report_recommend_reduce_joint_load">Reduce joint load and pause high-impact activity.</string>
+    <string name="report_recommend_follow_treatment_plan">Follow the prescribed treatment plan and repeat testing after therapy.</string>
+    <string name="report_recommend_retest_sooner">Inflammatory markers trended upward; consider repeating the measurement sooner.</string>
+    <string name="report_recommend_current_plan_effective">Markers trended downward; continue longitudinal observation.</string>
+    <string name="report_share_pdf">Share PDF report</string>
+    <string name="report_share_text">Share report summary</string>
+    <string name="report_error_create_file">Unable to create the report file.</string>
+    <string name="report_error_empty_file">The report file is empty and was not shared.</string>
+    <string name="report_error_no_share_app">No compatible app is available to share this report.</string>
+    <string name="report_error_open_file">The report file could not be opened for sharing.</string>
+</resources>

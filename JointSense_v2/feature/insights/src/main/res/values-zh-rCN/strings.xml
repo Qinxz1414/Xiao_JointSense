@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_title">JointSense 科研趋势报告</string>
+    <string name="report_page_header">炎症生物标志物纵向摘要</string>
+    <string name="report_generated">生成时间</string>
+    <string name="report_oa_index">骨关节炎炎症指数（AI）</string>
+    <string name="report_grade">级别</string>
+    <string name="report_risk">14 天进展风险</string>
+    <string name="report_latest_values">最新定量结果</string>
+    <string name="report_week_changes">较前一周变化</string>
+    <string name="report_oa_week_change">骨关节炎指数较前一周变化</string>
+    <string name="report_recommendations">科研趋势观察</string>
+    <string name="report_not_measured">未测量</string>
+    <string name="report_no_comparison">无可比数据</string>
+    <string name="report_disclaimer_label">科研使用声明</string>
+    <string name="report_disclaimer">本报告结果基于手机照片色度代理估算，仅供科研与纵向趋势观察，不作为临床诊断、治疗决策或替代经验证实验室检测的依据。</string>
+    <string name="report_grade_0">无风险</string>
+    <string name="report_grade_1">轻度</string>
+    <string name="report_grade_2">中度</string>
+    <string name="report_grade_3">重度</string>
+    <string name="report_grade_4">极重度</string>
+    <string name="report_recommend_continue_monitoring">继续当前照护与监测计划。</string>
+    <string name="report_recommend_low_impact_exercise">保持规律、对关节负荷较低的运动。</string>
+    <string name="report_recommend_discuss_with_clinician">下次就诊时可与临床医生讨论该趋势。</string>
+    <string name="report_recommend_avoid_overload">优先选择低冲击活动，避免关节过度负荷。</string>
+    <string name="report_recommend_regular_monitoring">保持规律监测节律（每周 2–3 次）。</string>
+    <string name="report_recommend_seek_clinical_review">建议尽快进行临床复核，评估该趋势。</string>
+    <string name="report_recommend_reduce_joint_load">降低关节负荷，暂停高冲击活动。</string>
+    <string name="report_recommend_follow_treatment_plan">遵循已制定的治疗计划，并在干预后复测。</string>
+    <string name="report_recommend_retest_sooner">炎症标志物呈上升趋势，可考虑提前复测。</string>
+    <string name="report_recommend_current_plan_effective">标志物呈下降趋势，建议继续纵向观察。</string>
+    <string name="report_share_pdf">分享 PDF 报告</string>
+    <string name="report_share_text">分享报告摘要</string>
+    <string name="report_error_create_file">无法创建报告文件。</string>
+    <string name="report_error_empty_file">报告文件为空，未进行分享。</string>
+    <string name="report_error_no_share_app">未找到可分享此报告的应用。</string>
+    <string name="report_error_open_file">无法打开报告文件进行分享。</string>
+</resources>

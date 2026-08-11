@@ -28,9 +28,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,9 +58,18 @@ import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.designsystem.theme.TnfRed
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import cloud.univ.jointsense.feature.insights.R
+import cloud.univ.jointsense.insights.report.LocalizedReportFormatter
+import cloud.univ.jointsense.insights.report.PdfExportResult
+import cloud.univ.jointsense.insights.report.PdfReportExporter
+import cloud.univ.jointsense.insights.report.ReportError
+import cloud.univ.jointsense.insights.report.ReportShareResult
+import cloud.univ.jointsense.insights.report.ReportSharing
+import cloud.univ.jointsense.insights.report.toReportModel
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * AI Report screen — cartilage inflammation assessment, 7-day change
@@ -68,13 +83,38 @@ fun ReportScreen(
     val context = LocalContext.current
     val ai = state.currentAi
     val grade = state.currentGrade
+    val locale = context.resources.configuration.locales[0]
+    val formatter = remember(context.resources, locale) {
+        LocalizedReportFormatter.from(context.resources, locale)
+    }
+    val exportReport = remember(state, formatter) {
+        formatter.formatExport(state.toReportModel(System.currentTimeMillis()))
+    }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var isExporting by remember { mutableStateOf(false) }
 
-    val reportTitle = "JointSense AI Report"
-    val reportLines = remember(state) {
-        buildReportLines(state)
+    fun showError(error: ReportError) {
+        scope.launch {
+            snackbarHostState.showSnackbar(context.getString(error.messageResource()))
+        }
+    }
+
+    fun shareTextReport() {
+        when (
+            val result = ReportSharing.shareText(
+                context,
+                exportReport.plainText,
+                context.getString(R.string.report_share_text),
+            )
+        ) {
+            is ReportShareResult.Failure -> showError(result.error)
+            ReportShareResult.Started -> Unit
+        }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             NavyTopBar(
                 title = "AI Report",
@@ -82,12 +122,7 @@ fun ReportScreen(
                     NavyBarAction(
                         icon = Icons.Default.Share,
                         contentDescription = "Share summary",
-                        onClick = {
-                            BaselineReportExporter.shareText(
-                                context,
-                                (listOf(reportTitle) + reportLines).joinToString("\n")
-                            )
-                        }
+                        onClick = ::shareTextReport,
                     )
                 }
             )
@@ -369,11 +404,34 @@ fun ReportScreen(
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Button(
                                 onClick = {
-                                    val file = BaselineReportExporter.buildPdf(
-                                        context, reportTitle, reportLines
-                                    )
-                                    BaselineReportExporter.shareFile(context, file, "application/pdf")
+                                    if (isExporting) return@Button
+                                    isExporting = true
+                                    scope.launch {
+                                        val exportResult = withContext(Dispatchers.IO) {
+                                            PdfReportExporter.export(
+                                                File(context.cacheDir, "reports"),
+                                                exportReport,
+                                            )
+                                        }
+                                        when (exportResult) {
+                                            is PdfExportResult.Failure -> showError(exportResult.error)
+                                            is PdfExportResult.Success -> {
+                                                when (
+                                                    val shareResult = ReportSharing.sharePdf(
+                                                        context,
+                                                        exportResult.file,
+                                                        context.getString(R.string.report_share_pdf),
+                                                    )
+                                                ) {
+                                                    is ReportShareResult.Failure -> showError(shareResult.error)
+                                                    ReportShareResult.Started -> Unit
+                                                }
+                                            }
+                                        }
+                                        isExporting = false
+                                    }
                                 },
+                                enabled = !isExporting,
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp),
@@ -392,13 +450,7 @@ fun ReportScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             OutlinedButton(
-                                onClick = {
-                                    BaselineReportExporter.shareText(
-                                        context,
-                                        (listOf(reportTitle) + reportLines)
-                                            .joinToString("\n")
-                                    )
-                                },
+                                onClick = ::shareTextReport,
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(48.dp),
@@ -428,38 +480,9 @@ fun ReportScreen(
     }
 }
 
-/** Plain-text report body shared by PDF export and text sharing. */
-private fun buildReportLines(state: ReportUiState): List<String> {
-    val lines = mutableListOf<String>()
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    val ai = state.currentAi
-    val grade = state.currentGrade ?: return lines
-
-    lines += "Generated: ${dateFormat.format(Date())}"
-    lines += ""
-    lines += "OA Inflammation Index (AI): " +
-        (ai?.let { "%.2f".format(it) } ?: "-") +
-        "  -> ${BaselineInsightsMetrics.gradeLabel(grade)} (grade $grade)"
-    lines += "14-day progression risk: ${BaselineInsightsMetrics.riskLabel(grade)}"
-    lines += ""
-    lines += "Latest quantitative values:"
-    val latest = state.latestValues
-    InflammationFactor.entries.forEach { factor ->
-        val v = latest[factor]
-        lines += "  - ${factor.shortName} (${factor.displayName}): " +
-            (v?.let { "%.2f $FACTOR_UNIT".format(it) } ?: "not measured")
-    }
-    lines += ""
-    lines += "Change vs previous week:"
-    InflammationFactor.entries.forEach { factor ->
-        val d = state.factorDeltaPct7d[factor]
-        lines += "  - ${factor.shortName}: " +
-            (d?.let { "%+.0f%%".format(it) } ?: "no comparison")
-    }
-    lines += ""
-    lines += "AI suggestions:"
-    BaselineInsightsMetrics.suggestions(grade, state.aiWeekDeltaPct).forEach { lines += "  * $it" }
-    lines += ""
-    lines += "Disclaimer: research prototype - not for medical diagnosis."
-    return lines
+private fun ReportError.messageResource(): Int = when (this) {
+    ReportError.CREATE_FILE -> R.string.report_error_create_file
+    ReportError.EMPTY_FILE -> R.string.report_error_empty_file
+    ReportError.NO_SHARE_APP -> R.string.report_error_no_share_app
+    ReportError.OPEN_FILE -> R.string.report_error_open_file
 }
