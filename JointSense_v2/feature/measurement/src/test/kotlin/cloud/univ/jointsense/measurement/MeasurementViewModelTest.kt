@@ -1168,7 +1168,7 @@ class MeasurementViewModelTest {
 
             assertEquals(listOf("mark"), history.events)
             assertTrue(viewModel.state.value.hasRequestedCameraPermission)
-            assertEquals(MeasurementEffect.RequestCameraPermission, viewModel.effects.first())
+            viewModel.acknowledgePermissionLaunch()
 
             viewModel.onAction(
                 MeasurementAction.CameraPermissionResult(
@@ -1217,8 +1217,22 @@ class MeasurementViewModelTest {
 
             io.runAll()
             runCurrent()
-            val effect = viewModel.effects.first()
-            handleCameraPermissionEffect(effect) { permissionLaunches += 1 }
+            val effect = viewModel.effects.first() as MeasurementEffect.RequestCameraPermission
+            val claim = requireNotNull(viewModel.claimCameraPermissionLaunch(effect))
+            launchClaimedCameraPermission(
+                claim = claim,
+                launch = { permissionLaunches += 1 },
+                onAcknowledged = {
+                    viewModel.onAction(
+                        MeasurementAction.CameraPermissionLaunchAcknowledged(claim),
+                    )
+                },
+                onFailure = { reason ->
+                    viewModel.onAction(
+                        MeasurementAction.CameraPermissionLaunchFailed(claim, reason),
+                    )
+                },
+            )
 
             assertEquals(listOf("mark"), history.events)
             assertEquals(1, permissionLaunches)
@@ -1226,36 +1240,179 @@ class MeasurementViewModelTest {
         }
 
     @Test
-    fun permissionRequestDuringHistoryLoadCannotBypassAuthorityRead() = runTest(dispatcher) {
-        val io = ManualQueueDispatcher()
+    fun firstPermissionRequestDuringHistoryLoadQueuesAndLaunchesExactlyOnceAfterRead() =
+        runTest(dispatcher) {
+            val io = ManualQueueDispatcher()
+            val history = RecordingPermissionHistoryStore()
+            val viewModel = MeasurementViewModel(
+                repository = RecordingRepository(),
+                analyzer = RecordingAnalyzer(),
+                savedStateHandle = SavedStateHandle(),
+                decoder = RecordingDecoder(),
+                cameraPermissionHistoryStore = history,
+                ioDispatcher = io,
+                defaultDispatcher = dispatcher,
+            )
+            runCurrent()
+
+            viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
+            runCurrent()
+
+            assertEquals(0, history.readCalls)
+            assertTrue(history.events.isEmpty())
+            assertNull(withTimeoutOrNull(1) { viewModel.effects.first() })
+
+            io.runAll()
+            runCurrent()
+            io.runAll()
+            runCurrent()
+
+            assertEquals(1, history.readCalls)
+            assertEquals(listOf("mark"), history.events)
+            assertTrue(viewModel.effects.first() is MeasurementEffect.RequestCameraPermission)
+            assertNull(withTimeoutOrNull(1) { viewModel.effects.first() })
+        }
+
+    @Test
+    fun unacknowledgedPermissionLaunchIsReissuedExactlyOnceAfterViewModelRecreation() =
+        runTest(dispatcher) {
+            val handle = SavedStateHandle()
+            val history = RecordingPermissionHistoryStore()
+            val first = MeasurementViewModel(
+                repository = RecordingRepository(),
+                analyzer = RecordingAnalyzer(),
+                draftIdFactory = { "draft-a" },
+                savedStateHandle = handle,
+                decoder = RecordingDecoder(),
+                cameraPermissionHistoryStore = history,
+                ioDispatcher = dispatcher,
+                defaultDispatcher = dispatcher,
+            )
+            advanceUntilIdle()
+            first.onAction(MeasurementAction.CameraPermissionRequestStarted)
+            advanceUntilIdle()
+            val initial = first.effects.first() as MeasurementEffect.RequestCameraPermission
+            assertNotNull(first.claimCameraPermissionLaunch(initial))
+
+            val recreated = MeasurementViewModel(
+                repository = RecordingRepository(),
+                analyzer = RecordingAnalyzer(),
+                draftIdFactory = { "unexpected-draft" },
+                savedStateHandle = handle,
+                decoder = RecordingDecoder(),
+                cameraPermissionHistoryStore = history,
+                ioDispatcher = dispatcher,
+                defaultDispatcher = dispatcher,
+            )
+            advanceUntilIdle()
+            val reissued = recreated.effects.first() as MeasurementEffect.RequestCameraPermission
+
+            assertNotNull(recreated.claimCameraPermissionLaunch(reissued))
+            assertEquals("draft-a", recreated.state.value.draftId)
+            assertNull(withTimeoutOrNull(1) { recreated.effects.first() })
+        }
+
+    @Test
+    fun acknowledgedPermissionLaunchIsNotReissuedAfterViewModelRecreation() =
+        runTest(dispatcher) {
+            val handle = SavedStateHandle()
+            val history = RecordingPermissionHistoryStore()
+            val first = MeasurementViewModel(
+                repository = RecordingRepository(),
+                analyzer = RecordingAnalyzer(),
+                draftIdFactory = { "draft-a" },
+                savedStateHandle = handle,
+                decoder = RecordingDecoder(),
+                cameraPermissionHistoryStore = history,
+                ioDispatcher = dispatcher,
+                defaultDispatcher = dispatcher,
+            )
+            advanceUntilIdle()
+            first.onAction(MeasurementAction.CameraPermissionRequestStarted)
+            advanceUntilIdle()
+            val effect = first.effects.first() as MeasurementEffect.RequestCameraPermission
+            val claim = requireNotNull(first.claimCameraPermissionLaunch(effect))
+            first.onAction(MeasurementAction.CameraPermissionLaunchAcknowledged(claim))
+
+            val recreated = MeasurementViewModel(
+                repository = RecordingRepository(),
+                analyzer = RecordingAnalyzer(),
+                draftIdFactory = { "unexpected-draft" },
+                savedStateHandle = handle,
+                decoder = RecordingDecoder(),
+                cameraPermissionHistoryStore = history,
+                ioDispatcher = dispatcher,
+                defaultDispatcher = dispatcher,
+            )
+            advanceUntilIdle()
+
+            assertNull(withTimeoutOrNull(1) { recreated.effects.first() })
+            assertEquals("draft-a", recreated.state.value.draftId)
+        }
+
+    @Test
+    fun synchronousPermissionLauncherFailureRollsBackAndRetryCanLaunch() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
         val history = RecordingPermissionHistoryStore()
         val viewModel = MeasurementViewModel(
             repository = RecordingRepository(),
             analyzer = RecordingAnalyzer(),
-            savedStateHandle = SavedStateHandle(),
+            draftIdFactory = { "draft-a" },
+            savedStateHandle = handle,
             decoder = RecordingDecoder(),
             cameraPermissionHistoryStore = history,
-            ioDispatcher = io,
+            ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
         )
-        runCurrent()
-
+        advanceUntilIdle()
         viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
-        runCurrent()
-        io.runAll()
-        runCurrent()
+        advanceUntilIdle()
+        val effect = viewModel.effects.first() as MeasurementEffect.RequestCameraPermission
+        val claim = requireNotNull(viewModel.claimCameraPermissionLaunch(effect))
 
-        assertEquals(1, history.readCalls)
-        assertTrue(history.events.isEmpty())
-        assertNull(withTimeoutOrNull(1) { viewModel.effects.first() })
+        launchClaimedCameraPermission(
+            claim = claim,
+            launch = { error("permission launcher unavailable") },
+            onAcknowledged = {
+                viewModel.onAction(MeasurementAction.CameraPermissionLaunchAcknowledged(claim))
+            },
+            onFailure = { reason ->
+                viewModel.onAction(MeasurementAction.CameraPermissionLaunchFailed(claim, reason))
+            },
+        )
 
-        viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
-        runCurrent()
-        io.runAll()
-        runCurrent()
+        assertEquals(Stage.RecoverableError, viewModel.state.value.stage)
+        assertEquals(
+            MeasurementError.PermissionLaunchFailed("permission launcher unavailable"),
+            viewModel.state.value.error,
+        )
+        viewModel.onAction(MeasurementAction.Retry)
+        advanceUntilIdle()
+        val retried = viewModel.effects.first() as MeasurementEffect.RequestCameraPermission
+        val retryClaim = requireNotNull(viewModel.claimCameraPermissionLaunch(retried))
+        launchClaimedCameraPermission(
+            claim = retryClaim,
+            launch = {},
+            onAcknowledged = {
+                viewModel.onAction(MeasurementAction.CameraPermissionLaunchAcknowledged(retryClaim))
+            },
+            onFailure = { reason ->
+                viewModel.onAction(MeasurementAction.CameraPermissionLaunchFailed(retryClaim, reason))
+            },
+        )
 
-        assertEquals(listOf("mark"), history.events)
-        assertEquals(MeasurementEffect.RequestCameraPermission, viewModel.effects.first())
+        val recreated = MeasurementViewModel(
+            repository = RecordingRepository(),
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "unexpected-draft" },
+            savedStateHandle = handle,
+            decoder = RecordingDecoder(),
+            cameraPermissionHistoryStore = history,
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        advanceUntilIdle()
+        assertNull(withTimeoutOrNull(1) { recreated.effects.first() })
     }
 
     @Test
@@ -1282,17 +1439,13 @@ class MeasurementViewModelTest {
             runCurrent()
             io.runAll()
             runCurrent()
-
-            assertEquals(1, history.readCalls)
-            assertTrue(history.events.isEmpty())
-
-            viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
-            runCurrent()
             io.runAll()
             runCurrent()
 
+            assertEquals(1, history.readCalls)
             assertEquals(listOf("mark"), history.events)
-            assertEquals(MeasurementEffect.RequestCameraPermission, viewModel.effects.first())
+            assertTrue(viewModel.effects.first() is MeasurementEffect.RequestCameraPermission)
+            assertNull(withTimeoutOrNull(1) { viewModel.effects.first() })
         }
 
     @Test
@@ -1351,7 +1504,7 @@ class MeasurementViewModelTest {
         advanceUntilIdle()
         viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
         advanceUntilIdle()
-        viewModel.effects.first()
+        viewModel.acknowledgePermissionLaunch()
 
         viewModel.onAction(
             MeasurementAction.CameraPermissionResult(
@@ -1442,7 +1595,7 @@ class MeasurementViewModelTest {
         return viewModel
     }
 
-    private fun TestScope.verifyPermissionDenialRecovery(permanentlyDenied: Boolean) {
+    private suspend fun TestScope.verifyPermissionDenialRecovery(permanentlyDenied: Boolean) {
         val viewModel = readyViewModel()
         viewModel.onAction(MeasurementAction.FactorSelected(InflammationFactor.IL1_BETA))
         val recoveryData = viewModel.state.value.let {
@@ -1451,6 +1604,7 @@ class MeasurementViewModelTest {
 
         viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
         testScheduler.advanceUntilIdle()
+        viewModel.acknowledgePermissionLaunch()
         viewModel.onAction(
             MeasurementAction.CameraPermissionResult(
                 granted = false,
@@ -1487,6 +1641,12 @@ class MeasurementViewModelTest {
 
 private fun MeasurementUiState.recoveryData(): List<Any?> =
     listOf(draftId, imageUri, cropRect, factor, originDestination)
+
+private suspend fun MeasurementViewModel.acknowledgePermissionLaunch() {
+    val effect = effects.first() as MeasurementEffect.RequestCameraPermission
+    val claim = requireNotNull(claimCameraPermissionLaunch(effect))
+    onAction(MeasurementAction.CameraPermissionLaunchAcknowledged(claim))
+}
 
 private fun MeasurementViewModel.acceptCreatedSession(): String {
     val request = requireNotNull(state.value.sessionCreationRequest)

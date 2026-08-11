@@ -22,6 +22,15 @@ sealed interface MeasurementAction {
 
     data object CameraPermissionRequestStarted : MeasurementAction
 
+    class CameraPermissionLaunchAcknowledged internal constructor(
+        val claim: CameraPermissionLaunchClaim,
+    ) : MeasurementAction
+
+    class CameraPermissionLaunchFailed internal constructor(
+        val claim: CameraPermissionLaunchClaim,
+        val reason: String,
+    ) : MeasurementAction
+
     data class CameraPermissionResult(
         val granted: Boolean,
         val shouldShowRationale: Boolean,

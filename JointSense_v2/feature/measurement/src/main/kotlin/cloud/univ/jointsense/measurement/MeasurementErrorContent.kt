@@ -55,6 +55,8 @@ fun MeasurementErrorContent(
         }
         MeasurementError.PermissionHistoryUnavailable ->
             "Camera permission status could not be loaded. Retry before taking a photo."
+        is MeasurementError.PermissionLaunchFailed ->
+            "Camera permission could not be requested. ${error.reason} Retry when permission prompts are available."
         MeasurementError.ImageUnreadable -> "The image could not be read. Choose another image and try again."
         MeasurementError.UnsupportedImage -> "This image format is not supported. Choose a JPEG, PNG, or HEIF image."
         MeasurementError.ImageTooLarge -> "The image is too large to process safely. Choose a smaller image."

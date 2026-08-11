@@ -12,9 +12,16 @@ internal fun handleTakePhotoRequest(
     }
 }
 
-internal fun handleCameraPermissionEffect(
-    effect: MeasurementEffect,
-    launchPermission: () -> Unit,
+internal fun launchClaimedCameraPermission(
+    claim: CameraPermissionLaunchClaim,
+    launch: () -> Unit,
+    onAcknowledged: () -> Unit,
+    onFailure: (String) -> Unit,
 ) {
-    if (effect == MeasurementEffect.RequestCameraPermission) launchPermission()
+    try {
+        launch()
+        onAcknowledged()
+    } catch (error: RuntimeException) {
+        onFailure(error.message ?: error::class.java.simpleName)
+    }
 }

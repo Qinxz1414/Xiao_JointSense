@@ -60,9 +60,23 @@ fun ImageSelectRouteScreen(
     LaunchedEffect(viewModel, cameraLauncher) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                MeasurementEffect.RequestCameraPermission -> handleCameraPermissionEffect(effect) {
-                    permissionLauncher.launch(Manifest.permission.CAMERA)
-                }
+                is MeasurementEffect.RequestCameraPermission ->
+                    viewModel.claimCameraPermissionLaunch(effect)?.let { claim ->
+                        launchClaimedCameraPermission(
+                            claim = claim,
+                            launch = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                            onAcknowledged = {
+                                viewModel.onAction(
+                                    MeasurementAction.CameraPermissionLaunchAcknowledged(claim),
+                                )
+                            },
+                            onFailure = { reason ->
+                                viewModel.onAction(
+                                    MeasurementAction.CameraPermissionLaunchFailed(claim, reason),
+                                )
+                            },
+                        )
+                    }
                 is MeasurementEffect.LaunchCamera -> viewModel.claimCameraLaunch(effect)?.let { claim ->
                     launchClaimedCamera(
                         claim = claim,
@@ -198,7 +212,7 @@ fun FactorSelectRouteScreen(
             when (effect) {
                 is MeasurementEffect.NavigateToResult -> onResultReady(effect.resultId)
                 is MeasurementEffect.LaunchCamera -> Unit
-                MeasurementEffect.RequestCameraPermission -> Unit
+                is MeasurementEffect.RequestCameraPermission -> Unit
             }
         }
     }

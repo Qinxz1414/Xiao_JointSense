@@ -20,6 +20,8 @@ sealed interface MeasurementError {
 
     data object PermissionHistoryUnavailable : MeasurementError
 
+    data class PermissionLaunchFailed(val reason: String) : MeasurementError
+
     data object ImageUnreadable : MeasurementError
 
     data object UnsupportedImage : MeasurementError
@@ -42,8 +44,16 @@ class CameraLaunchClaim internal constructor(
     internal val captureToken: String,
 )
 
+class CameraPermissionLaunchClaim internal constructor(
+    internal val requestToken: String,
+    internal val draftId: String,
+)
+
 sealed interface MeasurementEffect {
-    data object RequestCameraPermission : MeasurementEffect
+    class RequestCameraPermission internal constructor(
+        internal val requestToken: String,
+        internal val draftId: String,
+    ) : MeasurementEffect
 
     class LaunchCamera internal constructor(
         val uri: String,
