@@ -1,6 +1,7 @@
 package cloud.univ.jointsense.calibration
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class GridSignalDetectorTest {
@@ -39,6 +40,43 @@ class GridSignalDetectorTest {
 
         assertEquals(9f, reading.signal)
     }
+
+    @Test
+    fun rejectsInvalidAndOutOfBoundsCropsWithoutReadingPixels() {
+        val source = FakeGridPixelSource(width = 10, height = 10) { _, _ -> argb(1, 2) }
+        val invalid = listOf(
+            CalibrationIntBounds(0, 0, 0, 1),
+            CalibrationIntBounds(5, 5, 4, 6),
+            CalibrationIntBounds(-1, 0, 1, 1),
+            CalibrationIntBounds(0, -1, 1, 1),
+            CalibrationIntBounds(9, 9, 11, 10),
+            CalibrationIntBounds(9, 9, 10, 11),
+            CalibrationIntBounds(Int.MIN_VALUE, 0, Int.MAX_VALUE, 1),
+        )
+
+        invalid.forEach { crop ->
+            assertThrows(IllegalArgumentException::class.java) {
+                GridSignalDetector.detectGridSignals(source, crop, rows = 3, cols = 3)
+            }
+        }
+        assertEquals(0, source.readCalls)
+    }
+
+    @Test
+    fun minimumOnePixelCropIsHandledWithoutOverflowOrClampingOutsideCrop() {
+        val source = FakeGridPixelSource(width = 1, height = 1) { _, _ -> argb(4, 10) }
+
+        val readings = GridSignalDetector.detectGridSignals(
+            source,
+            CalibrationIntBounds(0, 0, 1, 1),
+            rows = 3,
+            cols = 3,
+        )
+
+        assertEquals(9, readings.size)
+        assertEquals(List(9) { 6f }, readings.map { it.signal })
+        assertEquals(9, source.readCalls)
+    }
 }
 
 private class FakeGridPixelSource(
@@ -46,8 +84,11 @@ private class FakeGridPixelSource(
     override val height: Int,
     private val pixel: (Int, Int) -> Int,
 ) : GridPixelSource {
+    var readCalls = 0
+
     override fun getPixels(left: Int, top: Int, width: Int, height: Int): IntArray =
         IntArray(width * height) { offset ->
+            readCalls += 1
             pixel(left + offset % width, top + offset / width)
         }
 }

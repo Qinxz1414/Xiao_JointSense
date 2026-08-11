@@ -56,11 +56,17 @@ internal object GridSignalDetector {
         require(wellFraction > 0f && wellFraction <= 1f) {
             "wellFraction must be in (0, 1]"
         }
+        require(source.width > 0 && source.height > 0) { "source must be non-empty" }
+        require(
+            crop.left >= 0 && crop.top >= 0 &&
+                crop.right > crop.left && crop.bottom > crop.top &&
+                crop.right <= source.width && crop.bottom <= source.height,
+        ) { "crop must be non-empty and fully inside the source" }
         return legacyCalibrationSampleWindows(crop, rows, cols, wellFraction).map { window ->
-            val left = window.left.coerceIn(0, source.width - 1)
-            val top = window.top.coerceIn(0, source.height - 1)
-            val width = window.width.coerceIn(1, source.width - left)
-            val height = window.height.coerceIn(1, source.height - top)
+            val left = window.left.coerceIn(crop.left, crop.right - 1)
+            val top = window.top.coerceIn(crop.top, crop.bottom - 1)
+            val width = window.width.coerceIn(1, crop.right - left)
+            val height = window.height.coerceIn(1, crop.bottom - top)
             val pixels = source.getPixels(left, top, width, height)
             GridWellReading(
                 row = window.row,

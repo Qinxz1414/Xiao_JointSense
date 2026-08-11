@@ -34,7 +34,7 @@ class LegacyCalibrationRevalidatorTest {
             validator.validate(inputs)
         }
 
-        revalidator.revalidateNeedsReview()
+        val summary = revalidator.revalidateNeedsReview()
 
         assertEquals(2, validations.size)
         assertEquals(listOf(9, 5), validations.map { it.size })
@@ -44,6 +44,87 @@ class LegacyCalibrationRevalidatorTest {
         assertEquals(10f, promoted.knots.first().rawSignal)
         assertEquals(48f, promoted.knots.last().fittedSignal)
         assertTrue(repository.current.value.single { it.factor == InflammationFactor.IL6 }.status == CalibrationStatus.NEEDS_REVIEW)
+        assertEquals(2, summary.attempted)
+        assertEquals(1, summary.promoted)
+        assertEquals(1, summary.retained)
+        assertTrue(summary.failures.isEmpty())
+    }
+
+    @Test
+    fun sameInvalidRecordIsAttemptedOnlyOnceAcrossRepeatedGraphRuns() = runTest {
+        val invalid = calibration(InflammationFactor.IL6, listOf(10f, 12f, 15f))
+        val repository = RevalidationRepository(listOf(invalid))
+        var validatorCalls = 0
+        val validator = CalibrationValidator()
+        val revalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            validatorCalls += 1
+            validator.validate(inputs)
+        }
+
+        val first = revalidator.revalidateNeedsReview()
+        val second = revalidator.revalidateNeedsReview()
+
+        assertEquals(1, validatorCalls)
+        assertEquals(1, first.attempted)
+        assertEquals(0, second.attempted)
+    }
+
+    @Test
+    fun processScopedProviderSharesOnceStateAcrossGraphFactories() = runTest {
+        val invalid = calibration(InflammationFactor.IL6, listOf(10f, 12f, 15f))
+        val repository = RevalidationRepository(listOf(invalid))
+
+        val firstGraph = LegacyCalibrationRevalidator.processScoped(repository)
+        val secondGraph = LegacyCalibrationRevalidator.processScoped(repository)
+        val first = firstGraph.revalidateNeedsReview()
+        val second = secondGraph.revalidateNeedsReview()
+
+        assertTrue(firstGraph === secondGraph)
+        assertEquals(1, first.attempted)
+        assertEquals(0, second.attempted)
+    }
+
+    @Test
+    fun validatorFailureIsReportedAndDoesNotAbortLaterRecords() = runTest {
+        val first = calibration(InflammationFactor.TNF_ALPHA, validSignals)
+        val second = calibration(InflammationFactor.IL6, validSignals)
+        val repository = RevalidationRepository(listOf(first, second))
+        val validator = CalibrationValidator()
+        val revalidator = LegacyCalibrationRevalidator(repository) { inputs ->
+            if (inputs.first().concentration == FACTORY_LADDER.getValue(InflammationFactor.TNF_ALPHA).first()) {
+                // The two ladders share a blank, so identify the first record by its second knot.
+                if (inputs[1].concentration == FACTORY_LADDER.getValue(InflammationFactor.TNF_ALPHA)[1]) {
+                    error("validator exploded")
+                }
+            }
+            validator.validate(inputs)
+        }
+
+        val summary = revalidator.revalidateNeedsReview()
+
+        assertEquals(listOf(InflammationFactor.IL6), repository.saved.map { it.factor })
+        assertEquals(1, summary.failures.size)
+        assertEquals(InflammationFactor.TNF_ALPHA, summary.failures.single().factor)
+        assertEquals(LegacyRevalidationStage.VALIDATE, summary.failures.single().stage)
+        assertEquals(2, summary.attempted)
+    }
+
+    @Test
+    fun saveFailureIsReportedAndDoesNotAbortLaterRecordsOrRetryAutomatically() = runTest {
+        val first = calibration(InflammationFactor.TNF_ALPHA, validSignals)
+        val second = calibration(InflammationFactor.IL6, validSignals)
+        val repository = RevalidationRepository(
+            initial = listOf(first, second),
+            saveFailures = mutableSetOf(InflammationFactor.TNF_ALPHA),
+        )
+        val revalidator = LegacyCalibrationRevalidator(repository)
+
+        val firstRun = revalidator.revalidateNeedsReview()
+        val secondRun = revalidator.revalidateNeedsReview()
+
+        assertEquals(listOf(InflammationFactor.IL6), repository.saved.map { it.factor })
+        assertEquals(LegacyRevalidationStage.SAVE, firstRun.failures.single().stage)
+        assertEquals(0, secondRun.attempted)
     }
 
     private fun calibration(
@@ -70,9 +151,16 @@ class LegacyCalibrationRevalidatorTest {
             },
         )
     }
+
+    private companion object {
+        val validSignals = listOf(10f, 12f, 15f, 18f, 22f, 28f, 36f, 46f, 58f)
+    }
 }
 
-private class RevalidationRepository(initial: List<Calibration>) : CalibrationRepository {
+private class RevalidationRepository(
+    initial: List<Calibration>,
+    private val saveFailures: MutableSet<InflammationFactor> = mutableSetOf(),
+) : CalibrationRepository {
     val current = MutableStateFlow(initial)
     val saved = mutableListOf<Calibration>()
 
@@ -82,6 +170,7 @@ private class RevalidationRepository(initial: List<Calibration>) : CalibrationRe
         MutableStateFlow(current.value.firstOrNull { it.factor == factor })
 
     override suspend fun save(calibration: Calibration) {
+        if (saveFailures.remove(calibration.factor)) error("save exploded")
         saved += calibration
         current.value = current.value.map { existing ->
             if (existing.factor == calibration.factor) calibration else existing

@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 class CalibrationViewModelFactory internal constructor(
     private val repository: CalibrationRepository,
     private val decoder: CalibrationBitmapDecoder,
+    private val legacyRevalidator: LegacyCalibrationRevalidator =
+        LegacyCalibrationRevalidator.processScoped(repository),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: () -> Long = System::currentTimeMillis,
@@ -26,7 +28,9 @@ class CalibrationViewModelFactory internal constructor(
         clock: () -> Long = System::currentTimeMillis,
     ) : this(
         repository = repository,
-        decoder = CalibrationBitmapDecoder { uri -> decoder.decode(Uri.parse(uri)).bitmap },
+        decoder = CalibrationBitmapDecoder { uri ->
+            BitmapCalibrationImage(decoder.decode(Uri.parse(uri)).bitmap)
+        },
         ioDispatcher = ioDispatcher,
         defaultDispatcher = defaultDispatcher,
         clock = clock,
@@ -48,7 +52,7 @@ class CalibrationViewModelFactory internal constructor(
         repository = repository,
         savedStateHandle = savedStateHandle,
         decoder = decoder,
-        legacyRevalidator = LegacyCalibrationRevalidator(repository),
+        legacyRevalidator = legacyRevalidator,
         clock = clock,
         ioDispatcher = ioDispatcher,
         defaultDispatcher = defaultDispatcher,

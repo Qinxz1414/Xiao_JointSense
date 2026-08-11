@@ -1,5 +1,6 @@
 package cloud.univ.jointsense.calibration
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,9 +66,9 @@ fun CalibrationReviewRouteScreen(
     onBack: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    BackHandler(enabled = state.isPersistenceBusy) { }
     LaunchedEffect(state.saveCompleted) {
-        if (state.saveCompleted) {
-            viewModel.consumeSaveCompleted()
+        if (viewModel.claimSaveNavigation()) {
             onSaved()
         }
     }
@@ -82,6 +83,7 @@ fun CalibrationDoneRouteScreen(
     onBack: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    BackHandler(enabled = state.isPersistenceBusy) { }
     LaunchedEffect(state.factoryRestoreCompleted) {
         if (state.factoryRestoreCompleted) {
             viewModel.consumeFactoryRestoreCompleted()
@@ -92,8 +94,10 @@ fun CalibrationDoneRouteScreen(
         state = state,
         onDone = onDone,
         onAnother = {
-            viewModel.resetForAnotherFactor()
-            onAnother()
+            if (!state.isPersistenceBusy) {
+                viewModel.resetForAnotherFactor()
+                onAnother()
+            }
         },
         onRestoreConfirmed = viewModel::confirmRestoreFactory,
         onBack = onBack,

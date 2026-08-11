@@ -1,15 +1,21 @@
 package cloud.univ.jointsense.calibration
 
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModelStore
 import cloud.univ.jointsense.analysis.calibration.CalibrationError
 import cloud.univ.jointsense.analysis.calibration.CalibrationValidation
 import cloud.univ.jointsense.domain.model.Calibration
+import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -94,6 +100,24 @@ class CalibrationViewModelTest {
     }
 
     @Test
+    fun reviewRequiresExactlyNineFiniteSignalsWithoutTruncatingExtras() {
+        listOf(
+            validSignals.take(8) to CalibrationError.WrongReadingCount,
+            (validSignals + 70f) to CalibrationError.WrongReadingCount,
+            validSignals.toMutableList().also { it[4] = Float.NaN } to CalibrationError.NonFiniteSignal,
+            validSignals.toMutableList().also { it[4] = Float.POSITIVE_INFINITY } to CalibrationError.NonFiniteSignal,
+        ).forEach { (signals, expected) ->
+            val viewModel = viewModel()
+            viewModel.setDetectedSignals(signals)
+
+            assertFalse(viewModel.review())
+            val invalid = viewModel.state.value.validation as CalibrationValidation.Invalid
+            assertTrue(expected in invalid.errors)
+            assertFalse(viewModel.state.value.canSave)
+        }
+    }
+
+    @Test
     fun validSavePersistsValidatorRawAndFittedKnotsExactlyOnce() = runTest(dispatcher) {
         val repository = ViewModelCalibrationRepository()
         val viewModel = viewModel(repository = repository)
@@ -145,7 +169,7 @@ class CalibrationViewModelTest {
     }
 
     @Test
-    fun staleSaveCompletionCannotMoveResetFlowToDone() = runTest(dispatcher) {
+    fun inFlightSaveRejectsResetAndCompletesOriginalFactor() = runTest(dispatcher) {
         val saveGate = CompletableDeferred<Unit>()
         val repository = ViewModelCalibrationRepository(saveGate)
         val viewModel = viewModel(repository = repository)
@@ -159,8 +183,8 @@ class CalibrationViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, repository.saved.size)
-        assertFalse(viewModel.state.value.saveCompleted)
-        assertNull(viewModel.state.value.savedFactor)
+        assertTrue(viewModel.state.value.saveCompleted)
+        assertEquals(InflammationFactor.TNF_ALPHA, viewModel.state.value.savedFactor)
     }
 
     @Test
@@ -183,6 +207,224 @@ class CalibrationViewModelTest {
     }
 
     @Test
+    fun claimingSaveNavigationDoesNotClearDurableCompletionOrAllowDuplicateWrite() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val repository = ViewModelCalibrationRepository()
+        val original = viewModel(repository, handle)
+        original.setDetectedSignals(validSignals)
+        assertTrue(original.review())
+        original.save()
+        advanceUntilIdle()
+
+        assertTrue(original.claimSaveNavigation())
+        assertFalse(original.claimSaveNavigation())
+        assertTrue(original.state.value.saveCompleted)
+        assertFalse(original.state.value.canSave)
+
+        val recreated = viewModel(repository, handle)
+        recreated.save()
+        advanceUntilIdle()
+        assertTrue(recreated.state.value.saveCompleted)
+        assertEquals(1, repository.saved.size)
+    }
+
+    @Test
+    fun mutationsAndFactoryRestoreAreRejectedWhileSaveIsInFlight() = runTest(dispatcher) {
+        val saveGate = CompletableDeferred<Unit>()
+        val repository = ViewModelCalibrationRepository(saveGate = saveGate)
+        val viewModel = viewModel(repository)
+        viewModel.setDetectedSignals(validSignals)
+        assertTrue(viewModel.review())
+        val originalTexts = viewModel.state.value.concentrationTexts
+
+        viewModel.save()
+        runCurrent()
+        viewModel.selectFactor(InflammationFactor.IL6)
+        viewModel.updateConcentration(1, "999")
+        viewModel.setDetectedSignals(List(9) { 999f })
+        viewModel.resetForAnotherFactor()
+        viewModel.confirmRestoreFactory()
+
+        assertTrue(viewModel.state.value.isPersistenceBusy)
+        assertEquals(InflammationFactor.TNF_ALPHA, viewModel.state.value.factor)
+        assertEquals(originalTexts, viewModel.state.value.concentrationTexts)
+        assertEquals(validSignals, viewModel.state.value.signals)
+        assertEquals(0, repository.clearCalls)
+        saveGate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(InflammationFactor.TNF_ALPHA, viewModel.state.value.savedFactor)
+    }
+
+    @Test
+    fun saveAndRestoreAreMutuallyExclusiveInBothOperationOrders() = runTest(dispatcher) {
+        val saveGate = CompletableDeferred<Unit>()
+        val saveRepository = ViewModelCalibrationRepository(saveGate = saveGate)
+        val saving = viewModel(saveRepository)
+        saving.setDetectedSignals(validSignals)
+        assertTrue(saving.review())
+        saving.save()
+        runCurrent()
+        saving.confirmRestoreFactory()
+        assertEquals(0, saveRepository.clearCalls)
+        saveGate.complete(Unit)
+        advanceUntilIdle()
+
+        val clearGate = CompletableDeferred<Unit>()
+        val clearRepository = ViewModelCalibrationRepository(clearGate = clearGate)
+        val restoring = viewModel(clearRepository)
+        restoring.setDetectedSignals(validSignals)
+        assertTrue(restoring.review())
+        restoring.confirmRestoreFactory()
+        runCurrent()
+        restoring.save()
+        restoring.confirmRestoreFactory()
+        assertEquals(0, clearRepository.saved.size)
+        assertEquals(1, clearRepository.clearCalls)
+        assertTrue(restoring.state.value.isPersistenceBusy)
+        clearGate.complete(Unit)
+        advanceUntilIdle()
+        assertTrue(restoring.state.value.factoryRestoreCompleted)
+    }
+
+    @Test
+    fun restoredImageDecodePreservesValidReviewWhenCropStillFits() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val original = viewModel(
+            savedStateHandle = handle,
+            decoder = CalibrationBitmapDecoder { FakeCalibrationImage(100, 100) },
+        )
+        original.onImageSelected("content://calibration")
+        advanceUntilIdle()
+        original.setDetectedSignals(validSignals)
+        assertTrue(original.review())
+
+        val restored = viewModel(
+            savedStateHandle = handle,
+            decoder = CalibrationBitmapDecoder { FakeCalibrationImage(100, 100) },
+        )
+        advanceUntilIdle()
+
+        assertTrue(restored.state.value.validation is CalibrationValidation.Valid)
+        assertTrue(restored.state.value.canSave)
+        assertEquals(validSignals, restored.state.value.signals)
+    }
+
+    @Test
+    fun restoredImageDecodeInvalidatesReviewWhenSavedCropDoesNotFit() = runTest(dispatcher) {
+        val handle = SavedStateHandle()
+        val original = viewModel(
+            savedStateHandle = handle,
+            decoder = CalibrationBitmapDecoder { FakeCalibrationImage(100, 100) },
+        )
+        original.onImageSelected("content://calibration")
+        advanceUntilIdle()
+        original.updateCrop(CalibrationIntBounds(80, 80, 100, 100))
+        original.setDetectedSignals(validSignals)
+        assertTrue(original.review())
+
+        val restored = viewModel(
+            savedStateHandle = handle,
+            decoder = CalibrationBitmapDecoder { FakeCalibrationImage(10, 10) },
+        )
+        advanceUntilIdle()
+
+        assertNull(restored.state.value.validation)
+        assertFalse(restored.state.value.canSave)
+        assertTrue(restored.state.value.errorMessage?.contains("crop", ignoreCase = true) == true)
+    }
+
+    @Test
+    fun replacingImageWaitsForNonCooperativeDetectorBeforeReleasingBorrowedImage() = runTest(dispatcher) {
+        val detectorDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        try {
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val exited = CountDownLatch(1)
+            val old = FakeCalibrationImage(20, 20)
+            val replacement = FakeCalibrationImage(20, 20)
+            var decoded: CalibrationImage = old
+            val viewModel = viewModel(
+                decoder = CalibrationBitmapDecoder { decoded },
+                detector = CalibrationSignalDetector { image, _ ->
+                    assertFalse(image.isReleased)
+                    entered.countDown()
+                    release.await()
+                    assertFalse(image.isReleased)
+                    exited.countDown()
+                    List(9) { GridWellReading(0, 0, it, it.toFloat()) }
+                },
+                defaultDispatcher = detectorDispatcher,
+            )
+            viewModel.onImageSelected("old")
+            advanceUntilIdle()
+            viewModel.detectSignals()
+            runCurrent()
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+
+            decoded = replacement
+            viewModel.onImageSelected("replacement")
+            runCurrent()
+            assertEquals(0, old.releaseCalls)
+            release.countDown()
+            assertTrue(exited.await(2, TimeUnit.SECONDS))
+            var attempts = 0
+            while (old.releaseCalls == 0 && attempts++ < 100) {
+                runCurrent()
+                Thread.sleep(5)
+            }
+
+            assertEquals(1, old.releaseCalls)
+            assertEquals(0, replacement.releaseCalls)
+        } finally {
+            detectorDispatcher.close()
+        }
+    }
+
+    @Test
+    fun resetAndOnClearedDelayBorrowedImageReleaseAndReleaseExactlyOnce() = runTest(dispatcher) {
+        suspend fun exercise(clear: (CalibrationViewModel) -> Unit) {
+            val detectorDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+            try {
+                val entered = CountDownLatch(1)
+                val release = CountDownLatch(1)
+                val exited = CountDownLatch(1)
+                val image = FakeCalibrationImage(20, 20)
+                val viewModel = viewModel(
+                    decoder = CalibrationBitmapDecoder { image },
+                    detector = CalibrationSignalDetector { borrowed, _ ->
+                        entered.countDown()
+                        release.await()
+                        assertFalse(borrowed.isReleased)
+                        exited.countDown()
+                        emptyList()
+                    },
+                    defaultDispatcher = detectorDispatcher,
+                )
+                viewModel.onImageSelected("image")
+                advanceUntilIdle()
+                viewModel.detectSignals()
+                runCurrent()
+                assertTrue(entered.await(2, TimeUnit.SECONDS))
+                clear(viewModel)
+                assertEquals(0, image.releaseCalls)
+                release.countDown()
+                assertTrue(exited.await(2, TimeUnit.SECONDS))
+                var attempts = 0
+                while (image.releaseCalls == 0 && attempts++ < 100) {
+                    runCurrent()
+                    Thread.sleep(5)
+                }
+                assertEquals(1, image.releaseCalls)
+            } finally {
+                detectorDispatcher.close()
+            }
+        }
+
+        exercise { it.resetForAnotherFactor() }
+        exercise { viewModel -> ViewModelStore().apply { put("calibration", viewModel); clear() } }
+    }
+
+    @Test
     fun confirmedFactoryRestoreClearsAllUserCurvesOnce() = runTest(dispatcher) {
         val repository = ViewModelCalibrationRepository()
         val viewModel = viewModel(repository = repository)
@@ -194,26 +436,69 @@ class CalibrationViewModelTest {
         assertEquals(1, repository.clearCalls)
     }
 
+    @Test
+    fun legacyPerRecordFailureIsVisibleInViewModelState() = runTest(dispatcher) {
+        val repository = ViewModelCalibrationRepository()
+        repository.calibrations.value = listOf(needsReviewCalibration())
+        val revalidator = LegacyCalibrationRevalidator(repository) { error("validator exploded") }
+
+        val viewModel = viewModel(repository = repository, legacyRevalidator = revalidator)
+        advanceUntilIdle()
+
+        val summary = viewModel.state.value.legacyRevalidationSummary
+        assertEquals(1, summary?.failures?.size)
+        assertEquals(LegacyRevalidationStage.VALIDATE, summary?.failures?.single()?.stage)
+        assertTrue(viewModel.state.value.errorMessage?.contains("legacy", ignoreCase = true) == true)
+    }
+
     private fun viewModel(
         repository: ViewModelCalibrationRepository = ViewModelCalibrationRepository(),
         savedStateHandle: SavedStateHandle = SavedStateHandle(),
+        decoder: CalibrationBitmapDecoder? = null,
+        detector: CalibrationSignalDetector = CalibrationSignalDetector { _, _ -> emptyList() },
+        defaultDispatcher: kotlinx.coroutines.CoroutineDispatcher = dispatcher,
+        legacyRevalidator: LegacyCalibrationRevalidator? = null,
     ) = CalibrationViewModel(
         repository = repository,
         savedStateHandle = savedStateHandle,
-        decoder = null,
-        legacyRevalidator = null,
+        decoder = decoder,
+        detector = detector,
+        legacyRevalidator = legacyRevalidator,
         clock = { 456L },
         ioDispatcher = dispatcher,
-        defaultDispatcher = dispatcher,
+        defaultDispatcher = defaultDispatcher,
     )
 
     private companion object {
         val validSignals = listOf(10f, 12f, 15f, 18f, 22f, 28f, 36f, 46f, 58f)
+
+        fun needsReviewCalibration(): Calibration {
+            val concentrations = FACTORY_LADDER.getValue(InflammationFactor.TNF_ALPHA)
+            return Calibration(
+                factor = InflammationFactor.TNF_ALPHA,
+                createdAt = 1L,
+                version = 1,
+                status = CalibrationStatus.NEEDS_REVIEW,
+                kitName = null,
+                kitLot = null,
+                knots = validSignals.mapIndexed { index, signal ->
+                    CalibrationKnot(
+                        position = index,
+                        concentration = concentrations[index],
+                        rawSignal = signal,
+                        netSignal = signal,
+                        fittedSignal = signal,
+                        isBlank = index == 0,
+                    )
+                },
+            )
+        }
     }
 }
 
 private class ViewModelCalibrationRepository(
     private val saveGate: CompletableDeferred<Unit>? = null,
+    private val clearGate: CompletableDeferred<Unit>? = null,
 ) : CalibrationRepository {
     val calibrations = MutableStateFlow<List<Calibration>>(emptyList())
     val saved = mutableListOf<Calibration>()
@@ -231,5 +516,18 @@ private class ViewModelCalibrationRepository(
 
     override suspend fun clearAll() {
         clearCalls += 1
+        clearGate?.await()
+    }
+}
+
+private class FakeCalibrationImage(
+    override val width: Int,
+    override val height: Int,
+) : CalibrationImage {
+    var releaseCalls = 0
+    override val isReleased: Boolean get() = releaseCalls > 0
+
+    override fun release() {
+        releaseCalls += 1
     }
 }

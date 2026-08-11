@@ -257,6 +257,7 @@ internal fun CalibrationReviewScreen(
         step = "Step 4 / 5 · Review & save",
         tag = "calibration:review",
         onBack = onBack,
+        backEnabled = !state.isPersistenceBusy,
     ) {
         Text("${state.factor.shortName} standard curve", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
@@ -302,6 +303,7 @@ internal fun CalibrationDoneScreen(
         step = "Step 5 / 5 · Done",
         tag = "calibration:done",
         onBack = onBack,
+        backEnabled = !state.isPersistenceBusy,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.CheckCircle, null, Modifier.size(72.dp), tint = MedicalGreen)
@@ -314,13 +316,25 @@ internal fun CalibrationDoneScreen(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onAnother, Modifier.fillMaxWidth().height(52.dp)) {
+            Button(
+                onClick = onAnother,
+                enabled = !state.isPersistenceBusy,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) {
                 Text("Calibrate Another Factor")
             }
-            TextButton(onClick = { showRestoreDialog = true }, Modifier.fillMaxWidth()) {
+            TextButton(
+                onClick = { showRestoreDialog = true },
+                enabled = !state.isPersistenceBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text("Restore factory curve")
             }
-            Button(onClick = onDone, Modifier.fillMaxWidth().height(52.dp)) { Text("Done") }
+            Button(
+                onClick = onDone,
+                enabled = !state.isPersistenceBusy,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text("Done") }
             state.errorMessage?.let { ErrorText(it) }
         }
     }
@@ -352,6 +366,7 @@ private fun CalibrationScaffold(
     step: String,
     tag: String,
     onBack: () -> Unit,
+    backEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Scaffold(
@@ -360,7 +375,11 @@ private fun CalibrationScaffold(
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack, modifier = Modifier.testTag("calibration:top-back")) {
+                    IconButton(
+                        onClick = onBack,
+                        enabled = backEnabled,
+                        modifier = Modifier.testTag("calibration:top-back"),
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },

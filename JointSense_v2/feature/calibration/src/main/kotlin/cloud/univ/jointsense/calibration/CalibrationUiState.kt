@@ -11,7 +11,7 @@ internal data class CalibrationUiState(
     val signals: List<Float> = emptyList(),
     val validation: CalibrationValidation? = null,
     val imageUri: String? = null,
-    val bitmap: Bitmap? = null,
+    val image: CalibrationImage? = null,
     val cropBounds: CalibrationIntBounds? = null,
     val isDecoding: Boolean = false,
     val isDetecting: Boolean = false,
@@ -22,8 +22,15 @@ internal data class CalibrationUiState(
     val savedFactor: InflammationFactor? = null,
     val isRestoringFactory: Boolean = false,
     val factoryRestoreCompleted: Boolean = false,
+    val legacyRevalidationSummary: LegacyRevalidationSummary? = null,
     val errorMessage: String? = null,
 ) {
+    val bitmap: Bitmap?
+        get() = (image as? BitmapCalibrationImage)?.bitmap
+
+    val isPersistenceBusy: Boolean
+        get() = isSaving || isRestoringFactory
+
     val canSave: Boolean
-        get() = validation is CalibrationValidation.Valid && !isSaving && !saveCompleted
+        get() = validation is CalibrationValidation.Valid && !isPersistenceBusy && !saveCompleted
 }
