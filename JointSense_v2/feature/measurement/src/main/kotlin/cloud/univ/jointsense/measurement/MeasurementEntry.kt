@@ -16,6 +16,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -32,6 +35,8 @@ fun ImageSelectRouteScreen(
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val context = LocalContext.current
     val activity = context.findActivity()
+    var permissionResultRequestToken by rememberSaveable { mutableStateOf<String?>(null) }
+    var permissionResultDraftId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
@@ -46,15 +51,22 @@ fun ImageSelectRouteScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        val shouldShowRationale = !granted && activity?.let {
-            ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
-        } == true
-        viewModel.onAction(
-            MeasurementAction.CameraPermissionResult(
-                granted = granted,
-                shouldShowRationale = shouldShowRationale,
-            ),
-        )
+        val resultToken = permissionResultRequestToken
+        val resultDraft = permissionResultDraftId
+        if (resultToken != null && resultDraft != null) {
+            permissionResultRequestToken = null
+            permissionResultDraftId = null
+            val shouldShowRationale = !granted && activity?.let {
+                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+            } == true
+            viewModel.onAction(
+                MeasurementAction.CameraPermissionResult(
+                    claim = CameraPermissionLaunchClaim(resultToken, resultDraft),
+                    granted = granted,
+                    shouldShowRationale = shouldShowRationale,
+                ),
+            )
+        }
     }
 
     LaunchedEffect(viewModel, cameraLauncher) {
@@ -64,13 +76,23 @@ fun ImageSelectRouteScreen(
                     viewModel.claimCameraPermissionLaunch(effect)?.let { claim ->
                         launchClaimedCameraPermission(
                             claim = claim,
-                            launch = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                            launch = {
+                                permissionResultRequestToken = claim.requestToken
+                                permissionResultDraftId = claim.draftId
+                                permissionLauncher.launch(Manifest.permission.CAMERA)
+                            },
                             onAcknowledged = {
                                 viewModel.onAction(
                                     MeasurementAction.CameraPermissionLaunchAcknowledged(claim),
                                 )
                             },
                             onFailure = { reason ->
+                                if (permissionResultRequestToken == claim.requestToken &&
+                                    permissionResultDraftId == claim.draftId
+                                ) {
+                                    permissionResultRequestToken = null
+                                    permissionResultDraftId = null
+                                }
                                 viewModel.onAction(
                                     MeasurementAction.CameraPermissionLaunchFailed(claim, reason),
                                 )
@@ -114,6 +136,7 @@ fun ImageSelectRouteScreen(
                 )
             },
             onPickImage = {
+                viewModel.onAction(MeasurementAction.GallerySelectionStarted)
                 photoPicker.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )

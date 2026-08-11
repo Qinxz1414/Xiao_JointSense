@@ -71,6 +71,7 @@ class MeasurementViewModel(
     private var decodeJob: Job? = null
     private var captureRequestJob: Job? = null
     private var permissionRequestJob: Job? = null
+    private var permissionRequestGeneration = 0L
     private var permissionHistoryReadJob: Job? = null
     private var permissionHistoryReadGeneration = 0L
     private var permissionHistoryReady = cameraPermissionHistoryStore == null
@@ -96,8 +97,14 @@ class MeasurementViewModel(
             decodeImage(it, restoring = true, picked = false)
         }
         restorePermissionHistory()
-        activePermissionRequest?.let(::persistPermissionRequest)
-        reissuePermissionRequest()
+        activePermissionRequest?.let { request ->
+            persistPermissionRequest(request)
+            clearQueuedPermissionRequestIntent()
+            reissuePermissionRequest()
+        }
+        if (activePermissionRequest == null && permissionRequestIntentQueued && permissionHistoryReady) {
+            recordCameraPermissionRequest()
+        }
         reissueCameraRequest()
     }
 
@@ -109,7 +116,11 @@ class MeasurementViewModel(
             is MeasurementAction.PickedImageSelected -> if (!blocksMutuallyExclusiveInputs()) {
                 decodeImage(action.uri, restoring = false, picked = true)
             }
+            MeasurementAction.GallerySelectionStarted -> if (!blocksMutuallyExclusiveInputs()) {
+                invalidatePermissionRequestFlow()
+            }
             MeasurementAction.CameraCaptureRequested -> if (!blocksMutuallyExclusiveInputs()) {
+                invalidatePermissionRequestFlow()
                 requestCameraCapture()
             }
             is MeasurementAction.CameraCaptureCompleted -> if (!blocksMutuallyExclusiveInputs()) {
@@ -255,6 +266,7 @@ class MeasurementViewModel(
             image.release()
             return
         }
+        invalidatePermissionRequestFlow()
         decodeJob?.cancel()
         selectedCapture = null
         state.value.image?.takeIf { it !== image }?.release()
@@ -291,6 +303,7 @@ class MeasurementViewModel(
     }
 
     private fun decodeImage(uri: String, restoring: Boolean, picked: Boolean) {
+        if (!restoring) invalidatePermissionRequestFlow()
         val imageDecoder = decoder ?: run {
             if (!restoring) setRecoverableError(MeasurementError.ImageUnreadable, Stage.AwaitingImage)
             return
@@ -596,23 +609,25 @@ class MeasurementViewModel(
     private fun recordCameraPermissionRequest() {
         if (blocksMutuallyExclusiveInputs() || activePermissionRequest != null ||
             permissionRequestJob?.isActive == true ||
-            state.value.stage == Stage.RecoverableError
+            state.value.stage != Stage.AwaitingImage
         ) return
+        queueCameraPermissionRequestIntent()
         if (permissionHistoryReadJob != null || !permissionHistoryReady) {
-            queueCameraPermissionRequestIntent()
             if (permissionHistoryReadJob == null) restorePermissionHistory()
             return
         }
-        permissionRequestIntentQueued = false
-        savedStateHandle[KEY_PERMISSION_REQUEST_INTENT_QUEUED] = false
         val requestedDraft = state.value.draftId
+        val generation = permissionRequestGeneration
         permissionRequestJob = viewModelScope.launch {
             val ownerJob = coroutineContext[Job]
             try {
-                cameraPermissionHistoryStore?.let { store ->
-                    withContext(ioDispatcher) { store.markRequested() }
+                if (!state.value.hasRequestedCameraPermission) {
+                    cameraPermissionHistoryStore?.let { store ->
+                        withContext(ioDispatcher) { store.markRequested() }
+                    }
                 }
-                if (state.value.draftId != requestedDraft) return@launch
+                if (!ownsQueuedPermissionIntent(generation, requestedDraft)) return@launch
+                updateState { it.copy(hasRequestedCameraPermission = true) }
                 val request = PermissionRequestSnapshot(
                     requestToken = permissionRequestTokenFactory(),
                     draftId = requestedDraft,
@@ -621,15 +636,23 @@ class MeasurementViewModel(
                 )
                 activePermissionRequest = request
                 persistPermissionRequest(request)
-                updateState { it.copy(hasRequestedCameraPermission = true) }
-                effectChannel.send(request.toEffect())
+                clearQueuedPermissionRequestIntent()
+                if (activePermissionRequest == request &&
+                    state.value.draftId == request.draftId &&
+                    state.value.stage == Stage.AwaitingImage
+                ) {
+                    effectChannel.send(request.toEffect())
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                setRecoverableError(
-                    MeasurementError.PermissionDenied(permanentlyDenied = false),
-                    Stage.AwaitingImage,
-                )
+                if (ownsQueuedPermissionIntent(generation, requestedDraft)) {
+                    permissionHistoryReady = false
+                    setRecoverableError(
+                        MeasurementError.PermissionHistoryUnavailable,
+                        Stage.AwaitingImage,
+                    )
+                }
             } finally {
                 if (permissionRequestJob === ownerJob) permissionRequestJob = null
             }
@@ -638,9 +661,11 @@ class MeasurementViewModel(
 
     private fun completeCameraPermissionRequest(action: MeasurementAction.CameraPermissionResult) {
         if (blocksMutuallyExclusiveInputs()) return
-        val request = activePermissionRequest
-        if (request != null && !request.acknowledged) return
-        val formallyRecorded = request != null || state.value.hasRequestedCameraPermission
+        val request = activePermissionRequest ?: return
+        if (!request.acknowledged || !request.matches(action.claim) ||
+            state.value.draftId != request.draftId ||
+            state.value.stage != Stage.AwaitingImage
+        ) return
         invalidatePermissionRequest()
         if (action.granted) {
             requestCameraCapture()
@@ -648,7 +673,7 @@ class MeasurementViewModel(
             setRecoverableError(
                 MeasurementError.PermissionDenied(
                     permanentlyDenied = classifyPermanentCameraDenial(
-                        wasRequestFormallyRecorded = formallyRecorded,
+                        wasRequestFormallyRecorded = true,
                         shouldShowRationale = action.shouldShowRationale,
                     ),
                 ),
@@ -663,6 +688,7 @@ class MeasurementViewModel(
         permissionHistoryReady = false
         val generation = ++permissionHistoryReadGeneration
         val requestedDraft = state.value.draftId
+        val durableHistoryProof = activePermissionRequest?.takeIf { it.draftId == requestedDraft }
         lateinit var job: Job
         job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             var resumeQueuedRequest = false
@@ -683,18 +709,24 @@ class MeasurementViewModel(
                     )
                 }
                 resumeQueuedRequest = permissionRequestIntentQueued &&
+                    activePermissionRequest == null &&
                     state.value.draftId == requestedDraft &&
                     state.value.stage == Stage.AwaitingImage
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
                 if (generation != permissionHistoryReadGeneration) return@launch
-                permissionHistoryReady = false
                 val current = state.value
-                if (current.draftId == requestedDraft &&
+                val pendingOwnsDurableHistory = durableHistoryProof != null &&
+                    current.draftId == durableHistoryProof.draftId
+                if (pendingOwnsDurableHistory) {
+                    permissionHistoryReady = true
+                    updateState { state -> state.copy(hasRequestedCameraPermission = true) }
+                } else if (current.draftId == requestedDraft &&
                     (current.stage == Stage.AwaitingImage ||
                         current.error == MeasurementError.PermissionHistoryUnavailable)
                 ) {
+                    permissionHistoryReady = false
                     setRecoverableError(
                         MeasurementError.PermissionHistoryUnavailable,
                         Stage.AwaitingImage,
@@ -714,12 +746,39 @@ class MeasurementViewModel(
         savedStateHandle[KEY_PERMISSION_REQUEST_INTENT_QUEUED] = true
     }
 
+    private fun clearQueuedPermissionRequestIntent() {
+        permissionRequestIntentQueued = false
+        savedStateHandle[KEY_PERMISSION_REQUEST_INTENT_QUEUED] = false
+    }
+
+    private fun ownsQueuedPermissionIntent(generation: Long, draftId: String): Boolean =
+        permissionRequestGeneration == generation &&
+            permissionRequestIntentQueued &&
+            activePermissionRequest == null &&
+            state.value.draftId == draftId &&
+            state.value.stage == Stage.AwaitingImage
+
+    private fun invalidatePermissionRequestFlow() {
+        permissionRequestGeneration += 1
+        permissionRequestJob?.cancel()
+        permissionRequestJob = null
+        clearQueuedPermissionRequestIntent()
+        invalidatePermissionRequest()
+    }
+
     private fun reissuePermissionRequest() {
         val restored = activePermissionRequest?.takeUnless { it.claimed || it.acknowledged } ?: return
         if (state.value.draftId == restored.draftId && state.value.stage == Stage.AwaitingImage) {
-            viewModelScope.launch { effectChannel.send(restored.toEffect()) }
+            viewModelScope.launch {
+                if (activePermissionRequest == restored &&
+                    state.value.draftId == restored.draftId &&
+                    state.value.stage == Stage.AwaitingImage
+                ) {
+                    effectChannel.send(restored.toEffect())
+                }
+            }
         } else if (activePermissionRequest == restored) {
-            invalidatePermissionRequest()
+            invalidatePermissionRequestFlow()
         }
     }
 
@@ -728,7 +787,8 @@ class MeasurementViewModel(
     ): CameraPermissionLaunchClaim? {
         val active = activePermissionRequest ?: return null
         if (!active.matches(effect) || active.claimed || active.acknowledged ||
-            state.value.draftId != active.draftId
+            state.value.draftId != active.draftId ||
+            state.value.stage != Stage.AwaitingImage
         ) return null
         val claimed = active.copy(claimed = true)
         activePermissionRequest = claimed
@@ -737,7 +797,10 @@ class MeasurementViewModel(
 
     private fun acknowledgeCameraPermissionLaunch(claim: CameraPermissionLaunchClaim) {
         val active = activePermissionRequest ?: return
-        if (!active.claimed || active.acknowledged || !active.matches(claim)) return
+        if (!active.claimed || active.acknowledged || !active.matches(claim) ||
+            state.value.draftId != active.draftId ||
+            state.value.stage != Stage.AwaitingImage
+        ) return
         val acknowledged = active.copy(claimed = false, acknowledged = true)
         activePermissionRequest = acknowledged
         persistPermissionRequest(acknowledged)
@@ -745,7 +808,10 @@ class MeasurementViewModel(
 
     private fun failCameraPermissionLaunch(claim: CameraPermissionLaunchClaim, reason: String) {
         val active = activePermissionRequest ?: return
-        if (!active.claimed || active.acknowledged || !active.matches(claim)) return
+        if (!active.claimed || active.acknowledged || !active.matches(claim) ||
+            state.value.draftId != active.draftId ||
+            state.value.stage != Stage.AwaitingImage
+        ) return
         val rolledBack = active.copy(claimed = false, acknowledged = false)
         activePermissionRequest = rolledBack
         persistPermissionRequest(rolledBack)
@@ -916,6 +982,7 @@ class MeasurementViewModel(
 
     private fun returnToImageSelection() {
         val expected = selectedCapture ?: activeCameraRequest?.capture
+        invalidatePermissionRequestFlow()
         captureRequestJob?.cancel()
         invalidateCameraRequest()
         decodeJob?.cancel()
@@ -984,6 +1051,7 @@ class MeasurementViewModel(
 
     private fun beginNewDraft() {
         val expected = selectedCapture ?: activeCameraRequest?.capture
+        invalidatePermissionRequestFlow()
         invalidateCameraRequest()
         invalidateActiveOperation(releaseImage = true)
         decodeJob?.cancel()
@@ -1019,11 +1087,7 @@ class MeasurementViewModel(
         permissionHistoryReadGeneration += 1
         permissionHistoryReadJob?.cancel()
         permissionHistoryReadJob = null
-        permissionRequestJob?.cancel()
-        permissionRequestJob = null
-        permissionRequestIntentQueued = false
-        savedStateHandle[KEY_PERMISSION_REQUEST_INTENT_QUEUED] = false
-        invalidatePermissionRequest()
+        invalidatePermissionRequestFlow()
         captureRequestJob?.cancel()
         invalidateCameraRequest()
         invalidateActiveOperation(releaseImage = true)

@@ -7,6 +7,8 @@ sealed interface MeasurementAction {
 
     data class PickedImageSelected(val uri: String) : MeasurementAction
 
+    data object GallerySelectionStarted : MeasurementAction
+
     data object CameraCaptureRequested : MeasurementAction
 
     data class CameraCaptureCompleted(val success: Boolean) : MeasurementAction
@@ -32,6 +34,7 @@ sealed interface MeasurementAction {
     ) : MeasurementAction
 
     data class CameraPermissionResult(
+        val claim: CameraPermissionLaunchClaim,
         val granted: Boolean,
         val shouldShowRationale: Boolean,
     ) : MeasurementAction
