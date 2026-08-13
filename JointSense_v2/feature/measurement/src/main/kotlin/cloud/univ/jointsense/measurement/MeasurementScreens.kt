@@ -384,7 +384,7 @@ fun FactorSelectScreen(
                         modifier = Modifier
                             .size(24.dp)
                             .testTag(MEASUREMENT_PROGRESS_TAG),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(12.dp))

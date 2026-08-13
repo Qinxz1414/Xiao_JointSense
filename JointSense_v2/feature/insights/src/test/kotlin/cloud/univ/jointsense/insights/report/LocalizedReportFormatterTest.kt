@@ -8,6 +8,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -71,6 +72,20 @@ class LocalizedReportFormatterTest {
         assertTrue(report.plainText.contains(percent.format(0.25)))
         assertTrue(report.plainText.contains(CHINESE_DISCLAIMER))
         assertFalse(formatter.formatResultSummary(sampleModel()).contains(CHINESE_DISCLAIMER))
+    }
+
+    @Test
+    fun corruptGradesAreFormattedAsNoGradeInsteadOfValidEndpoints() {
+        val formatter = LocalizedReportFormatter(
+            locale = Locale.US,
+            timeZone = utc,
+            text = englishText,
+        )
+        val noGrade = formatter.formatExport(sampleModel().copy(grade = null))
+
+        listOf(-1, 5).forEach { corruptGrade ->
+            assertEquals(noGrade, formatter.formatExport(sampleModel().copy(grade = corruptGrade)))
+        }
     }
 
     private fun sampleModel() = ReportModel(

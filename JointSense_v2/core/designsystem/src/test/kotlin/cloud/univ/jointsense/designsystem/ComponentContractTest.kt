@@ -13,6 +13,7 @@ class ComponentContractTest {
             "JointSenseTopBar.kt",
             "ClinicalCard.kt",
             "FactorValue.kt",
+            "GradeBadge.kt",
             "GradeScale.kt",
             "LoadingErrorState.kt",
         )

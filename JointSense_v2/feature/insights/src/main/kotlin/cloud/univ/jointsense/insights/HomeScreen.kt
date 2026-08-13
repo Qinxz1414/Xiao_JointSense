@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -45,9 +44,8 @@ import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.chart.LineChart
 import cloud.univ.jointsense.designsystem.chart.Sparkline
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.GradeBadge
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.AiLine
-import cloud.univ.jointsense.designsystem.theme.GradeColors
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.text.SimpleDateFormat
@@ -249,19 +247,13 @@ private fun DashboardContent(
                     )
                     if (grade != null) {
                         Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(GradeColors[grade])
-                                .padding(horizontal = 12.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = BaselineInsightsMetrics.gradeLabel(grade),
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        val gradeLabel = BaselineInsightsMetrics.gradeLabel(grade)
+                        GradeBadge(
+                            grade = grade,
+                            label = gradeLabel,
+                            contentDescription = "OA inflammation grade",
+                            stateDescription = "Grade $grade, $gradeLabel",
+                        )
                     }
                 }
             }
@@ -341,7 +333,7 @@ private fun DashboardContent(
                             value = it.value
                         )
                     },
-                    lineColor = AiLine,
+                    lineColor = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxSize(),
                     yAxisLabel = "AI"
                 )

@@ -39,20 +39,28 @@ internal object BaselineMeasurementMetrics {
     fun normalize(factor: InflammationFactor, value: Float): Float =
         (value / caps.getValue(factor)).coerceIn(0f, 1f)
 
-    fun grade(ai: Float): Int = when {
-        ai < 0.25f -> 0
-        ai < 0.50f -> 1
-        ai < 0.75f -> 2
-        ai < 0.90f -> 3
-        else -> 4
+    fun grade(ai: Float): Int {
+        require(ai.isFinite() && ai in 0f..1f) { "AI must be finite and between 0 and 1" }
+        return when {
+            ai < 0.25f -> 0
+            ai < 0.50f -> 1
+            ai < 0.75f -> 2
+            ai < 0.90f -> 3
+            else -> 4
+        }
     }
 
     fun gradeLabel(grade: Int): String =
-        listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")[grade.coerceIn(0, 4)]
+        listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")[validGrade(grade)]
 
     fun wellColor(intensity: Float): Color {
         val index = (intensity.coerceIn(0f, 1f) * (WellPalette.size - 1)).roundToInt()
         return WellPalette[index]
+    }
+
+    private fun validGrade(grade: Int): Int {
+        require(grade in 0..4) { "Grade must be between 0 and 4" }
+        return grade
     }
 }
 

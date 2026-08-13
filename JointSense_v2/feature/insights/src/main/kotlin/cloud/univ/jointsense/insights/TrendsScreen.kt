@@ -45,7 +45,6 @@ import cloud.univ.jointsense.designsystem.chart.MultiLineChart
 import cloud.univ.jointsense.designsystem.chart.TimePoint
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.AiLine
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.text.SimpleDateFormat
@@ -222,7 +221,7 @@ fun TrendsScreen(
                                         value = it.value
                                     )
                                 },
-                                lineColor = AiLine,
+                                lineColor = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.fillMaxSize(),
                                 yAxisLabel = "AI"
                             )

@@ -11,7 +11,6 @@ import kotlin.math.pow
 /** Stable brand and scientific semantic colors. */
 object JointSenseColors {
     val Ink = Color(0xFF0E2841)
-    val Primary = Color(0xFF156082)
     val Cyan = Color(0xFF0F9ED5)
     val BioGreen = Color(0xFF196B24)
     val Structure = Color(0xFFE2E8EC)
@@ -150,7 +149,7 @@ private fun relativeLuminance(argb: Long): Double {
 
 internal val LightSemanticColors = JointSenseSemanticColors(
     topBarContainer = JointSenseColors.Ink,
-    onTopBar = Color.White,
+    onTopBar = Color(LightMaterialColorRoles.statusBarForeground),
     cardContainer = JointSenseColors.Surface,
     cardOutline = JointSenseColors.Structure,
     statusBarContainer = Color(LightMaterialColorRoles.statusBarBackground),
@@ -169,6 +168,5 @@ internal val DarkSemanticColors = JointSenseSemanticColors(
 internal val LocalJointSenseSemanticColors = staticCompositionLocalOf { LightSemanticColors }
 
 // Canonical short names kept for chart and feature code.
-val AiLine = JointSenseColors.Primary
 val GradeColors = JointSenseColors.Grades
 val WellPalette = JointSenseColors.WellPalette

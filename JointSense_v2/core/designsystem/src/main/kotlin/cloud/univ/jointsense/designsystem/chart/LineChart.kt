@@ -38,7 +38,7 @@ data class ChartDataPoint(
 @Composable
 fun LineChart(
     dataPoints: List<ChartDataPoint>,
-    lineColor: Color = Color(0xFF0077B6),
+    lineColor: Color = MaterialTheme.colorScheme.primary,
     modifier: Modifier = Modifier,
     yAxisLabel: String = "pg/mL"
 ) {

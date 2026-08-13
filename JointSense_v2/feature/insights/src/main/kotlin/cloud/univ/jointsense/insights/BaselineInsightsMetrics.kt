@@ -37,16 +37,19 @@ internal object BaselineInsightsMetrics {
         return if (weightSum == 0f) null else (weighted / weightSum).coerceIn(0f, 1f)
     }
 
-    fun grade(ai: Float): Int = when {
-        ai < 0.25f -> 0
-        ai < 0.50f -> 1
-        ai < 0.75f -> 2
-        ai < 0.90f -> 3
-        else -> 4
+    fun grade(ai: Float): Int {
+        require(ai.isFinite() && ai in 0f..1f) { "AI must be finite and between 0 and 1" }
+        return when {
+            ai < 0.25f -> 0
+            ai < 0.50f -> 1
+            ai < 0.75f -> 2
+            ai < 0.90f -> 3
+            else -> 4
+        }
     }
 
     fun gradeLabel(grade: Int): String =
-        listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")[grade.coerceIn(0, 4)]
+        listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")[validGrade(grade)]
 
     fun activityLabel(grade: Int): String = listOf(
         "Minimal OA activity",
@@ -54,10 +57,10 @@ internal object BaselineInsightsMetrics {
         "Moderate OA activity",
         "High OA activity",
         "Very high OA activity",
-    )[grade.coerceIn(0, 4)]
+    )[validGrade(grade)]
 
     fun riskLabel(grade: Int): String =
-        listOf("Very low risk", "Low risk", "Medium risk", "High risk", "Very high risk")[grade.coerceIn(0, 4)]
+        listOf("Very low risk", "Low risk", "Medium risk", "High risk", "Very high risk")[validGrade(grade)]
 
     fun aiSeries(sessions: List<TestSession>): List<InsightPoint> = sessions
         .filter { it.results.isNotEmpty() }
@@ -125,28 +128,36 @@ internal object BaselineInsightsMetrics {
         return events.sortedByDescending(KeyEventItem::time).take(10)
     }
 
-    fun suggestions(grade: Int, weekDeltaPct: Float?): List<String> = buildList {
-        when {
-            grade <= 1 -> {
-                add("Continue the current care and monitoring plan.")
-                add("Maintain regular, low-impact joint-friendly exercise.")
+    fun suggestions(grade: Int, weekDeltaPct: Float?): List<String> {
+        validGrade(grade)
+        return buildList {
+            when {
+                grade <= 1 -> {
+                    add("Continue the current care and monitoring plan.")
+                    add("Maintain regular, low-impact joint-friendly exercise.")
+                }
+                grade == 2 -> {
+                    add("Discuss the result with your clinician at the next visit.")
+                    add("Prefer low-impact activity and avoid joint overloading.")
+                    add("Keep a regular monitoring cadence (2-3 times / week).")
+                }
+                else -> {
+                    add("Seek clinical review promptly for treatment adjustment.")
+                    add("Reduce joint load; pause high-impact activity.")
+                    add("Follow the prescribed treatment plan and re-test after therapy.")
+                }
             }
-            grade == 2 -> {
-                add("Discuss the result with your clinician at the next visit.")
-                add("Prefer low-impact activity and avoid joint overloading.")
-                add("Keep a regular monitoring cadence (2-3 times / week).")
-            }
-            else -> {
-                add("Seek clinical review promptly for treatment adjustment.")
-                add("Reduce joint load; pause high-impact activity.")
-                add("Follow the prescribed treatment plan and re-test after therapy.")
+            when {
+                weekDeltaPct != null && weekDeltaPct > 10f ->
+                    add("Inflammatory markers trended up vs last week - re-check sooner.")
+                weekDeltaPct != null && weekDeltaPct < -10f ->
+                    add("Markers trended down vs last week - current plan appears effective.")
             }
         }
-        when {
-            weekDeltaPct != null && weekDeltaPct > 10f ->
-                add("Inflammatory markers trended up vs last week - re-check sooner.")
-            weekDeltaPct != null && weekDeltaPct < -10f ->
-                add("Markers trended down vs last week - current plan appears effective.")
-        }
+    }
+
+    private fun validGrade(grade: Int): Int {
+        require(grade in 0..4) { "Grade must be between 0 and 4" }
+        return grade
     }
 }

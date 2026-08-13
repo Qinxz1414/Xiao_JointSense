@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import cloud.univ.jointsense.designsystem.component.GradeScale
+import cloud.univ.jointsense.designsystem.component.GradeBadge
 import cloud.univ.jointsense.designsystem.component.LoadingErrorState
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import org.junit.Assert.assertEquals
@@ -54,6 +55,25 @@ class DesignSystemComponentTest {
         composeRule.onNodeWithContentDescription("OA grade scale")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Grade unavailable"))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+    }
+
+    @Test
+    fun gradeBadgeExposesNeutralReadOnlyTextAndGradeState() {
+        composeRule.setContent {
+            JointSenseTheme {
+                GradeBadge(
+                    grade = 2,
+                    label = "Moderate",
+                    contentDescription = "OA inflammation grade",
+                    stateDescription = "Grade 2, Moderate",
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("OA inflammation grade")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Grade 2, Moderate"))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        composeRule.onNodeWithText("Moderate").assertIsDisplayed()
     }
 
     @Test

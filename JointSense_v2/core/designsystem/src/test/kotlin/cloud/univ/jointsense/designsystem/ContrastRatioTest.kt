@@ -16,6 +16,15 @@ class ContrastRatioTest {
         assertRoleContrast(darkTheme = true)
     }
 
+    @Test
+    fun neutralGradeBadgeTextMeetsNormalTextContrastInBothThemes() {
+        listOf(false, true).forEach { darkTheme ->
+            val roles = materialColorRoles(darkTheme)
+            val ratio = contrastRatio(roles.onSurface, roles.surface)
+            assertTrue("Grade badge contrast was $ratio in darkTheme=$darkTheme", ratio >= 4.5)
+        }
+    }
+
     private fun assertRoleContrast(darkTheme: Boolean) {
         val roles = materialColorRoles(darkTheme)
         val pairs = mapOf(

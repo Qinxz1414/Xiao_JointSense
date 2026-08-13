@@ -68,7 +68,7 @@ class LocalizedReportFormatter(
 
     private fun format(model: ReportModel, includeDisclaimer: Boolean): FormattedReport {
         val generated = dateTimeFormat().format(Date(model.generatedAtEpochMillis))
-        val grade = model.grade?.coerceIn(0, 4)
+        val grade = model.grade?.takeIf { it in 0..4 }
         val sections = mutableListOf<String>()
 
         sections += buildString {
@@ -147,7 +147,8 @@ class LocalizedReportFormatter(
             1 -> ReportText.GRADE_1
             2 -> ReportText.GRADE_2
             3 -> ReportText.GRADE_3
-            else -> ReportText.GRADE_4
+            4 -> ReportText.GRADE_4
+            else -> error("Grade must be between 0 and 4")
         }
     )
 

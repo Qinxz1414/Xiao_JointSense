@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -40,9 +39,9 @@ import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.chart.AiScaleBar
 import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.GradeBadge
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.GradeColors
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.TestResult
@@ -261,19 +260,13 @@ fun ResultScreen(
                         )
                         if (grade != null) {
                             Spacer(modifier = Modifier.width(12.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(GradeColors[grade])
-                                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = BaselineMeasurementMetrics.gradeLabel(grade),
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                            val gradeLabel = BaselineMeasurementMetrics.gradeLabel(grade)
+                            GradeBadge(
+                                grade = grade,
+                                label = gradeLabel,
+                                contentDescription = "OA inflammation grade",
+                                stateDescription = "Grade $grade, $gradeLabel",
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
