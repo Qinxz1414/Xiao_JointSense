@@ -592,7 +592,7 @@ Expected: no silent error patterns or manual navigation enums remain.
 
 Record each fixed defect, curve behavior, calibration thresholds, image limit, report behavior, and exact verification commands/output. Mark device tests unavailable if they were not executed.
 
-- [ ] **Step 4: Commit Phase 2 documentation**
+- [x] **Step 4: Commit Phase 2 documentation**
 
 ```powershell
 git add 项目结构需求梳理.md docs/superpowers/plans/2026-08-07-jointsense-measurement-reliability.md
@@ -605,4 +605,4 @@ git commit -m "docs: record measurement reliability results"
 - Step 1 was rerun after execution access recovered. The focused Phase 2 command completed 85/85 actionable tasks; `testDebugUnitTest --rerun-tasks` completed 206/206 actionable tasks with 237/237 XML tests and zero failures/errors/skips; `:app:lintDebug :app:assembleDebug --rerun-tasks` completed 374/374 actionable tasks.
 - Task 7 base commit `8f34c28` plus reviewed lifecycle/collision/timestamp fixes are complete. The final fixes passed `:feature:insights:testDebugUnitTest --rerun-tasks` (14/14; 38/38 actionable), compiled Android test sources, built the app in a 211/211 actionable command, and were committed as `3c8445c`.
 - No Phase 2 connected-device suite has a passing result. Tasks 3–5 had no attached device; Task 6 reached a transient `M2012K11AC` but timed out/cancelled after partial instrumentation; Task 7 had no stable authorized device/emulator run.
-- Step 4 remains unchecked until these final documentation edits are committed. Generated build directories remain untracked and out of scope.
+- Step 4 completed in commit `a883198`; generated build directories remain untracked and out of scope.
