@@ -41,7 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -79,12 +81,14 @@ fun ReportScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val resources = LocalResources.current
     val presentation = state.toReportPresentation()
     val ai = presentation.oaIndex
     val grade = presentation.grade
-    val locale = context.resources.configuration.locales[0]
-    val formatter = remember(context.resources, locale) {
-        LocalizedReportFormatter.from(context.resources, locale)
+    val locale = configuration.locales[0]
+    val formatter = remember(resources, locale) {
+        LocalizedReportFormatter.from(resources, locale)
     }
     val numberFormat = remember(locale) {
         NumberFormat.getNumberInstance(locale).apply {
@@ -98,10 +102,23 @@ fun ReportScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var isExporting by remember { mutableStateOf(false) }
+    val shareTextTitle = stringResource(R.string.report_share_text)
+    val sharePdfTitle = stringResource(R.string.report_share_pdf)
+    val createFileErrorMessage = stringResource(R.string.report_error_create_file)
+    val emptyFileErrorMessage = stringResource(R.string.report_error_empty_file)
+    val noShareAppErrorMessage = stringResource(R.string.report_error_no_share_app)
+    val openFileErrorMessage = stringResource(R.string.report_error_open_file)
+
+    fun errorMessage(error: ReportError): String = when (error) {
+        ReportError.CREATE_FILE -> createFileErrorMessage
+        ReportError.EMPTY_FILE -> emptyFileErrorMessage
+        ReportError.NO_SHARE_APP -> noShareAppErrorMessage
+        ReportError.OPEN_FILE -> openFileErrorMessage
+    }
 
     fun showError(error: ReportError) {
         scope.launch {
-            snackbarHostState.showSnackbar(context.getString(error.messageResource()))
+            snackbarHostState.showSnackbar(errorMessage(error))
         }
     }
 
@@ -111,7 +128,7 @@ fun ReportScreen(
             val result = ReportSharing.shareText(
                 context,
                 exportReport.plainText,
-                context.getString(R.string.report_share_text),
+                shareTextTitle,
             )
         ) {
             is ReportShareResult.Failure -> showError(result.error)
@@ -451,7 +468,7 @@ fun ReportScreen(
                                                     val shareResult = ReportSharing.sharePdf(
                                                         context,
                                                         exportResult.file,
-                                                        context.getString(R.string.report_share_pdf),
+                                                        sharePdfTitle,
                                                     )
                                                 ) {
                                                     is ReportShareResult.Failure -> showError(shareResult.error)
@@ -506,13 +523,6 @@ fun ReportScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
-}
-
-private fun ReportError.messageResource(): Int = when (this) {
-    ReportError.CREATE_FILE -> R.string.report_error_create_file
-    ReportError.EMPTY_FILE -> R.string.report_error_empty_file
-    ReportError.NO_SHARE_APP -> R.string.report_error_no_share_app
-    ReportError.OPEN_FILE -> R.string.report_error_open_file
 }
 
 private fun trendInterpretationResource(trend: TrendInterpretation): Int = when (trend) {
