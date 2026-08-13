@@ -10,9 +10,9 @@ import cloud.univ.jointsense.measurement.BaselinePhotoAnalysisAdapter
 import cloud.univ.jointsense.measurement.CropBounds
 import cloud.univ.jointsense.measurement.MeasurementImage
 import cloud.univ.jointsense.measurement.MeasurementViewModel
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -50,7 +50,7 @@ class SessionCreationNavigationLifecycleTest {
         val sessionDriver = SessionCreationNavigationDriver(viewModel, actions)
         actions.openTopLevel(TopLevelDestination.TRENDS)
 
-        sessionDriver.request(TopLevelDestination.TRENDS)
+        sessionDriver.request(TopLevelDestination.TRENDS, "Test")
         runCurrent()
         actions.navigateBack()
         sessionDriver.synchronize(TopLevelDestination.HOME)
@@ -75,7 +75,7 @@ class SessionCreationNavigationLifecycleTest {
         val oldActions = NavigationActions(oldNavigation)
         val oldOwner = SessionCreationNavigationDriver(viewModel, oldActions)
 
-        oldOwner.request(TopLevelDestination.TRENDS)
+        oldOwner.request(TopLevelDestination.TRENDS, "Test")
         runCurrent()
 
         val currentNavigation = LifecycleStackNavigationDriver(
@@ -101,15 +101,34 @@ class SessionCreationNavigationLifecycleTest {
             currentNavigation.stack,
         )
     }
+
+    @Test
+    fun retainedDriverUsesThePrefixFromEachRequest() = runTest(dispatcher) {
+        val repository = DelayedSessionRepository()
+        val viewModel = MeasurementViewModel(repository, UnusedAnalyzer)
+        val navigation = LifecycleStackNavigationDriver(mutableListOf(HomeRoute))
+        val sessionDriver = SessionCreationNavigationDriver(viewModel, NavigationActions(navigation))
+
+        sessionDriver.request(TopLevelDestination.HOME, "Test")
+        repository.completeCreate("english-session")
+        advanceUntilIdle()
+        sessionDriver.synchronize(TopLevelDestination.HOME)
+
+        sessionDriver.request(TopLevelDestination.HOME, "检测")
+        repository.completeCreate("chinese-session")
+        advanceUntilIdle()
+
+        assertEquals(listOf("Test #1", "检测 #1"), repository.sessions.value.map(TestSession::name))
+    }
 }
 
 private class DelayedSessionRepository : TestSessionRepository {
-    private val createResult = CompletableDeferred<String>()
+    private val createResults = Channel<String>(Channel.UNLIMITED)
     val sessions = MutableStateFlow<List<TestSession>>(emptyList())
     val deletedIds = mutableListOf<String>()
 
     fun completeCreate(id: String) {
-        createResult.complete(id)
+        check(createResults.trySend(id).isSuccess)
     }
 
     override fun observeSessions(): Flow<List<TestSession>> = sessions
@@ -119,7 +138,7 @@ private class DelayedSessionRepository : TestSessionRepository {
     )
 
     override suspend fun createSession(name: String, source: DataSource): String {
-        val id = createResult.await()
+        val id = createResults.receive()
         sessions.value = sessions.value + TestSession(
             id = id,
             name = name,

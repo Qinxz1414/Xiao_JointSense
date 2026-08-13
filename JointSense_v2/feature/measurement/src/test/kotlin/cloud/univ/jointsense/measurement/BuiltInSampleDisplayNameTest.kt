@@ -14,11 +14,21 @@ class BuiltInSampleDisplayNameTest {
     fun stableBuiltInIdsResolveWithoutDependingOnPersistedEnglishName() {
         assertEquals(
             BuiltInSampleDisplayName(BuiltInSampleKind.TEST, 7),
-            builtInSampleDisplayName(session("builtin-tc7", "renamed")),
+            builtInSampleDisplayName(session("builtin-tc7", "Test Plate 99", DataSource.USER)),
         )
         assertEquals(
             BuiltInSampleDisplayName(BuiltInSampleKind.CLIPBOARD, 3),
-            builtInSampleDisplayName(session("builtin-clip-3", "renamed")),
+            builtInSampleDisplayName(session("builtin-clip-3", "renamed", DataSource.USER)),
+        )
+    }
+
+    @Test
+    fun stableIdTakesPrecedenceOverLegacyName() {
+        assertEquals(
+            BuiltInSampleDisplayName(BuiltInSampleKind.TEST, 7),
+            builtInSampleDisplayName(
+                session("builtin-tc7", "Clipboard Plate 2", DataSource.BUILT_IN),
+            ),
         )
     }
 

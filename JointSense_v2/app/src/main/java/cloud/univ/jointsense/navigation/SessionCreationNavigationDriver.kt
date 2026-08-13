@@ -6,8 +6,8 @@ internal class SessionCreationNavigationDriver(
     private val measurement: MeasurementViewModel,
     private val actions: NavigationActions,
 ) {
-    fun request(origin: TopLevelDestination) {
-        measurement.createNewSession(origin.name)
+    fun request(origin: TopLevelDestination, sessionNamePrefix: String) {
+        measurement.createNewSession(origin.name, sessionNamePrefix)
     }
 
     fun synchronize(

@@ -18,13 +18,13 @@ internal data class BuiltInSampleDisplayName(
  * Stable IDs are authoritative; legacy English names keep older database rows compatible.
  */
 internal fun builtInSampleDisplayName(session: TestSession): BuiltInSampleDisplayName? {
-    if (session.source != DataSource.BUILT_IN) return null
     STABLE_TEST.matchEntire(session.id)?.groupValues?.get(1)?.toIntOrNull()?.let {
         return BuiltInSampleDisplayName(BuiltInSampleKind.TEST, it)
     }
     STABLE_CLIPBOARD.matchEntire(session.id)?.groupValues?.get(1)?.toIntOrNull()?.let {
         return BuiltInSampleDisplayName(BuiltInSampleKind.CLIPBOARD, it)
     }
+    if (session.source != DataSource.BUILT_IN) return null
     LEGACY_TEST.matchEntire(session.name)?.groupValues?.get(1)?.toIntOrNull()?.let {
         return BuiltInSampleDisplayName(BuiltInSampleKind.TEST, it)
     }

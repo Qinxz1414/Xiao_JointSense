@@ -208,7 +208,7 @@ class MeasurementViewModelTest {
             defaultDispatcher = dispatcher,
         )
 
-        original.createNewSession("REPORT")
+        original.createNewSession("REPORT", "Test")
         advanceUntilIdle()
         original.acceptCreatedSession()
         original.onAction(MeasurementAction.ImageSelected("content://measurement/photo"))
@@ -354,7 +354,7 @@ class MeasurementViewModelTest {
         val viewModel = readyViewModel(draftIdFactory = { "draft-${++draftNumber}" })
         val firstFlowDraft = viewModel.state.value.draftId
 
-        viewModel.createNewSession("PROFILE")
+        viewModel.createNewSession("PROFILE", "Test")
         advanceUntilIdle()
         viewModel.acceptCreatedSession()
 
@@ -384,7 +384,7 @@ class MeasurementViewModelTest {
     }
 
     @Test
-    fun updatingLocalizedPrefixAffectsTheNextSessionWithoutRecreatingViewModel() = runTest(dispatcher) {
+    fun eventTimeLocalizedPrefixAffectsTheNextSessionWithoutRecreatingViewModel() = runTest(dispatcher) {
         val repository = RecordingRepository()
         val viewModel = MeasurementViewModel(
             repository = repository,
@@ -393,17 +393,29 @@ class MeasurementViewModelTest {
             decoder = RecordingDecoder(),
             ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
-            sessionNamePrefix = "Test",
         )
 
-        viewModel.createNewSession("HOME")
+        viewModel.createNewSession("HOME", "Test")
         advanceUntilIdle()
         viewModel.acceptCreatedSession()
-        viewModel.updateSessionNamePrefix("检测")
-        viewModel.createNewSession("HOME")
+        viewModel.createNewSession("HOME", "检测")
         advanceUntilIdle()
 
         assertEquals(listOf("Test #1", "检测 #1"), repository.sessions.value.map(TestSession::name))
+    }
+
+    @Test
+    fun blankSessionPrefixFailsBeforeRepositoryMutation() = runTest(dispatcher) {
+        val repository = RecordingRepository()
+        val viewModel = MeasurementViewModel(repository, RecordingAnalyzer())
+
+        val failure = runCatching { viewModel.createNewSession("HOME", "   ") }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        advanceUntilIdle()
+        assertTrue(repository.sessions.value.isEmpty())
+        assertFalse(viewModel.state.value.isCreatingSession)
+        assertNull(viewModel.state.value.sessionCreationRequest)
     }
 
     @Test
@@ -741,7 +753,7 @@ class MeasurementViewModelTest {
             ioDispatcher = io,
             defaultDispatcher = cpu,
         )
-        viewModel.createNewSession("HOME")
+        viewModel.createNewSession("HOME", "Test")
         advanceUntilIdle()
         viewModel.acceptCreatedSession()
 
@@ -1112,7 +1124,7 @@ class MeasurementViewModelTest {
             ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
         )
-        viewModel.createNewSession("HOME")
+        viewModel.createNewSession("HOME", "Test")
         advanceUntilIdle()
         viewModel.acceptCreatedSession()
         viewModel.onAction(MeasurementAction.ImageSelected(requireNotNull(captureStore.currentCapture()).uri))
@@ -1857,7 +1869,7 @@ class MeasurementViewModelTest {
             ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
         )
-        viewModel.createNewSession("HOME")
+        viewModel.createNewSession("HOME", "Test")
         testScheduler.advanceUntilIdle()
         viewModel.acceptCreatedSession()
         viewModel.onAction(MeasurementAction.ImageSelected("content://measurement/photo"))
@@ -1881,7 +1893,7 @@ class MeasurementViewModelTest {
             ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
         )
-        viewModel.createNewSession("HOME")
+        viewModel.createNewSession("HOME", "Test")
         testScheduler.advanceUntilIdle()
         viewModel.acceptCreatedSession()
         viewModel.setImage(image)
@@ -1900,7 +1912,7 @@ class MeasurementViewModelTest {
             ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
         )
-        viewModel.createNewSession("HOME")
+        viewModel.createNewSession("HOME", "Test")
         testScheduler.advanceUntilIdle()
         viewModel.acceptCreatedSession()
         val recoveryData = viewModel.state.value.let {

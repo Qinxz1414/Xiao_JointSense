@@ -8,7 +8,7 @@
     <string name="report_risk">14-day progression risk</string>
     <string name="report_latest_values">Latest quantitative values</string>
     <string name="report_week_changes">Change vs previous week</string>
-    <string name="report_oa_week_change">OA index change vs previous week</string>
+    <string name="report_oa_week_change">OA inflammation index (AI) change vs previous week</string>
     <string name="report_recommendations">Research trend observations</string>
     <string name="report_not_measured">not measured</string>
     <string name="report_no_comparison">no comparison</string>
@@ -58,7 +58,7 @@
     <string name="insights_share_summary">Share summary</string>
     <string name="insights_report_empty">No data yet. Run a test to generate your AI report.</string>
     <string name="insights_cartilage_assessment">Cartilage inflammation assessment</string>
-    <string name="insights_ai_grade_summary">AI %1$.2f — %2$s (grade %3$d)</string>
+    <string name="insights_ai_grade_summary">OA inflammation index (AI) %1$.2f — %2$s (grade %3$d)</string>
     <string name="insights_change_trend">Change trend (last 7 days)</string>
     <string name="insights_percent_absolute">%1$.0f%%</string>
     <string name="insights_change_up">Increased %1$.0f%%</string>
@@ -83,9 +83,9 @@
         <item quantity="one">Test completed — %1$d measurement%2$s</item>
         <item quantity="other">Test completed — %1$d measurements%2$s</item>
     </plurals>
-    <string name="insights_event_ai_value">, AI %1$.2f</string>
-    <string name="insights_event_ai_up">AI index rose from %1$.2f to %2$.2f</string>
-    <string name="insights_event_ai_down">AI index decreased from %1$.2f to %2$.2f</string>
+    <string name="insights_event_ai_value">, OA inflammation index (AI) %1$.2f</string>
+    <string name="insights_event_ai_up">OA inflammation index (AI) rose from %1$.2f to %2$.2f</string>
+    <string name="insights_event_ai_down">OA inflammation index (AI) decreased from %1$.2f to %2$.2f</string>
     <string name="insights_activity_0">Minimal OA activity</string>
     <string name="insights_activity_1">Low OA activity</string>
     <string name="insights_activity_2">Moderate OA activity</string>

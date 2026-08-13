@@ -43,7 +43,7 @@ class MeasurementCompletionRecreationTest {
         composeRule.runOnIdle { collectorAttached.value = false }
         composeRule.waitForIdle()
 
-        composeRule.runOnIdle { viewModel.createNewSession("test-origin") }
+        composeRule.runOnIdle { viewModel.createNewSession("test-origin", "Test") }
         composeRule.waitUntil(timeoutMillis = 5_000) {
             viewModel.state.value.sessionCreationRequest?.completedSessionId != null
         }

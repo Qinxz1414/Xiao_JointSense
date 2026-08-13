@@ -3,7 +3,9 @@ package cloud.univ.jointsense.locale
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.w3c.dom.Element
 
@@ -101,6 +103,8 @@ class ResourceParityTest {
         val measurementZh = resources("feature/measurement", "values-zh-rCN")
         val insightsEn = resources("feature/insights", "values")
         val insightsZh = resources("feature/insights", "values-zh-rCN")
+        val settingsEn = resources("feature/settings", "values")
+        val settingsZh = resources("feature/settings", "values-zh-rCN")
 
         assertEquals("Standard curve calibration", calibrationEn.text("calibration_title"))
         assertEquals("标准曲线校准", calibrationZh.text("calibration_title"))
@@ -121,6 +125,33 @@ class ResourceParityTest {
         assertEquals(CHINESE_OA_TERM, insightsZh.text("insights_oa_index"))
         assertEquals(ENGLISH_OA_TERM, insightsEn.text("report_oa_index"))
         assertEquals(CHINESE_OA_TERM, insightsZh.text("report_oa_index"))
+        listOf(
+            "report_oa_week_change",
+            "insights_ai_trend",
+            "insights_ai_grade_summary",
+            "insights_event_ai_value",
+            "insights_event_ai_up",
+            "insights_event_ai_down",
+        ).forEach { key ->
+            assertTrue("feature/insights/values:$key must use the approved OA term", insightsEn.text(key).contains(ENGLISH_OA_TERM))
+            assertTrue("feature/insights/values-zh-rCN:$key must use the approved OA term", insightsZh.text(key).contains(CHINESE_OA_TERM))
+        }
+        assertTrue(settingsEn.text("settings_about_model_body").contains(ENGLISH_OA_TERM))
+        assertTrue(settingsZh.text("settings_about_model_body").contains(CHINESE_OA_TERM))
+        localizedModules.forEach { module ->
+            listOf("values", "values-zh-rCN").forEach { directory ->
+                resources(module, directory).forEach { (key, entry) ->
+                    entry.items.forEach { (item, value) ->
+                        DEPRECATED_OA_TERMS.forEach { deprecated ->
+                            assertTrue(
+                                "$module/$directory:$key[$item] contains deprecated OA terminology: ${deprecated.pattern}",
+                                !deprecated.containsMatchIn(value),
+                            )
+                        }
+                    }
+                }
+            }
+        }
         assertEquals(ENGLISH_DISCLAIMER, insightsEn.text("report_disclaimer"))
         assertEquals(CHINESE_DISCLAIMER, insightsZh.text("report_disclaimer"))
         invariantScientificResources().forEach { (path, declaration) ->
@@ -136,8 +167,71 @@ class ResourceParityTest {
             projectRoot,
             "app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt",
         ).readText()
-        assertTrue(navigation.contains("updateSessionNamePrefix(sessionNamePrefix)"))
+        assertTrue(navigation.contains("request(topLevelDestination, sessionNamePrefix)"))
+        assertTrue(!navigation.contains("updateSessionNamePrefix"))
         assertTrue(!navigation.contains("context.getString(R.string.session_name_prefix)"))
+        listOf(
+            "feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModel.kt",
+            "feature/measurement/src/main/kotlin/cloud/univ/jointsense/measurement/MeasurementViewModelFactory.kt",
+        ).forEach { path ->
+            val source = File(projectRoot, path).readText()
+            assertTrue("$path must not retain a localized prefix", !source.contains("currentSessionNamePrefix"))
+            assertTrue("$path must not define a hardcoded Test prefix", !source.contains("sessionNamePrefix: String = \"Test\""))
+        }
+    }
+
+    @Test
+    fun `formatter parser models Java argument selection and conversion families`() {
+        assertNotEquals(placeholders("%1\$tY"), placeholders("%1\$s"))
+        assertEquals(
+            listOf(FormatFamily.STRING, FormatFamily.STRING),
+            placeholders("%1\$s %<S").arguments.getValue(1),
+        )
+        assertEquals(
+            mapOf(
+                1 to listOf(FormatFamily.STRING),
+                2 to listOf(FormatFamily.INTEGER),
+                3 to listOf(FormatFamily.FLOAT),
+            ),
+            placeholders("%s %d %.2f").arguments,
+        )
+        assertEquals(
+            mapOf(
+                1 to listOf(FormatFamily.STRING, FormatFamily.STRING),
+                2 to listOf(FormatFamily.STRING),
+            ),
+            placeholders("%2\$s %s %<S").arguments,
+        )
+        assertEquals(FormatContract(emptyMap()), placeholders("100%% | %5% | %-5% | %n"))
+        listOf(
+            "%D", "%O", "%F", "%N",
+            "%1\$n", "%5n", "%.2n",
+            "%1\$%", "%.2%", "%+5%", "%0%", "%--5%",
+        ).forEach { invalid ->
+            try {
+                placeholders(invalid)
+                fail("Expected invalid Java Formatter token to be rejected: $invalid")
+            } catch (_: IllegalArgumentException) {
+                Unit
+            }
+        }
+        assertEquals(
+            FormatContract(mapOf(1 to listOf(FormatFamily.FLOAT))),
+            placeholders("%1\$-08.2f"),
+        )
+        assertEquals(
+            placeholders("%1\$s scored %2\$.2f"),
+            placeholders("%2\$.2f / %1\$s"),
+        )
+        assertEquals(
+            listOf(FormatFamily.STRING, FormatFamily.INTEGER),
+            placeholders("%1\$d %1\$s").arguments.getValue(1),
+        )
+        assertNotEquals(placeholders("%1\$d %1\$s"), placeholders("%1\$d %1\$d"))
+        assertEquals(
+            listOf(FormatFamily.DATE_TIME, FormatFamily.DATE_TIME),
+            placeholders("%1\$tY %1\$TY").arguments.getValue(1),
+        )
     }
 
     private fun compareItem(
@@ -195,21 +289,72 @@ class ResourceParityTest {
         }
     }
 
-    private fun placeholders(value: String): Map<Int, String> {
-        var implicitIndex = 1
-        return FORMAT.findAll(value).filter { it.groupValues[2] != "%" }.associate { match ->
-            val index = match.groupValues[1].takeIf(String::isNotEmpty)?.toInt() ?: implicitIndex++
-            index to placeholderType(match.groupValues[2].single())
+    private fun placeholders(value: String): FormatContract {
+        var nextImplicitIndex = 1
+        var previousIndex: Int? = null
+        var cursor = 0
+        val arguments = mutableMapOf<Int, MutableList<FormatFamily>>()
+        while (true) {
+            val start = value.indexOf('%', cursor)
+            if (start < 0) break
+            val match = FORMAT.matchAt(value, start)
+                ?: throw IllegalArgumentException("Unsupported Java Formatter token at offset $start in: $value")
+            cursor = match.range.last + 1
+            val explicitIndex = match.groupValues[1].takeIf(String::isNotEmpty)?.toInt()
+            val flags = match.groupValues[2]
+            val width = match.groupValues[3]
+            val precision = match.groupValues[4]
+            val dateTimePrefix = match.groupValues[5]
+            val conversion = match.groupValues[6].single()
+            if (dateTimePrefix.isEmpty() && conversion == 'n') {
+                require(explicitIndex == null && flags.isEmpty() && width.isEmpty() && precision.isEmpty()) {
+                    "Line-separator token cannot declare an index, flags, width, or precision: ${match.value}"
+                }
+                continue
+            }
+            if (dateTimePrefix.isEmpty() && conversion == '%') {
+                require(explicitIndex == null && precision.isEmpty() && flags in setOf("", "-")) {
+                    "Percent token only accepts an optional '-' flag and width: ${match.value}"
+                }
+                continue
+            }
+
+            val relative = '<' in flags
+            require(!relative || explicitIndex == null) {
+                "Formatter token cannot combine an explicit argument index with '<': ${match.value}"
+            }
+            val argumentIndex = when {
+                relative -> requireNotNull(previousIndex) {
+                    "Formatter token cannot use '<' before an argument: ${match.value}"
+                }
+                explicitIndex != null -> explicitIndex
+                else -> nextImplicitIndex++
+            }
+            require(argumentIndex > 0) { "Formatter argument indices are one-based: ${match.value}" }
+            previousIndex = argumentIndex
+            val family = if (dateTimePrefix.isNotEmpty()) {
+                require(conversion in DATE_TIME_CONVERSIONS) {
+                    "Unsupported date/time conversion: ${match.value}"
+                }
+                FormatFamily.DATE_TIME
+            } else {
+                placeholderType(conversion)
+            }
+            arguments.getOrPut(argumentIndex, ::mutableListOf).add(family)
         }
+        return FormatContract(
+            arguments.toSortedMap().mapValues { (_, families) -> families.sortedBy(FormatFamily::ordinal) },
+        )
     }
 
-    private fun placeholderType(type: Char): String = when (type.lowercaseChar()) {
-        'd', 'o', 'x' -> "integer"
-        'e', 'f', 'g', 'a' -> "float"
-        'c' -> "character"
-        'b' -> "boolean"
-        'h' -> "hash"
-        else -> "string"
+    private fun placeholderType(type: Char): FormatFamily = when (type) {
+        's', 'S' -> FormatFamily.STRING
+        'd', 'o', 'x', 'X' -> FormatFamily.INTEGER
+        'e', 'E', 'f', 'g', 'G', 'a', 'A' -> FormatFamily.FLOAT
+        'c', 'C' -> FormatFamily.CHARACTER
+        'b', 'B' -> FormatFamily.BOOLEAN
+        'h', 'H' -> FormatFamily.HASH
+        else -> throw IllegalArgumentException("Unsupported Java Formatter conversion: $type")
     }
 
     private fun productionKotlinFiles(): List<File> = listOf("app", "core", "feature")
@@ -231,6 +376,10 @@ class ResourceParityTest {
 
     private data class ResourceEntry(val kind: String, val items: Map<String, String>)
 
+    private data class FormatContract(val arguments: Map<Int, List<FormatFamily>>)
+
+    private enum class FormatFamily { STRING, INTEGER, FLOAT, DATE_TIME, CHARACTER, BOOLEAN, HASH }
+
     private fun invariantScientificResources() = mapOf(
         "core/designsystem/src/main/res/values/strings.xml" to "I18N invariant scientific unit",
         "feature/measurement/src/main/res/values/strings.xml" to "I18N invariant scientific unit",
@@ -238,8 +387,17 @@ class ResourceParityTest {
     )
 
     private companion object {
-        val FORMAT = Regex("""%(?:(\d+)\$)?[-#+ 0,(<]*\d*(?:\.\d+)?([a-zA-Z%])""")
+        val FORMAT = Regex("""%(?:(\d+)\$)?([-#+ 0,(<]*)(\d*)(?:\.(\d+))?([tT]?)([a-zA-Z%])""")
+        const val DATE_TIME_CONVERSIONS = "HIklMSLNpzZsQBbhAaCYyjmdeRTrDFc"
         val SIGNAL_TERMS = listOf("raw signal", "net signal", "fitted signal", "原始信号", "净信号", "拟合信号")
+        val DEPRECATED_OA_TERMS = listOf(
+            Regex("""\bOA index\b""", RegexOption.IGNORE_CASE),
+            Regex("""\bAI index\b""", RegexOption.IGNORE_CASE),
+            Regex("""OA inflammation index(?! \(AI\))""", RegexOption.IGNORE_CASE),
+            Regex("""OA 炎症综合指数(?!（AI）)"""),
+            Regex("""骨关节炎(?:炎症)?指数"""),
+            Regex("""AI 指数"""),
+        )
         const val ENGLISH_OA_TERM = "OA inflammation index (AI)"
         const val CHINESE_OA_TERM = "OA 炎症综合指数（AI）"
         const val ENGLISH_DISCLAIMER =

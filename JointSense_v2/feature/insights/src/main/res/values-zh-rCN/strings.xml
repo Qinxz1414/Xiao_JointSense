@@ -58,7 +58,7 @@
     <string name="insights_share_summary">分享摘要</string>
     <string name="insights_report_empty">暂无数据。完成一次检测后即可生成 AI 报告。</string>
     <string name="insights_cartilage_assessment">软骨炎症评估</string>
-    <string name="insights_ai_grade_summary">AI %1$.2f — %2$s（%3$d 级）</string>
+    <string name="insights_ai_grade_summary">OA 炎症综合指数（AI）%1$.2f — %2$s（%3$d 级）</string>
     <string name="insights_change_trend">变化趋势（近 7 天）</string>
     <string name="insights_percent_absolute">%1$.0f%%</string>
     <string name="insights_change_up">上升 %1$.0f%%</string>
@@ -82,9 +82,9 @@
     <plurals name="insights_event_test">
         <item quantity="other">检测完成 — %1$d 项测量%2$s</item>
     </plurals>
-    <string name="insights_event_ai_value">，AI %1$.2f</string>
-    <string name="insights_event_ai_up">AI 指数由 %1$.2f 上升至 %2$.2f</string>
-    <string name="insights_event_ai_down">AI 指数由 %1$.2f 下降至 %2$.2f</string>
+    <string name="insights_event_ai_value">，OA 炎症综合指数（AI）%1$.2f</string>
+    <string name="insights_event_ai_up">OA 炎症综合指数（AI）由 %1$.2f 上升至 %2$.2f</string>
+    <string name="insights_event_ai_down">OA 炎症综合指数（AI）由 %1$.2f 下降至 %2$.2f</string>
     <string name="insights_activity_0">OA 活动水平极低</string>
     <string name="insights_activity_1">OA 活动水平较低</string>
     <string name="insights_activity_2">OA 活动水平中等</string>

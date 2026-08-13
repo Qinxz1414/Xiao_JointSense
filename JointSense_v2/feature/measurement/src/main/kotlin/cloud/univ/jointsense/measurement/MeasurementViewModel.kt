@@ -41,9 +41,7 @@ class MeasurementViewModel(
     private val permissionRequestTokenFactory: () -> String = { UUID.randomUUID().toString() },
     private val ioDispatcher: CoroutineDispatcher,
     private val defaultDispatcher: CoroutineDispatcher,
-    sessionNamePrefix: String = "Test",
 ) : ViewModel() {
-    private var currentSessionNamePrefix = sessionNamePrefix
     /** Transitional constructor for Phase-1 callers; production uses the dispatcher-aware factory. */
     constructor(
         repository: TestSessionRepository,
@@ -153,7 +151,8 @@ class MeasurementViewModel(
         }
     }
 
-    fun createNewSession(originIdentity: String) {
+    fun createNewSession(originIdentity: String, sessionNamePrefix: String) {
+        require(sessionNamePrefix.isNotBlank()) { "Session name prefix must not be blank." }
         if (state.value.isCreatingSession) return
         val creationId = ++nextSessionCreationId
         activeSessionCreationId = creationId
@@ -165,7 +164,7 @@ class MeasurementViewModel(
                 sessionCreationError = null,
             )
         }
-        val requestedName = nextSessionName(state.value.sessions.map(TestSession::name), currentSessionNamePrefix)
+        val requestedName = nextSessionName(state.value.sessions.map(TestSession::name), sessionNamePrefix)
         viewModelScope.launch {
             try {
                 val id = withContext(ioDispatcher) { repository.createSession(requestedName) }
@@ -228,11 +227,6 @@ class MeasurementViewModel(
 
     fun consumeSessionCreationError() {
         mutableState.update { it.copy(sessionCreationError = null) }
-    }
-
-    fun updateSessionNamePrefix(prefix: String) {
-        require(prefix.isNotBlank()) { "Session name prefix must not be blank." }
-        currentSessionNamePrefix = prefix
     }
 
     fun selectSession(id: String) {
