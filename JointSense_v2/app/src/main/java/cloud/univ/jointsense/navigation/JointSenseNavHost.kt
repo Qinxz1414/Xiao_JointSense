@@ -80,6 +80,7 @@ import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
 import cloud.univ.jointsense.measurement.MeasurementViewModel
 import cloud.univ.jointsense.measurement.MeasurementViewModelFactory
 import cloud.univ.jointsense.measurement.ResultRouteScreen
+import cloud.univ.jointsense.measurement.locateResultById
 import cloud.univ.jointsense.settings.SettingsRouteScreen
 import cloud.univ.jointsense.settings.SettingsViewModel
 import cloud.univ.jointsense.settings.SettingsViewModelFactory
@@ -153,6 +154,14 @@ private fun JointSenseNavHostContent(
             SessionCreationNavigationDriver(measurement, actions)
         }
     }
+    val restoreSamplesNavigationDriver = featureViewModels?.settings?.let { settings ->
+        remember(settings, actions) {
+            RestoreSamplesNavigationDriver(
+                requestConfirmation = settings::requestRestoreBuiltInSamplesConfirmation,
+                openProfile = { actions.openTopLevel(TopLevelDestination.PROFILE) },
+            )
+        }
+    }
 
     LaunchedEffect(
         sessionCreationDriver,
@@ -202,7 +211,7 @@ private fun JointSenseNavHostContent(
                                     .request(TopLevelDestination.HOME, sessionNamePrefix)
                             },
                             onRestoreSamples = {
-                                actions.openTopLevel(TopLevelDestination.PROFILE)
+                                requireNotNull(restoreSamplesNavigationDriver).requestFromHome()
                             },
                             onOpenReport = {
                                 actions.openTopLevel(TopLevelDestination.REPORT)
@@ -293,10 +302,12 @@ private fun JointSenseNavHostContent(
                     Destination(if (forceProductionResult) null else screenSlot, route, actions) {
                         val measurement = requireNotNull(measurementViewModel)
                         val state = measurement.state.collectAsStateWithLifecycle().value
-                        val session = state.currentSession ?: state.sessions.firstOrNull { candidate ->
-                            candidate.results.any { it.id == route.resultId }
-                        }
-                        val canContinue = session?.results?.size?.let { it < 5 } == true
+                        val located = locateResultById(
+                            route.resultId,
+                            state.currentSession,
+                            state.sessions,
+                        )
+                        val canContinue = located?.session?.results?.size?.let { it < 5 } == true
                         val origin = if (inMeasurement) {
                             state.originDestination?.let { encoded ->
                                 runCatching { TopLevelDestination.valueOf(encoded) }.getOrNull()
@@ -308,8 +319,8 @@ private fun JointSenseNavHostContent(
                             viewModel = measurement,
                             resultId = route.resultId,
                             onContinueMeasurement = {
-                                if (session != null && canContinue) {
-                                    measurement.selectSession(session.id)
+                                if (located != null && canContinue) {
+                                    measurement.selectSession(located.session.id)
                                     measurement.startNewTestInSession()
                                     actions.continueMeasurementFromResult(origin)
                                 }
@@ -385,6 +396,16 @@ private fun JointSenseNavHostContent(
                 }
             }
         }
+    }
+}
+
+internal class RestoreSamplesNavigationDriver(
+    private val requestConfirmation: () -> Unit,
+    private val openProfile: () -> Unit,
+) {
+    fun requestFromHome() {
+        requestConfirmation()
+        openProfile()
     }
 }
 

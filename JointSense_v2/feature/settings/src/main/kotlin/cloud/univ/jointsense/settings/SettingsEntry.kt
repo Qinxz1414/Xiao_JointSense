@@ -26,6 +26,9 @@ fun SettingsRouteScreen(
         onOpenHistory = onOpenHistory,
         onCalibrate = onCalibrate,
         onClearAllData = viewModel::clearAllData,
+        onConfirmRestoreSamples = viewModel::confirmRestoreBuiltInSamples,
+        onCancelRestoreSamples = viewModel::cancelRestoreBuiltInSamplesConfirmation,
+        onDismissRestoreSamplesOutcome = viewModel::dismissRestoreSamplesOutcome,
         modifier = modifier,
     )
 }

@@ -2,6 +2,7 @@ package cloud.univ.jointsense.insights.report
 
 import android.content.res.Resources
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.domain.report.ReportModel
 import cloud.univ.jointsense.domain.report.ReportRecommendation
 import cloud.univ.jointsense.feature.insights.R
@@ -91,7 +92,7 @@ class LocalizedReportFormatter(
 
         sections += buildList {
             add(text(ReportText.LATEST_VALUES))
-            InflammationFactor.entries.forEach { factor ->
+            inflammationFactorPresentationOrder.forEach { factor ->
                 val value = model.latestConcentrations[factor]
                 val displayed = value?.let {
                     formatted(ReportText.CONCENTRATION_FORMAT, decimal(it))
@@ -102,7 +103,7 @@ class LocalizedReportFormatter(
 
         sections += buildList {
             add(text(ReportText.WEEK_CHANGES))
-            InflammationFactor.entries.forEach { factor ->
+            inflammationFactorPresentationOrder.forEach { factor ->
                 add(formatted(
                     ReportText.LABELED_VALUE_FORMAT,
                     factor.label(),

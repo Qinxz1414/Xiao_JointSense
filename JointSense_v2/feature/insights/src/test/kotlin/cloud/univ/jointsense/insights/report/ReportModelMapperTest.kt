@@ -73,6 +73,32 @@ class ReportModelMapperTest {
     }
 
     @Test
+    fun exportBoundaryRemovesNonFiniteAndOutOfRangeValues() {
+        val model = ReportUiState(
+            latestValues = mapOf(
+                InflammationFactor.TNF_ALPHA to Float.NaN,
+                InflammationFactor.IL6 to 12f,
+                InflammationFactor.IL1_BETA to Float.POSITIVE_INFINITY,
+            ),
+            currentAi = 1.1f,
+            currentGrade = 4,
+            factorDeltaPct7d = mapOf(
+                InflammationFactor.TNF_ALPHA to Float.NEGATIVE_INFINITY,
+            ),
+            aiWeekDeltaPct = Float.POSITIVE_INFINITY,
+        ).toReportModel(generatedAtEpochMillis = 99L)
+
+        assertNull(model.oaIndex)
+        assertNull(model.grade)
+        assertNull(model.latestConcentrations[InflammationFactor.TNF_ALPHA])
+        assertEquals(12.0, model.latestConcentrations[InflammationFactor.IL6]!!, 0.0001)
+        assertNull(model.latestConcentrations[InflammationFactor.IL1_BETA])
+        assertNull(model.weekChanges[InflammationFactor.TNF_ALPHA])
+        assertNull(model.oaWeekChange)
+        assertTrue(model.recommendations.isEmpty())
+    }
+
+    @Test
     fun everyValidGradePreservesItsLabelAdviceAndExactDisclaimerScope() {
         val formatter = tokenFormatter()
         val expectedRecommendations = mapOf(

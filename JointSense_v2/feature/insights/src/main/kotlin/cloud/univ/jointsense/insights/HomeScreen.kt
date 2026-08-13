@@ -276,6 +276,7 @@ private fun DashboardContent(
         presentation.factorValues.forEach { factorValue ->
             val factor = factorValue.factor
             val spark = state.factorSeries[factor].orEmpty()
+                .filter { it.value.isFinite() && it.value >= 0f }
                 .sortedBy(InsightPoint::time)
                 .takeLast(7)
                 .map(InsightPoint::value)

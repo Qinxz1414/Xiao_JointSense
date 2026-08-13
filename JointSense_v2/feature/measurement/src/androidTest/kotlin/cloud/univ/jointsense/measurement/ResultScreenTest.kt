@@ -5,8 +5,10 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.domain.model.DataSource
@@ -15,6 +17,7 @@ import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,5 +74,32 @@ class ResultScreenTest {
         composeRule.onAllNodesWithText(
             "本报告结果基于手机照片色度代理估算，仅供科研与纵向趋势观察，不作为临床诊断、治疗决策或替代经验证实验室检测的依据。",
         ).assertCountEquals(0)
+    }
+
+    @Test
+    fun missingRequestedResultShowsNotFoundWithBackAndHomeActions() {
+        var backs = 0
+        var homes = 0
+        composeRule.setContent {
+            JointSenseTheme {
+                ResultScreen(
+                    session = null,
+                    lastResult = null,
+                    canAddMore = false,
+                    onContinueMeasurement = {},
+                    onReturnToOrigin = { backs += 1 },
+                    onGoHome = { homes += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(RESULT_NOT_FOUND_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(RESULT_NOT_FOUND_BACK_TAG).performClick()
+        composeRule.onNodeWithTag(RESULT_NOT_FOUND_HOME_TAG).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, backs)
+            assertEquals(1, homes)
+        }
+        composeRule.onAllNodesWithTag(RESULT_RANGE_STATUS_TAG).assertCountEquals(0)
     }
 }

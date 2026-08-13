@@ -25,6 +25,13 @@
     <string name="settings_delete">删除</string>
     <string name="settings_cancel">取消</string>
     <string name="settings_ok">确定</string>
+    <string name="settings_restore_samples_title">恢复内置样例？</string>
+    <string name="settings_restore_samples_message">内置样例检测会话将重新添加到本设备。恢复内置样例不会更改或恢复用户校准曲线。</string>
+    <string name="settings_restore_samples_confirm">恢复样例</string>
+    <string name="settings_restore_samples_success_title">样例已恢复</string>
+    <string name="settings_restore_samples_success_message">内置样例检测会话已恢复，用户校准曲线未被更改。</string>
+    <string name="settings_restore_samples_failure_title">无法恢复样例</string>
+    <string name="settings_restore_samples_failure_message">校准数据未被更改，请稍后重新尝试恢复内置样例。</string>
     <string name="settings_about_model_body">JointSense 基于芯片反应腔图像估算 TNF-α、IL-6 和 IL-1β。六项 RGB 特征（各通道均值与标准差）输入因子专属分析模型；OA 炎症综合指数（AI）将三项因子合成为 0 至 1 的分数，并映射至 0 至 4 级。\n\n本科研版本的模型系数为占位数据，仍需经验证的训练模型导出替换。</string>
     <plurals name="settings_calibration_review">
         <item quantity="other">%1$d 项校准需要复核</item>

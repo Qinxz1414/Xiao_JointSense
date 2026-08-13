@@ -1,6 +1,7 @@
 package cloud.univ.jointsense.insights.report
 
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.domain.report.ReportModel
 import cloud.univ.jointsense.domain.report.ReportRecommendation
 import cloud.univ.jointsense.insights.ReportUiState
@@ -13,19 +14,21 @@ internal class ReportActionModelFactory(
 }
 
 internal fun ReportUiState.toReportModel(generatedAtEpochMillis: Long): ReportModel {
-    val validatedGrade = currentGrade?.takeIf { it in 0..4 }
+    val validatedAi = currentAi?.takeIf { it.isFinite() && it in 0f..1f }
+    val validatedGrade = currentGrade?.takeIf { validatedAi != null && it in 0..4 }
+    val validatedWeekChange = aiWeekDeltaPct?.takeIf(Float::isFinite)
     return ReportModel(
         generatedAtEpochMillis = generatedAtEpochMillis,
-        oaIndex = currentAi?.toDouble(),
+        oaIndex = validatedAi?.toDouble(),
         grade = validatedGrade,
-        latestConcentrations = InflammationFactor.entries.associateWith { factor ->
-            latestValues[factor]?.toDouble()
+        latestConcentrations = inflammationFactorPresentationOrder.associateWith { factor ->
+            latestValues[factor]?.takeIf { it.isFinite() && it >= 0f }?.toDouble()
         },
-        weekChanges = InflammationFactor.entries.associateWith { factor ->
-            factorDeltaPct7d[factor]?.toDouble()?.div(100.0)
+        weekChanges = inflammationFactorPresentationOrder.associateWith { factor ->
+            factorDeltaPct7d[factor]?.takeIf(Float::isFinite)?.toDouble()?.div(100.0)
         },
-        oaWeekChange = aiWeekDeltaPct?.toDouble()?.div(100.0),
-        recommendations = recommendations(validatedGrade, aiWeekDeltaPct),
+        oaWeekChange = validatedWeekChange?.toDouble()?.div(100.0),
+        recommendations = recommendations(validatedGrade, validatedWeekChange),
     )
 }
 

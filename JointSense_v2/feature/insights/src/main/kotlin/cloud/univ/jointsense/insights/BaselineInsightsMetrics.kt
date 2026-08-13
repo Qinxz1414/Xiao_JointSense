@@ -19,7 +19,8 @@ internal object BaselineInsightsMetrics {
     )
 
     fun latestPerFactor(results: List<TestResult>): Map<InflammationFactor, Float> =
-        results.groupBy(TestResult::factor)
+        results.filter { it.concentration.isFinite() && it.concentration >= 0f }
+            .groupBy(TestResult::factor)
             .mapValues { (_, values) -> values.maxBy(TestResult::timestamp).concentration }
 
     fun aiFromResults(results: List<TestResult>): Float? = aiFromValues(latestPerFactor(results))
@@ -28,7 +29,7 @@ internal object BaselineInsightsMetrics {
         if (values.isEmpty()) return null
         var weighted = 0f
         var weightSum = 0f
-        values.forEach { (factor, concentration) ->
+        values.filterValues { it.isFinite() && it >= 0f }.forEach { (factor, concentration) ->
             val weight = weights[factor] ?: return@forEach
             val cap = caps.getValue(factor)
             weighted += weight * (concentration / cap).coerceIn(0f, 1f)
@@ -80,12 +81,17 @@ internal object BaselineInsightsMetrics {
     }
 
     fun aiWeekDeltaPct(series: List<InsightPoint>, now: Long): Float? {
-        if (series.size < 2) return null
-        val latest = series.last().value
-        val baseline = series.lastOrNull { it.time <= now - DAY_MILLIS * 7 }?.value
-            ?: series.first().value
-        if (baseline <= 0f) return null
-        return (latest - baseline) / baseline * 100f
+        val boundary = now - DAY_MILLIS * 7
+        val valid = series
+            .asSequence()
+            .filter { it.time <= now && it.value.isFinite() && it.value in 0f..1f }
+            .sortedBy(InsightPoint::time)
+            .toList()
+        val baseline = valid.lastOrNull { it.time <= boundary }?.value
+            ?.takeIf { it > 0f }
+            ?: return null
+        val latest = valid.lastOrNull { it.time > boundary }?.value ?: return null
+        return ((latest - baseline) / baseline * 100f).takeIf(Float::isFinite)
     }
 
     fun keyEvents(sessions: List<TestSession>, series: List<InsightPoint>): List<KeyEventItem> {

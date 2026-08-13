@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.domain.model.DataSource
@@ -15,6 +16,7 @@ import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,12 +54,13 @@ class InsightsScreenTest {
 
     @Test
     fun emptyHomeOffersStartAndRestoreWithoutMetricNodes() {
+        var restoreRequests = 0
         composeRule.setContent {
             JointSenseTheme {
                 HomeScreen(
                     state = HomeUiState(),
                     onTestNow = {},
-                    onRestoreSamples = {},
+                    onRestoreSamples = { restoreRequests += 1 },
                     onOpenReport = {},
                 )
             }
@@ -65,14 +68,17 @@ class InsightsScreenTest {
 
         composeRule.onNodeWithTag("start_measurement").assertIsDisplayed()
         composeRule.onNodeWithTag("restore_samples").assertIsDisplayed()
+        composeRule.onNodeWithTag("restore_samples").performClick()
+        composeRule.runOnIdle { assertEquals(1, restoreRequests) }
         composeRule.onAllNodesWithText("0.00").assertCountEquals(0)
         composeRule.onAllNodesWithText("4").assertCountEquals(0)
     }
 
     @Test
     fun trendsExposeChartsAndDirectAxisAndSeriesLabels() {
+        val now = 2_000_000_000_000L
         composeRule.setContent {
-            JointSenseTheme { TrendsScreen(completeTrendsState()) }
+            JointSenseTheme { TrendsScreen(completeTrendsState(now), nowMillis = { now }) }
         }
 
         listOf(
@@ -132,11 +138,17 @@ class InsightsScreenTest {
         )
     }
 
-    private fun completeTrendsState(): TrendsUiState = TrendsUiState(
+    private fun completeTrendsState(now: Long): TrendsUiState = TrendsUiState(
         factorSeries = InflammationFactor.entries.associateWith { factor ->
-            listOf(InsightPoint(1L, 10f + factor.ordinal), InsightPoint(2L, 11f + factor.ordinal))
+            listOf(
+                InsightPoint(now - DAY_MILLIS * 2, 10f + factor.ordinal),
+                InsightPoint(now - DAY_MILLIS, 11f + factor.ordinal),
+            )
         },
-        aiSeries = listOf(InsightPoint(1L, 0.2f), InsightPoint(2L, 0.3f)),
+        aiSeries = listOf(
+            InsightPoint(now - DAY_MILLIS * 2, 0.2f),
+            InsightPoint(now - DAY_MILLIS, 0.3f),
+        ),
     )
 
     private fun result(index: Int, factor: InflammationFactor) = TestResult(

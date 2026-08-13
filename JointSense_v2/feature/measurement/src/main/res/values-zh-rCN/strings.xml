@@ -21,6 +21,8 @@
     <string name="measurement_selected">已选择</string>
     <string name="measurement_analyzing">正在分析…</string>
     <string name="measurement_title_result">分析结果</string>
+    <string name="measurement_result_not_found_title">未找到检测结果</string>
+    <string name="measurement_result_not_found_message">本设备上已不存在所请求的结果。请返回上一页或前往首页。</string>
     <string name="measurement_cleanup_warning">临时图像清理未能完成，可继续使用本次结果。</string>
     <string name="measurement_quantitative_analysis">定量分析（pg/mL）</string>
     <string name="measurement_latest_measurement">本次测量结果</string>

@@ -6,8 +6,8 @@
     <string name="report_oa_index">OA 炎症综合指数（AI）</string>
     <string name="report_grade">级别</string>
     <string name="report_latest_values">最新定量结果</string>
-    <string name="report_week_changes">较前一周变化</string>
-    <string name="report_oa_week_change">OA 炎症综合指数（AI）较前一周变化</string>
+    <string name="report_week_changes">周对比（有可用基线时）</string>
+    <string name="report_oa_week_change">OA 炎症综合指数（AI）周对比（有可用基线时）</string>
     <string name="report_recommendations">科研趋势观察</string>
     <string name="report_not_measured">未测量</string>
     <string name="report_no_comparison">无可比数据</string>
@@ -59,12 +59,12 @@
     <string name="insights_report_empty">暂无数据。完成一次检测后即可生成 AI 报告。</string>
     <string name="insights_cartilage_assessment">软骨炎症评估</string>
     <string name="insights_ai_grade_summary">OA 炎症综合指数（AI）%1$.2f — %2$s（%3$d 级）</string>
-    <string name="insights_factor_summary">最新因子定量值与周变化</string>
+    <string name="insights_factor_summary">最新因子定量值与可用对比</string>
     <string name="insights_concentration_value">%1$s pg/mL</string>
     <string name="insights_change_up">上升 %1$.0f%%</string>
     <string name="insights_change_down">下降 %1$.0f%%</string>
     <string name="insights_no_comparison">— 暂无可比数据</string>
-    <string name="insights_trend_interpretation">周趋势解读</string>
+    <string name="insights_trend_interpretation">趋势证据</string>
     <string name="insights_trend_rising">上升：OA 炎症综合指数（AI）较对比周期上升超过 %1$d%%。</string>
     <string name="insights_trend_stable">稳定：OA 炎症综合指数（AI）较对比周期的变化不超过 %1$d%%。</string>
     <string name="insights_trend_falling">下降：OA 炎症综合指数（AI）较对比周期下降超过 %1$d%%。</string>

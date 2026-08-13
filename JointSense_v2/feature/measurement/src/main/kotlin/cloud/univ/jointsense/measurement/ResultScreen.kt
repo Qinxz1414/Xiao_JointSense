@@ -50,6 +50,7 @@ import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.feature.measurement.R
 import java.text.NumberFormat
 
@@ -69,6 +70,14 @@ fun ResultScreen(
     onGoHome: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (lastResult == null) {
+        ResultNotFoundScreen(
+            onBack = onReturnToOrigin,
+            onGoHome = onGoHome,
+            modifier = modifier,
+        )
+        return
+    }
     val locale = LocalConfiguration.current.locales[0]
     val aiScaleFormat = remember(locale) {
         NumberFormat.getNumberInstance(locale).apply {
@@ -214,7 +223,7 @@ fun ResultScreen(
 
                     // Factor legend
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        InflammationFactor.entries.forEach { factor ->
+                        inflammationFactorPresentationOrder.forEach { factor ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(
                                     modifier = Modifier
@@ -237,7 +246,7 @@ fun ResultScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
 
                     // Value rows
-                    InflammationFactor.entries.forEach { factor ->
+                    inflammationFactorPresentationOrder.forEach { factor ->
                         val value = presentation.factorValues.first { it.factor == factor }.value
                         val isJustMeasured = lastResult?.factor == factor
                         Row(
@@ -284,7 +293,10 @@ fun ResultScreen(
                     }
 
                     // Well signal swatch (ELISA palette, Rule/SKILL.md)
-                    lastResult?.let { result ->
+                    val measuredConcentration = presentation.concentration
+                    val measuredFeatures = presentation.features
+                    if (measuredConcentration != null && measuredFeatures != null) {
+                        val result = lastResult
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -295,7 +307,7 @@ fun ResultScreen(
                                         BaselineMeasurementMetrics.wellColor(
                                             BaselineMeasurementMetrics.normalize(
                                                 result.factor,
-                                                result.concentration,
+                                                measuredConcentration,
                                             )
                                         )
                                     )
@@ -306,7 +318,7 @@ fun ResultScreen(
                                     text = stringResource(
                                         R.string.measurement_well_signal,
                                         result.factor.shortName,
-                                        result.concentration,
+                                        measuredConcentration,
                                     ),
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -314,9 +326,9 @@ fun ResultScreen(
                                 Text(
                                     text = stringResource(
                                         R.string.measurement_rgb_features,
-                                        result.features.rMean, result.features.rStd,
-                                        result.features.gMean, result.features.gStd,
-                                        result.features.bMean, result.features.bStd,
+                                        measuredFeatures.rMean, measuredFeatures.rStd,
+                                        measuredFeatures.gMean, measuredFeatures.gStd,
+                                        measuredFeatures.bMean, measuredFeatures.bStd,
                                     ),
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -470,11 +482,82 @@ fun ResultScreen(
     }
 }
 
+@Composable
+private fun ResultNotFoundScreen(
+    onBack: () -> Unit,
+    onGoHome: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        topBar = {
+            JointSenseTopBar(
+                title = stringResource(R.string.measurement_title_result),
+                navigationIcon = {
+                    JointSenseBarAction(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.measurement_action_back),
+                        onClick = onBack,
+                    )
+                },
+            )
+        },
+    ) { paddingValues ->
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(24.dp)
+                .testTag(RESULT_NOT_FOUND_TAG),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = stringResource(R.string.measurement_result_not_found_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.measurement_result_not_found_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                OutlinedButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(RESULT_NOT_FOUND_BACK_TAG),
+                ) {
+                    Text(stringResource(R.string.measurement_action_back))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onGoHome,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(RESULT_NOT_FOUND_HOME_TAG),
+                ) {
+                    Icon(Icons.Default.Home, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.measurement_action_home))
+                }
+            }
+        }
+    }
+}
+
 const val MEASUREMENT_CLEANUP_WARNING_TAG = "measurement_cleanup_warning"
 const val RESULT_CONCENTRATION_TAG = "result_concentration"
 const val RESULT_RANGE_STATUS_TAG = "result_range_status"
 const val RESULT_FEATURES_SUMMARY_TAG = "result_features_summary"
 const val RESULT_HOME_ACTION_TAG = "result_home_action"
+const val RESULT_NOT_FOUND_TAG = "result_not_found"
+const val RESULT_NOT_FOUND_BACK_TAG = "result_not_found_back"
+const val RESULT_NOT_FOUND_HOME_TAG = "result_not_found_home"
 
 private fun RangeStatus.labelResource(): Int = when (this) {
     RangeStatus.UNKNOWN -> R.string.measurement_range_unknown

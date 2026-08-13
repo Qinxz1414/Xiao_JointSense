@@ -52,6 +52,7 @@ import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.GradeColors
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.feature.insights.R
 import cloud.univ.jointsense.insights.report.LocalizedReportFormatter
 import cloud.univ.jointsense.insights.report.PdfExportResult
@@ -233,8 +234,8 @@ fun ReportScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        InflammationFactor.entries.forEach { factor ->
-                            val delta = state.factorDeltaPct7d[factor]
+                        inflammationFactorPresentationOrder.forEach { factor ->
+                            val delta = state.factorDeltaPct7d[factor]?.takeIf(Float::isFinite)
                             val absolute = presentation.factorValues
                                 .first { it.factor == factor }
                                 .value
@@ -371,7 +372,10 @@ fun ReportScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        BaselineInsightsMetrics.suggestions(grade, state.aiWeekDeltaPct).forEach { line ->
+                        BaselineInsightsMetrics.suggestions(
+                            grade,
+                            presentation.weekChangePercent,
+                        ).forEach { line ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

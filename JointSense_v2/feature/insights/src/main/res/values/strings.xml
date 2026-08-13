@@ -6,8 +6,8 @@
     <string name="report_oa_index">OA inflammation index (AI)</string>
     <string name="report_grade">grade</string>
     <string name="report_latest_values">Latest quantitative values</string>
-    <string name="report_week_changes">Change vs previous week</string>
-    <string name="report_oa_week_change">OA inflammation index (AI) change vs previous week</string>
+    <string name="report_week_changes">Week-over-week comparison (when available)</string>
+    <string name="report_oa_week_change">OA inflammation index (AI) week-over-week comparison (when available)</string>
     <string name="report_recommendations">Research trend observations</string>
     <string name="report_not_measured">not measured</string>
     <string name="report_no_comparison">no comparison</string>
@@ -59,12 +59,12 @@
     <string name="insights_report_empty">No data yet. Run a test to generate your AI report.</string>
     <string name="insights_cartilage_assessment">Cartilage inflammation assessment</string>
     <string name="insights_ai_grade_summary">OA inflammation index (AI) %1$.2f — %2$s (grade %3$d)</string>
-    <string name="insights_factor_summary">Latest factor values and weekly changes</string>
+    <string name="insights_factor_summary">Latest factor values and available comparisons</string>
     <string name="insights_concentration_value">%1$s pg/mL</string>
     <string name="insights_change_up">Increased %1$.0f%%</string>
     <string name="insights_change_down">Decreased %1$.0f%%</string>
     <string name="insights_no_comparison">— no comparison</string>
-    <string name="insights_trend_interpretation">Weekly trend interpretation</string>
+    <string name="insights_trend_interpretation">Trend evidence</string>
     <string name="insights_trend_rising">Rising: OA inflammation index (AI) increased by more than %1$d%% versus the comparison period.</string>
     <string name="insights_trend_stable">Stable: OA inflammation index (AI) changed by no more than %1$d%% versus the comparison period.</string>
     <string name="insights_trend_falling">Falling: OA inflammation index (AI) decreased by more than %1$d%% versus the comparison period.</string>

@@ -8,6 +8,8 @@ import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ResultUiModelTest {
@@ -41,10 +43,35 @@ class ResultUiModelTest {
 
         val model = createResultUiModel(session(result), result)
 
-        assertEquals(InflammationFactor.entries.toList(), model.factorValues.map(ResultFactorPresentation::factor))
+        assertEquals(APPROVED_FACTOR_ORDER, model.factorValues.map(ResultFactorPresentation::factor))
         assertEquals(42.5f, model.factorValues.single { it.factor == InflammationFactor.TNF_ALPHA }.value)
         assertEquals(null, model.factorValues.single { it.factor == InflammationFactor.IL6 }.value)
         assertEquals(null, model.factorValues.single { it.factor == InflammationFactor.IL1_BETA }.value)
+    }
+
+    @Test
+    fun corruptPersistedNumbersAreUnavailableAndNeverThrow() {
+        val corrupt = result(RangeStatus.ABOVE_RANGE).copy(
+            concentration = Float.NaN,
+            features = RgbFeatures(
+                rMean = Float.POSITIVE_INFINITY,
+                gMean = 2f,
+                bMean = 3f,
+                rStd = 1f,
+                gStd = 1f,
+                bStd = 1f,
+            ),
+        )
+
+        val model = createResultUiModel(session(corrupt), corrupt)
+
+        assertEquals(InflammationFactor.TNF_ALPHA, model.measuredFactor)
+        assertNull(model.concentration)
+        assertNull(model.features)
+        assertNull(model.factorValues.single { it.factor == InflammationFactor.TNF_ALPHA }.value)
+        assertNull(model.oaIndex)
+        assertNull(model.grade)
+        assertTrue(model.factorValues.none { it.value?.isFinite() == false })
     }
 
     private fun result(status: RangeStatus) = TestResult(
@@ -68,5 +95,10 @@ class ResultUiModelTest {
 
     private companion object {
         val FEATURES = RgbFeatures(11f, 22f, 33f, 1f, 2f, 3f)
+        val APPROVED_FACTOR_ORDER = listOf(
+            InflammationFactor.TNF_ALPHA,
+            InflammationFactor.IL6,
+            InflammationFactor.IL1_BETA,
+        )
     }
 }

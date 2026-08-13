@@ -1,6 +1,7 @@
 package cloud.univ.jointsense.insights
 
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 
 data class FactorPresentation(
     val factor: InflammationFactor,
@@ -33,31 +34,42 @@ data class ReportPresentation(
 
 fun HomeUiState.toHomePresentation(): HomePresentation {
     val empty = allResults.isEmpty()
+    val validAi = currentAi?.takeIf { it.isFinite() && it in 0f..1f }
     return HomePresentation(
         isEmpty = empty,
         latestTimestamp = if (empty) null else allResults.maxOf { it.timestamp },
-        oaIndex = currentAi.takeUnless { empty },
-        grade = currentGrade.takeUnless { empty },
-        factorValues = InflammationFactor.entries.map { factor ->
-            FactorPresentation(factor, latestValues[factor].takeUnless { empty })
+        oaIndex = validAi.takeUnless { empty },
+        grade = currentGrade?.takeIf { !empty && validAi != null && it in 0..4 },
+        factorValues = inflammationFactorPresentationOrder.map { factor ->
+            FactorPresentation(
+                factor,
+                latestValues[factor]?.takeIf { !empty && it.isFinite() && it >= 0f },
+            )
         },
         recentObservations = if (empty) {
             emptyList()
         } else {
-            aiSeries.sortedBy(InsightPoint::time).takeLast(RECENT_OBSERVATION_COUNT)
+            aiSeries
+                .filter { it.value.isFinite() && it.value in 0f..1f }
+                .sortedBy(InsightPoint::time)
+                .takeLast(RECENT_OBSERVATION_COUNT)
         },
     )
 }
 
-fun ReportUiState.toReportPresentation(): ReportPresentation = ReportPresentation(
-    oaIndex = currentAi,
-    grade = currentGrade?.takeIf { it in 0..4 },
-    factorValues = InflammationFactor.entries.map { factor ->
-        FactorPresentation(factor, latestValues[factor])
-    },
-    weekChangePercent = aiWeekDeltaPct,
-    trend = trendInterpretation(aiWeekDeltaPct),
-)
+fun ReportUiState.toReportPresentation(): ReportPresentation {
+    val validAi = currentAi?.takeIf { it.isFinite() && it in 0f..1f }
+    val validWeekChange = aiWeekDeltaPct?.takeIf(Float::isFinite)
+    return ReportPresentation(
+        oaIndex = validAi,
+        grade = currentGrade?.takeIf { validAi != null && it in 0..4 },
+        factorValues = inflammationFactorPresentationOrder.map { factor ->
+            FactorPresentation(factor, latestValues[factor]?.takeIf { it.isFinite() && it >= 0f })
+        },
+        weekChangePercent = validWeekChange,
+        trend = trendInterpretation(validWeekChange),
+    )
+}
 
 fun trendInterpretation(weekChangePercent: Float?): TrendInterpretation = when {
     weekChangePercent == null || !weekChangePercent.isFinite() ->

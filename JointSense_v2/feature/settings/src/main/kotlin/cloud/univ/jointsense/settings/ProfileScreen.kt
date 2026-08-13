@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -60,6 +61,9 @@ internal fun SettingsScreen(
     onOpenHistory: () -> Unit,
     onCalibrate: () -> Unit,
     onClearAllData: () -> Unit,
+    onConfirmRestoreSamples: () -> Unit,
+    onCancelRestoreSamples: () -> Unit,
+    onDismissRestoreSamplesOutcome: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
@@ -240,7 +244,64 @@ internal fun SettingsScreen(
             }
         )
     }
+
+    if (state.restoreSamplesConfirmationPending) {
+        AlertDialog(
+            modifier = Modifier.testTag(RESTORE_SAMPLES_CONFIRMATION_TAG),
+            onDismissRequest = onCancelRestoreSamples,
+            title = { Text(stringResource(R.string.settings_restore_samples_title)) },
+            text = { Text(stringResource(R.string.settings_restore_samples_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = onConfirmRestoreSamples,
+                    enabled = !state.restoreSamplesInProgress,
+                ) {
+                    Text(stringResource(R.string.settings_restore_samples_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onCancelRestoreSamples) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            },
+        )
+    }
+
+    state.restoreSamplesOutcome?.let { outcome ->
+        AlertDialog(
+            onDismissRequest = onDismissRestoreSamplesOutcome,
+            title = {
+                Text(
+                    stringResource(
+                        if (outcome == RestoreSamplesOutcome.SUCCESS) {
+                            R.string.settings_restore_samples_success_title
+                        } else {
+                            R.string.settings_restore_samples_failure_title
+                        },
+                    ),
+                )
+            },
+            text = {
+                Text(
+                    stringResource(
+                        if (outcome == RestoreSamplesOutcome.SUCCESS) {
+                            R.string.settings_restore_samples_success_message
+                        } else {
+                            R.string.settings_restore_samples_failure_message
+                        },
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onDismissRestoreSamplesOutcome) {
+                    Text(stringResource(R.string.settings_ok))
+                }
+            },
+        )
+    }
 }
+
+const val RESTORE_SAMPLES_CONFIRMATION_TAG = "restore_samples_confirmation"
 
 internal sealed interface CalibrationSubtitle {
     data class Review(val count: Int) : CalibrationSubtitle

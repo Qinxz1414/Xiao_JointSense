@@ -64,10 +64,63 @@ class InsightsUiModelsTest {
 
         val model = state.toReportPresentation()
 
-        assertEquals(InflammationFactor.entries.toList(), model.factorValues.map(FactorPresentation::factor))
+        assertEquals(APPROVED_FACTOR_ORDER, model.factorValues.map(FactorPresentation::factor))
         assertEquals(12f, model.factorValues.single { it.factor == InflammationFactor.TNF_ALPHA }.value)
         assertEquals(34f, model.factorValues.single { it.factor == InflammationFactor.IL6 }.value)
         assertNull(model.factorValues.single { it.factor == InflammationFactor.IL1_BETA }.value)
+    }
+
+    @Test
+    fun homeUsesApprovedFactorOrderAndFiltersCorruptPresentationValues() {
+        val state = HomeUiState(
+            allResults = listOf(result(1L)),
+            latestValues = mapOf(
+                InflammationFactor.TNF_ALPHA to Float.NaN,
+                InflammationFactor.IL6 to Float.POSITIVE_INFINITY,
+                InflammationFactor.IL1_BETA to 4f,
+            ),
+            currentAi = 1.1f,
+            currentGrade = 5,
+            aiSeries = listOf(
+                InsightPoint(1L, Float.NaN),
+                InsightPoint(2L, -0.1f),
+                InsightPoint(3L, 0.5f),
+                InsightPoint(4L, Float.POSITIVE_INFINITY),
+            ),
+        )
+
+        val model = state.toHomePresentation()
+
+        assertEquals(APPROVED_FACTOR_ORDER, model.factorValues.map(FactorPresentation::factor))
+        assertNull(model.oaIndex)
+        assertNull(model.grade)
+        assertNull(model.factorValues[0].value)
+        assertNull(model.factorValues[1].value)
+        assertEquals(4f, model.factorValues[2].value)
+        assertEquals(listOf(InsightPoint(3L, 0.5f)), model.recentObservations)
+    }
+
+    @Test
+    fun reportFiltersNonFiniteAndOutOfRangePresentationValues() {
+        val model = ReportUiState(
+            latestValues = mapOf(
+                InflammationFactor.TNF_ALPHA to Float.NEGATIVE_INFINITY,
+                InflammationFactor.IL6 to 12f,
+                InflammationFactor.IL1_BETA to Float.NaN,
+            ),
+            currentAi = -0.1f,
+            currentGrade = -1,
+            aiWeekDeltaPct = Float.POSITIVE_INFINITY,
+        ).toReportPresentation()
+
+        assertEquals(APPROVED_FACTOR_ORDER, model.factorValues.map(FactorPresentation::factor))
+        assertNull(model.oaIndex)
+        assertNull(model.grade)
+        assertNull(model.weekChangePercent)
+        assertEquals(TrendInterpretation.INSUFFICIENT_DATA, model.trend)
+        assertEquals(12f, model.factorValues[1].value)
+        assertNull(model.factorValues[0].value)
+        assertNull(model.factorValues[2].value)
     }
 
     @Test
@@ -89,4 +142,12 @@ class InsightsUiModelsTest {
         features = RgbFeatures(1f, 2f, 3f, 4f, 5f, 6f),
         timestamp = timestamp,
     )
+
+    private companion object {
+        val APPROVED_FACTOR_ORDER = listOf(
+            InflammationFactor.TNF_ALPHA,
+            InflammationFactor.IL6,
+            InflammationFactor.IL1_BETA,
+        )
+    }
 }

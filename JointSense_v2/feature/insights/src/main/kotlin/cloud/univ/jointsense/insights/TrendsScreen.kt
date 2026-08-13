@@ -53,6 +53,7 @@ import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.feature.insights.R
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -66,7 +67,8 @@ import java.util.Locale
 @Composable
 fun TrendsScreen(
     state: TrendsUiState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    nowMillis: () -> Long = System::currentTimeMillis,
 ) {
     // 0 = All
     var periodDays by rememberSaveable { mutableIntStateOf(7) }
@@ -123,23 +125,26 @@ fun TrendsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            val now = nowMillis()
             val since = if (periodDays == 0) {
                 0L
             } else {
-                System.currentTimeMillis() - DAY_MILLIS * periodDays
+                now - DAY_MILLIS * periodDays
             }
 
-            val factorSeries = InflammationFactor.entries.map { factor ->
+            val factorSeries = inflammationFactorPresentationOrder.map { factor ->
                 ChartSeries(
                     name = factor.shortName,
                     color = factorColor(factor),
                     points = state.factorSeries[factor].orEmpty()
-                        .filter { it.time >= since }
+                        .filter { it.time in since..now && it.value.isFinite() && it.value >= 0f }
                         .map { TimePoint(it.time, it.value) }
                 )
             }
-            val aiSeries = state.aiSeries.filter { it.time >= since }
-            val events = state.keyEvents.filter { it.time >= since }
+            val aiSeries = state.aiSeries.filter {
+                it.time in since..now && it.value.isFinite() && it.value in 0f..1f
+            }
+            val events = state.keyEvents.filter { it.time in since..now && it.isPresentable() }
             val hasData = factorSeries.any { it.points.isNotEmpty() }
 
             if (!hasData) {
@@ -397,4 +402,12 @@ private fun KeyEventItem.localizedText(): String = when (kind) {
         requireNotNull(previousAi),
         requireNotNull(currentAi),
     )
+}
+
+private fun KeyEventItem.isPresentable(): Boolean = when (kind) {
+    EventKind.TEST -> measurementCount != null && aiValue?.let { it.isFinite() && it in 0f..1f } != false
+    EventKind.UP,
+    EventKind.DOWN,
+    -> previousAi?.let { it.isFinite() && it in 0f..1f } == true &&
+        currentAi?.let { it.isFinite() && it in 0f..1f } == true
 }
