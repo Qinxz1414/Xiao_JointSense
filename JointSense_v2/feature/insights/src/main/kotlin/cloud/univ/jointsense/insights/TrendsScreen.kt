@@ -20,9 +20,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Science
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,13 +43,11 @@ import cloud.univ.jointsense.designsystem.chart.ChartSeries
 import cloud.univ.jointsense.designsystem.chart.LineChart
 import cloud.univ.jointsense.designsystem.chart.MultiLineChart
 import cloud.univ.jointsense.designsystem.chart.TimePoint
-import cloud.univ.jointsense.designsystem.component.NavyTopBar
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.AiLine
-import cloud.univ.jointsense.designsystem.theme.BgLight
 import cloud.univ.jointsense.designsystem.theme.BioGreen
-import cloud.univ.jointsense.designsystem.theme.InkText
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.designsystem.theme.TnfRed
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
@@ -71,13 +69,13 @@ fun TrendsScreen(
     val periods = listOf(7, 30, 90, 0)
 
     Scaffold(
-        topBar = { NavyTopBar(title = "Trend Analysis") }
+        topBar = { JointSenseTopBar(title = "Trend Analysis") }
     ) { paddingValues ->
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(BgLight)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
@@ -90,14 +88,14 @@ fun TrendsScreen(
                             .weight(1f)
                             .padding(horizontal = 4.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (selected) PrimaryAccent else Color.White)
+                            .background(if (selected) PrimaryAccent else MaterialTheme.colorScheme.surface)
                             .clickable { periodDays = days }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = if (days == 0) "All" else "${days}D",
-                            color = if (selected) Color.White else TextSecondary,
+                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                         )
@@ -127,10 +125,9 @@ fun TrendsScreen(
             val hasData = factorSeries.any { it.points.isNotEmpty() }
 
             if (!hasData) {
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     Text(
                         text = "No measurements in this period.\nRun a test to start tracking trends.",
@@ -138,16 +135,15 @@ fun TrendsScreen(
                             .fillMaxWidth()
                             .padding(32.dp),
                         textAlign = TextAlign.Center,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                 }
             } else {
                 // Factor trends
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -159,7 +155,7 @@ fun TrendsScreen(
                             text = "Inflammatory Factor Trends (pg/mL)",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         // Legend
@@ -176,7 +172,7 @@ fun TrendsScreen(
                                     Text(
                                         text = series.name,
                                         fontSize = 11.sp,
-                                        color = TextSecondary
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
                                 }
@@ -199,10 +195,9 @@ fun TrendsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // AI trend
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -214,7 +209,7 @@ fun TrendsScreen(
                             text = "OA Inflammation Index (AI) Trend",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         val dayFormat = remember { SimpleDateFormat("MM/dd", Locale.getDefault()) }
@@ -241,10 +236,9 @@ fun TrendsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Key events
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -256,13 +250,13 @@ fun TrendsScreen(
                             text = "Key Events",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         if (events.isEmpty()) {
                             Text(
                                 text = "No events in this period.",
-                                color = TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp
                             )
                         }
@@ -312,12 +306,12 @@ fun TrendsScreen(
                                     Text(
                                         text = event.text,
                                         fontSize = 12.sp,
-                                        color = InkText
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = eventFormat.format(Date(event.time)),
                                         fontSize = 10.sp,
-                                        color = TextSecondary
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }

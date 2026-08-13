@@ -3,6 +3,7 @@ package cloud.univ.jointsense.designsystem.chart
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -42,6 +43,10 @@ fun LineChart(
     yAxisLabel: String = "pg/mL"
 ) {
     if (dataPoints.isEmpty()) return
+    val axisColor = MaterialTheme.colorScheme.outline
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val pointCenterColor = MaterialTheme.colorScheme.surface
 
     Canvas(
         modifier = modifier
@@ -66,7 +71,6 @@ fun LineChart(
         val yMax = maxValue + valueRange * 0.1f
 
         // Draw axes
-        val axisColor = Color(0xFF6C757D)
         val axisStroke = 2f
 
         // Y-axis
@@ -86,7 +90,6 @@ fun LineChart(
 
         // Draw Y-axis labels and grid lines
         val ySteps = 4
-        val gridColor = Color(0xFFE0E0E0)
         for (i in 0..ySteps) {
             val y = paddingTop + chartHeight - (chartHeight * i / ySteps)
             val value = yMin + (yMax - yMin) * i / ySteps
@@ -107,7 +110,7 @@ fun LineChart(
                 paddingLeft - 8f,
                 y + 4f,
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#6C757D")
+                    color = labelColor
                     textSize = 24f
                     textAlign = android.graphics.Paint.Align.RIGHT
                 }
@@ -123,7 +126,7 @@ fun LineChart(
                 16f,
                 paddingTop + chartHeight / 2,
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#6C757D")
+                    color = labelColor
                     textSize = 22f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
@@ -148,7 +151,7 @@ fun LineChart(
                 x,
                 paddingTop + chartHeight + 35f,
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#6C757D")
+                    color = labelColor
                     textSize = 22f
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
@@ -210,7 +213,7 @@ fun LineChart(
             for (i in points.indices) {
                 // Data point
                 drawCircle(
-                    color = Color.White,
+                    color = pointCenterColor,
                     radius = 7f,
                     center = points[i]
                 )
@@ -226,7 +229,7 @@ fun LineChart(
                     points[i].x,
                     paddingTop + chartHeight + 35f,
                     android.graphics.Paint().apply {
-                        color = android.graphics.Color.parseColor("#6C757D")
+                        color = labelColor
                         textSize = 22f
                         textAlign = android.graphics.Paint.Align.CENTER
                     }

@@ -24,10 +24,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,13 +47,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.core.designsystem.R as DesignSystemR
-import cloud.univ.jointsense.designsystem.component.NavyTopBar
-import cloud.univ.jointsense.designsystem.theme.BgLight
-import cloud.univ.jointsense.designsystem.theme.InkText
-import cloud.univ.jointsense.designsystem.theme.MedicalGreen
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
+import cloud.univ.jointsense.designsystem.theme.BioGreen
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.designsystem.theme.StructureGray
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.designsystem.theme.TnfRed
 
 /** Profile tab — app info, history entry, data management, and about. */
@@ -69,21 +67,20 @@ internal fun SettingsScreen(
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { NavyTopBar(title = "Profile") }
+        topBar = { JointSenseTopBar(title = "Profile") }
     ) { paddingValues ->
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(BgLight)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
             // Identity card
-            Card(
+            ClinicalCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Row(
@@ -112,20 +109,20 @@ internal fun SettingsScreen(
                             text = "JointSense",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "OA Inflammation Monitor  ·  v1.0",
                             fontSize = 12.sp,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "${state.sessionCount} session(s), " +
                                 "${state.measurementCount} measurement(s)",
                             fontSize = 12.sp,
-                            color = TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -134,10 +131,9 @@ internal fun SettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Settings card
-            Card(
+            ClinicalCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -159,7 +155,7 @@ internal fun SettingsScreen(
                     HorizontalDivider(color = StructureGray, thickness = 1.dp)
                     ProfileEntry(
                         icon = Icons.Default.Science,
-                        tint = MedicalGreen,
+                        tint = BioGreen,
                         title = "Calibrate Standard Curve",
                         subtitle = calibrationSubtitle(state),
                         onClick = onCalibrate
@@ -182,7 +178,7 @@ internal fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 fontSize = 11.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -281,18 +277,18 @@ private fun ProfileEntry(
                 text = title,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = InkText
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = subtitle,
                 fontSize = 12.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = TextSecondary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp)
         )
     }

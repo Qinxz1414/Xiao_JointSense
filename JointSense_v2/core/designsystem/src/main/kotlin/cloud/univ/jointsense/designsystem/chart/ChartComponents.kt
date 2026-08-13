@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,8 +33,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import cloud.univ.jointsense.designsystem.theme.InkText
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -109,6 +108,10 @@ fun MultiLineChart(
 ) {
     val allPoints = series.flatMap { it.points }
     if (allPoints.isEmpty()) return
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val axisColor = MaterialTheme.colorScheme.outline
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val pointCenterColor = MaterialTheme.colorScheme.surface
 
     Canvas(modifier = modifier) {
         val density = this.density
@@ -136,9 +139,6 @@ fun MultiLineChart(
         fun y(value: Float) =
             paddingTop + chartHeight - (value - yMin) / (yMax - yMin) * chartHeight
 
-        val gridColor = Color(0xFFE0E0E0)
-        val axisColor = Color(0xFF9AA5B1)
-
         // Horizontal grid + y labels
         val ySteps = 4
         for (i in 0..ySteps) {
@@ -152,7 +152,7 @@ fun MultiLineChart(
                 paddingLeft - 8f,
                 gy + textSize(4f),
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#5F6B7A")
+                    color = labelColor
                     textSize = textSize(10f)
                     textAlign = android.graphics.Paint.Align.RIGHT
                 }
@@ -177,7 +177,7 @@ fun MultiLineChart(
                 tx,
                 paddingTop + chartHeight + textSize(14f),
                 android.graphics.Paint().apply {
-                    color = android.graphics.Color.parseColor("#5F6B7A")
+                    color = labelColor
                     textSize = textSize(10f)
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
@@ -202,7 +202,7 @@ fun MultiLineChart(
                 style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
             for (p in pts) {
-                drawCircle(Color.White, radius = 6f, center = Offset(x(p.time), y(p.value)))
+                drawCircle(pointCenterColor, radius = 6f, center = Offset(x(p.time), y(p.value)))
                 drawCircle(s.color, radius = 4f, center = Offset(x(p.time), y(p.value)))
             }
         }
@@ -218,6 +218,8 @@ fun GaugeChart(
     value: Float,
     modifier: Modifier = Modifier
 ) {
+    val needleColor = MaterialTheme.colorScheme.onSurface
+    val needleCenterColor = MaterialTheme.colorScheme.surface
     Canvas(modifier = modifier) {
         val strokeWidth = size.height * 0.28f
         // Radius must respect BOTH dimensions: a stroked semicircle of
@@ -251,9 +253,9 @@ fun GaugeChart(
             center.x + (needleLen * cos(angle)).toFloat(),
             center.y + (needleLen * sin(angle)).toFloat()
         )
-        drawLine(InkText, center, tip, strokeWidth = 5f, cap = StrokeCap.Round)
-        drawCircle(InkText, radius = 10f, center = center)
-        drawCircle(Color.White, radius = 4f, center = center)
+        drawLine(needleColor, center, tip, strokeWidth = 5f, cap = StrokeCap.Round)
+        drawCircle(needleColor, radius = 10f, center = center)
+        drawCircle(needleCenterColor, radius = 4f, center = center)
     }
 }
 
@@ -293,7 +295,7 @@ fun GradeBar(
                     text = if (i == currentGrade) "▲" else " ",
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
-                    color = InkText,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 10.sp
                 )
             }
@@ -304,7 +306,7 @@ fun GradeBar(
                     text = labels[i],
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 10.sp,
                     maxLines = 1
                 )
@@ -337,7 +339,7 @@ fun AiScaleBar(
                 val fraction = value.coerceIn(0f, 1f)
                 Text(
                     text = "▼",
-                    color = InkText,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 10.sp,
                     modifier = Modifier
                         .offset(x = width * fraction - 5.dp)
@@ -353,7 +355,7 @@ fun AiScaleBar(
             listOf("0", "0.25", "0.50", "0.75", "1.00").forEachIndexed { i, label ->
                 Text(
                     text = label,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 9.sp,
                     modifier = Modifier.weight(1f),
                     textAlign = when (i) {

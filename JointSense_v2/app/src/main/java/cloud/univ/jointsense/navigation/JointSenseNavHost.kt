@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -64,10 +65,7 @@ import cloud.univ.jointsense.calibration.CalibrationSelectRouteScreen
 import cloud.univ.jointsense.calibration.CalibrationViewModel
 import cloud.univ.jointsense.calibration.CalibrationViewModelFactory
 import cloud.univ.jointsense.calibration.LegacyCalibrationRevalidator
-import cloud.univ.jointsense.designsystem.theme.BgLight
-import cloud.univ.jointsense.designsystem.theme.BgWhite
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.di.AppContainer
 import cloud.univ.jointsense.insights.HomeRouteScreen
 import cloud.univ.jointsense.insights.InsightsViewModel
@@ -190,7 +188,7 @@ private fun JointSenseNavHostContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .background(BgLight),
+                    .background(MaterialTheme.colorScheme.background),
             ) {
                 composable<HomeRoute> {
                     Destination(screenSlot, HomeRoute, actions) {
@@ -361,7 +359,7 @@ private fun JointSenseNavHostContent(
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .border(4.dp, BgWhite, CircleShape)
+                        .border(4.dp, MaterialTheme.colorScheme.surface, CircleShape)
                         .clip(CircleShape)
                         .background(PrimaryAccent)
                         .clickable {
@@ -496,7 +494,7 @@ private fun MainBottomBar(
     onDestination: (TopLevelDestination) -> Unit,
 ) {
     Surface(
-        color = BgWhite,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -572,14 +570,14 @@ private fun RowScope.BarTab(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (selected) PrimaryAccent else TextSecondary,
+            tint = if (selected) PrimaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             fontSize = 10.sp,
-            color = if (selected) PrimaryAccent else TextSecondary,
+            color = if (selected) PrimaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }

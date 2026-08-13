@@ -1,26 +1,19 @@
 package cloud.univ.jointsense.migration
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import cloud.univ.jointsense.R
+import cloud.univ.jointsense.designsystem.component.LoadingErrorState
 import cloud.univ.jointsense.data.legacy.LegacyMigrationCoordinator
 import cloud.univ.jointsense.data.legacy.MigrationOutcome
 import kotlinx.coroutines.CancellationException
@@ -165,18 +158,11 @@ fun MigrationGate(
 
 @Composable
 private fun MigrationProgressScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        CircularProgressIndicator()
-        Text(
-            text = stringResource(R.string.migration_preparing_data),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(top = 20.dp),
-        )
-    }
+    LoadingErrorState(
+        isLoading = true,
+        message = stringResource(R.string.migration_preparing_data),
+        actionLabel = null,
+        onAction = null,
+        modifier = modifier.fillMaxSize(),
+    )
 }

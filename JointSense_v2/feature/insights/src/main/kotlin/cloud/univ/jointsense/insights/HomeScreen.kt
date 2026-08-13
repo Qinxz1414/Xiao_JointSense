@@ -22,9 +22,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -45,13 +45,11 @@ import cloud.univ.jointsense.designsystem.chart.ChartDataPoint
 import cloud.univ.jointsense.designsystem.chart.GradeBar
 import cloud.univ.jointsense.designsystem.chart.LineChart
 import cloud.univ.jointsense.designsystem.chart.Sparkline
-import cloud.univ.jointsense.designsystem.component.NavyTopBar
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.AiLine
-import cloud.univ.jointsense.designsystem.theme.BgLight
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import cloud.univ.jointsense.designsystem.theme.InkText
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.text.SimpleDateFormat
@@ -71,13 +69,13 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     Scaffold(
-        topBar = { NavyTopBar(title = "OA Inflammation Monitor") }
+        topBar = { JointSenseTopBar(title = "OA Inflammation Monitor") }
     ) { paddingValues ->
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(BgLight)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
@@ -98,10 +96,9 @@ fun HomeScreen(
 
 @Composable
 private fun EmptyHome(onTestNow: () -> Unit) {
-    Card(
+    ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -131,7 +128,7 @@ private fun EmptyHome(onTestNow: () -> Unit) {
                 text = "JointSense",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = InkText
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -139,7 +136,7 @@ private fun EmptyHome(onTestNow: () -> Unit) {
             Text(
                 text = "No tests yet.\nRun your first detection to build your\ninflammation dashboard.",
                 fontSize = 13.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 lineHeight = 18.sp
             )
@@ -182,10 +179,9 @@ private fun DashboardContent(
         InflammationFactor.entries.forEach { factor ->
             val value = latest[factor]
             val spark = state.factorSeries[factor].orEmpty().takeLast(7).map { it.value }
-            Card(
+            ClinicalCard(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(
@@ -197,7 +193,7 @@ private fun DashboardContent(
                         text = factor.shortName,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Bottom) {
@@ -205,13 +201,13 @@ private fun DashboardContent(
                             text = value?.let { "%.2f".format(it) } ?: "—",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Text(
                         text = "pg/mL",
                         fontSize = 9.sp,
-                        color = TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Sparkline(
@@ -229,10 +225,9 @@ private fun DashboardContent(
     Spacer(modifier = Modifier.height(12.dp))
 
     // AI composite card
-    Card(
+    ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -245,7 +240,7 @@ private fun DashboardContent(
                 Text(
                     text = "OA Inflammation Index (AI)",
                     fontSize = 13.sp,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -253,7 +248,7 @@ private fun DashboardContent(
                         text = ai?.let { "%.2f".format(it) } ?: "—",
                         fontSize = 34.sp,
                         fontWeight = FontWeight.Bold,
-                        color = InkText
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     if (grade != null) {
                         Spacer(modifier = Modifier.width(12.dp))
@@ -277,7 +272,7 @@ private fun DashboardContent(
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = "Open AI report",
-                    tint = TextSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -286,10 +281,9 @@ private fun DashboardContent(
     Spacer(modifier = Modifier.height(12.dp))
 
     // Grade card
-    Card(
+    ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -300,7 +294,7 @@ private fun DashboardContent(
             Text(
                 text = "OA Inflammation Grade",
                 fontSize = 13.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
             GradeBar(currentGrade = grade)
@@ -310,10 +304,9 @@ private fun DashboardContent(
     Spacer(modifier = Modifier.height(12.dp))
 
     // Recent 7-day AI trend
-    Card(
+    ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -324,7 +317,7 @@ private fun DashboardContent(
             Text(
                 text = "Recent Trend (7 days)",
                 fontSize = 13.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
             val weekSeries = state.aiSeries.filter {
@@ -354,10 +347,9 @@ private fun DashboardContent(
     Spacer(modifier = Modifier.height(12.dp))
 
     // Last test + test now footer
-    Card(
+    ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -370,14 +362,14 @@ private fun DashboardContent(
                 Text(
                     text = "Last test",
                     fontSize = 12.sp,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = dateFormat.format(Date(lastTest)),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = InkText
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Button(

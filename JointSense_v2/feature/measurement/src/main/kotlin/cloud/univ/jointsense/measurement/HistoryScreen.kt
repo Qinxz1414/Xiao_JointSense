@@ -24,16 +24,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Science
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,8 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cloud.univ.jointsense.designsystem.theme.MedicalBlue
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
+import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.domain.model.TestSession
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,7 +52,6 @@ import java.util.Locale
  * History Screen - Shows all saved test sessions.
  * User can tap a session to view its results or delete sessions.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     sessions: List<TestSession>,
@@ -67,18 +64,11 @@ fun HistoryScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Test History", fontWeight = FontWeight.SemiBold) },
+            JointSenseTopBar(
+                title = "Test History",
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
+                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MedicalBlue,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
             )
         }
     ) { paddingValues ->
@@ -96,7 +86,7 @@ fun HistoryScreen(
                     imageVector = Icons.Default.FolderOpen,
                     contentDescription = null,
                     modifier = Modifier.size(80.dp),
-                    tint = MedicalBlue.copy(alpha = 0.2f)
+                    tint = PrimaryAccent.copy(alpha = 0.2f)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -105,7 +95,7 @@ fun HistoryScreen(
                     text = "No Test History",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -113,7 +103,7 @@ fun HistoryScreen(
                 Text(
                     text = "Start a new test to see results here",
                     fontSize = 14.sp,
-                    color = TextSecondary.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
             }
@@ -126,7 +116,7 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(sessions.reversed()) { session ->
-                    Card(
+                    ClinicalCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSessionClick(session) },
@@ -144,13 +134,13 @@ fun HistoryScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(CircleShape)
-                                    .background(MedicalBlue.copy(alpha = 0.1f)),
+                                    .background(PrimaryAccent.copy(alpha = 0.1f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Science,
                                     contentDescription = null,
-                                    tint = MedicalBlue,
+                                    tint = PrimaryAccent,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -170,7 +160,7 @@ fun HistoryScreen(
                                 Text(
                                     text = dateFormat.format(Date(session.createdAt)),
                                     fontSize = 13.sp,
-                                    color = TextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -186,13 +176,13 @@ fun HistoryScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(4.dp))
-                                            .background(MedicalBlue.copy(alpha = 0.1f))
+                                            .background(PrimaryAccent.copy(alpha = 0.1f))
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = "$resultCount/5 tests",
                                             fontSize = 11.sp,
-                                            color = MedicalBlue,
+                                            color = PrimaryAccent,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -202,7 +192,7 @@ fun HistoryScreen(
                                         Text(
                                             text = factorsSummary,
                                             fontSize = 12.sp,
-                                            color = TextSecondary
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -216,7 +206,7 @@ fun HistoryScreen(
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = "Delete",
-                                    tint = TextSecondary,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -225,7 +215,7 @@ fun HistoryScreen(
                             Icon(
                                 imageVector = Icons.Default.ChevronRight,
                                 contentDescription = null,
-                                tint = TextSecondary,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }

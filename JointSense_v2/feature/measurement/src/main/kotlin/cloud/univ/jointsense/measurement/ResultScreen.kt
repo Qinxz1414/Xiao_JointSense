@@ -21,10 +21,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -40,14 +40,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.chart.AiScaleBar
 import cloud.univ.jointsense.designsystem.chart.GradeBar
-import cloud.univ.jointsense.designsystem.component.NavyTopBar
-import cloud.univ.jointsense.designsystem.component.NavyBarAction
-import cloud.univ.jointsense.designsystem.theme.BgLight
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import cloud.univ.jointsense.designsystem.theme.InkText
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.designsystem.theme.StructureGray
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.TestResult
@@ -75,10 +73,10 @@ fun ResultScreen(
 
     Scaffold(
         topBar = {
-            NavyTopBar(
+            JointSenseTopBar(
                 title = "Analysis Result",
                 navigationIcon = {
-                    NavyBarAction(
+                    JointSenseBarAction(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         onClick = onReturnToOrigin,
@@ -91,7 +89,7 @@ fun ResultScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(BgLight)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
@@ -107,10 +105,9 @@ fun ResultScreen(
                 Spacer(modifier = Modifier.height(12.dp))
             }
             // ---- Quantitative analysis card ----
-            Card(
+            ClinicalCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -122,7 +119,7 @@ fun ResultScreen(
                         text = "Quantitative Analysis (pg/mL)",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = InkText
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -141,7 +138,7 @@ fun ResultScreen(
                                 Text(
                                     text = factor.shortName,
                                     fontSize = 12.sp,
-                                    color = TextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.width(14.dp))
                             }
@@ -175,20 +172,20 @@ fun ResultScreen(
                                 text = factor.shortName,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = InkText,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
                                 text = value?.let { "%.2f".format(it) } ?: "—",
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (value != null) InkText else TextSecondary
+                                color = if (value != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                     text = FACTOR_UNIT,
                                 fontSize = 11.sp,
-                                color = TextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         HorizontalDivider(
@@ -220,7 +217,7 @@ fun ResultScreen(
                                     text = "Well signal - ${result.factor.shortName} " +
                                         "(ELISA palette)",
                                     fontSize = 11.sp,
-                                    color = TextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     text = "R(μ=%.1f, σ=%.1f) G(μ=%.1f, σ=%.1f) B(μ=%.1f, σ=%.1f)"
@@ -230,7 +227,7 @@ fun ResultScreen(
                                             result.features.bMean, result.features.bStd
                                         ),
                                     fontSize = 10.sp,
-                                    color = TextSecondary
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -241,10 +238,9 @@ fun ResultScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             // ---- AI index card ----
-            Card(
+            ClinicalCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -256,7 +252,7 @@ fun ResultScreen(
                         text = "OA Inflammation Index (AI)",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = InkText
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -264,7 +260,7 @@ fun ResultScreen(
                             text = ai?.let { "%.2f".format(it) } ?: "—",
                             fontSize = 34.sp,
                             fontWeight = FontWeight.Bold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (grade != null) {
                             Spacer(modifier = Modifier.width(12.dp))
@@ -291,10 +287,9 @@ fun ResultScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             // ---- Grade card ----
-            Card(
+            ClinicalCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
@@ -306,7 +301,7 @@ fun ResultScreen(
                         text = "OA Inflammation Grade",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = InkText
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     GradeBar(currentGrade = grade)
@@ -365,7 +360,7 @@ fun ResultScreen(
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 fontSize = 11.sp,
-                color = TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(8.dp))

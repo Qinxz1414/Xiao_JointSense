@@ -23,9 +23,9 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -47,14 +47,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.chart.GaugeChart
-import cloud.univ.jointsense.designsystem.component.NavyBarAction
-import cloud.univ.jointsense.designsystem.component.NavyTopBar
-import cloud.univ.jointsense.designsystem.theme.BgLight
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.BioGreen
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import cloud.univ.jointsense.designsystem.theme.InkText
 import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
 import cloud.univ.jointsense.designsystem.theme.TnfRed
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
@@ -117,10 +115,10 @@ fun ReportScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            NavyTopBar(
+            JointSenseTopBar(
                 title = "AI Report",
                 actions = {
-                    NavyBarAction(
+                    JointSenseBarAction(
                         icon = Icons.Default.Share,
                         contentDescription = "Share summary",
                         onClick = ::shareTextReport,
@@ -133,15 +131,14 @@ fun ReportScreen(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(BgLight)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
             if (ai == null || grade == null) {
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     Text(
                         text = "No data yet.\nRun a test to generate your AI report.",
@@ -149,7 +146,7 @@ fun ReportScreen(
                             .fillMaxWidth()
                             .padding(32.dp),
                         textAlign = TextAlign.Center,
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                 }
@@ -157,10 +154,9 @@ fun ReportScreen(
                 val gradeColor = GradeColors[grade]
 
                 // ---- Assessment card ----
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Row(
@@ -188,14 +184,14 @@ fun ReportScreen(
                             Text(
                                 text = "Cartilage Inflammation Assessment",
                                 fontSize = 12.sp,
-                                color = TextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = BaselineInsightsMetrics.activityLabel(grade),
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = InkText
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "AI %.2f - %s (grade %d)".format(
@@ -204,7 +200,7 @@ fun ReportScreen(
                                     grade,
                                 ),
                                 fontSize = 12.sp,
-                                color = TextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -213,10 +209,9 @@ fun ReportScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // ---- 7-day change card ----
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -228,7 +223,7 @@ fun ReportScreen(
                             text = "Change Trend (Last 7 Days)",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         InflammationFactor.entries.forEach { factor ->
@@ -250,7 +245,7 @@ fun ReportScreen(
                                     text = factor.shortName,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = InkText,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 if (delta != null) {
@@ -275,13 +270,13 @@ fun ReportScreen(
                                     Text(
                                         text = "vs prev. week",
                                         fontSize = 10.sp,
-                                        color = TextSecondary
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 } else {
                                     Text(
                                         text = "— no comparison",
                                         fontSize = 11.sp,
-                                        color = TextSecondary
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -292,10 +287,9 @@ fun ReportScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // ---- Risk gauge card ----
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -312,13 +306,13 @@ fun ReportScreen(
                                 text = "Risk Index",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = InkText,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
                                 text = "14-day OA progression forecast",
                                 fontSize = 10.sp,
-                                color = TextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -340,10 +334,9 @@ fun ReportScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // ---- AI suggestions card ----
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -355,7 +348,7 @@ fun ReportScreen(
                             text = "AI Suggestions",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         BaselineInsightsMetrics.suggestions(grade, state.aiWeekDeltaPct).forEach { line ->
@@ -373,7 +366,7 @@ fun ReportScreen(
                                 Text(
                                     text = line,
                                     fontSize = 13.sp,
-                                    color = InkText,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     lineHeight = 18.sp
                                 )
                             }
@@ -384,10 +377,9 @@ fun ReportScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // ---- Export card ----
-                Card(
+                ClinicalCard(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(
@@ -399,7 +391,7 @@ fun ReportScreen(
                             text = "Export Report",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = InkText
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(modifier = Modifier.fillMaxWidth()) {

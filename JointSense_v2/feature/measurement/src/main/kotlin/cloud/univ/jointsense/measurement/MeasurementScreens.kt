@@ -30,17 +30,12 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,9 +46,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cloud.univ.jointsense.designsystem.theme.MedicalBlue
-import cloud.univ.jointsense.designsystem.theme.MedicalGreen
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
+import cloud.univ.jointsense.designsystem.theme.BioGreen
+import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.measurement.crop.ImageCropView
 
@@ -67,7 +64,6 @@ const val CONTINUE_MEASUREMENT_TAG = "continue_measurement"
  * Image Selection Screen - Step 1 of the test flow.
  * Allows user to take a photo or select from gallery.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImageSelectScreen(
     onTakePhoto: () -> Unit,
@@ -78,18 +74,11 @@ fun ImageSelectScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(sessionName, fontWeight = FontWeight.SemiBold) },
+            JointSenseTopBar(
+                title = sessionName,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
+                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MedicalBlue,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
             )
         }
     ) { paddingValues ->
@@ -105,7 +94,7 @@ fun ImageSelectScreen(
                 imageVector = Icons.Default.CameraAlt,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
-                tint = MedicalBlue.copy(alpha = 0.3f)
+                tint = PrimaryAccent.copy(alpha = 0.3f)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -122,7 +111,7 @@ fun ImageSelectScreen(
             Text(
                 text = "Take a photo of the chip reaction chamber\nor select an existing image from gallery",
                 fontSize = 14.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
@@ -135,7 +124,7 @@ fun ImageSelectScreen(
                     .fillMaxWidth()
                     .height(60.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MedicalBlue)
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
             ) {
                 Icon(
                     imageVector = Icons.Default.CameraAlt,
@@ -157,7 +146,7 @@ fun ImageSelectScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MedicalBlue
+                    contentColor = PrimaryAccent
                 )
             ) {
                 Icon(
@@ -176,7 +165,6 @@ fun ImageSelectScreen(
  * Image Crop Screen - Step 2 of the test flow.
  * Allows user to select the region of interest (chip reaction chamber).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImageCropScreen(
     bitmap: Bitmap,
@@ -188,18 +176,11 @@ fun ImageCropScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Select Analysis Area", fontWeight = FontWeight.SemiBold) },
+            JointSenseTopBar(
+                title = "Select Analysis Area",
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
+                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MedicalBlue,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
             )
         }
     ) { paddingValues ->
@@ -220,13 +201,13 @@ fun ImageCropScreen(
                     imageVector = Icons.Default.Crop,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
-                    tint = MedicalBlue
+                    tint = PrimaryAccent
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Drag to move, drag corners to resize the selection area",
                     fontSize = 13.sp,
-                    color = TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -257,7 +238,7 @@ fun ImageCropScreen(
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MedicalGreen)
+                    colors = ButtonDefaults.buttonColors(containerColor = BioGreen)
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -276,7 +257,6 @@ fun ImageCropScreen(
  * Factor Selection Screen - Step 3 of the test flow.
  * Allows user to select which inflammation factor to detect.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FactorSelectScreen(
     selectedFactor: InflammationFactor,
@@ -289,18 +269,16 @@ fun FactorSelectScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Select Detection Factor", fontWeight = FontWeight.SemiBold) },
+            JointSenseTopBar(
+                title = "Select Detection Factor",
                 navigationIcon = {
-                    IconButton(onClick = onBack, enabled = backEnabled) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
+                    JointSenseBarAction(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        onClick = onBack,
+                        enabled = backEnabled,
+                    )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MedicalBlue,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
             )
         }
     ) { paddingValues ->
@@ -317,7 +295,7 @@ fun FactorSelectScreen(
                 imageVector = Icons.Default.Science,
                 contentDescription = null,
                 modifier = Modifier.size(60.dp),
-                tint = MedicalBlue.copy(alpha = 0.3f)
+                tint = PrimaryAccent.copy(alpha = 0.3f)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -325,7 +303,7 @@ fun FactorSelectScreen(
             Text(
                 text = "Choose the inflammation factor\nyou want to detect",
                 fontSize = 16.sp,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
@@ -334,7 +312,7 @@ fun FactorSelectScreen(
             // Factor selection cards
             InflammationFactor.entries.forEach { factor ->
                 val isSelected = factor == selectedFactor
-                Card(
+                ClinicalCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 6.dp)
@@ -343,7 +321,7 @@ fun FactorSelectScreen(
                             if (isSelected) {
                                 Modifier.border(
                                     2.dp,
-                                    MedicalBlue,
+                                    PrimaryAccent,
                                     RoundedCornerShape(16.dp)
                                 )
                             } else {
@@ -353,7 +331,7 @@ fun FactorSelectScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelected) {
-                            MedicalBlue.copy(alpha = 0.08f)
+                            PrimaryAccent.copy(alpha = 0.08f)
                         } else {
                             MaterialTheme.colorScheme.surface
                         }
@@ -373,19 +351,19 @@ fun FactorSelectScreen(
                                 text = factor.shortName,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MedicalBlue else MaterialTheme.colorScheme.onSurface
+                                color = if (isSelected) PrimaryAccent else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = factor.displayName,
                                 fontSize = 13.sp,
-                                color = TextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         if (isSelected) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Selected",
-                                tint = MedicalBlue,
+                                tint = PrimaryAccent,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -403,7 +381,7 @@ fun FactorSelectScreen(
                     .height(56.dp)
                     .testTag(ANALYZE_BUTTON_TAG),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MedicalBlue),
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
                 enabled = !isAnalyzing
             ) {
                 if (isAnalyzing) {

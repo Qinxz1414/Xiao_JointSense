@@ -33,18 +33,13 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,9 +59,11 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import cloud.univ.jointsense.analysis.calibration.CalibrationError
 import cloud.univ.jointsense.analysis.calibration.CalibrationValidation
-import cloud.univ.jointsense.designsystem.theme.MedicalBlue
-import cloud.univ.jointsense.designsystem.theme.MedicalGreen
-import cloud.univ.jointsense.designsystem.theme.TextSecondary
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
+import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
+import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
+import cloud.univ.jointsense.designsystem.theme.BioGreen
+import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.io.File
 
@@ -103,13 +100,13 @@ internal fun CalibrationSelectScreen(
         onBack = onBack,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Science, null, Modifier.size(80.dp), tint = MedicalBlue.copy(alpha = 0.3f))
+            Icon(Icons.Default.Science, null, Modifier.size(80.dp), tint = PrimaryAccent.copy(alpha = 0.3f))
             Spacer(Modifier.height(16.dp))
             Text("Photo the standard ladder plate", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(
                 "Use the kit's 3×3 standard plate for one factor.",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(24.dp))
@@ -163,9 +160,9 @@ internal fun CalibrationCropScreen(
             Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Crop, null, Modifier.size(20.dp), tint = MedicalBlue)
+            Icon(Icons.Default.Crop, null, Modifier.size(20.dp), tint = PrimaryAccent)
             Spacer(Modifier.width(8.dp))
-            Text("Crop to the 3×3 well plate region", color = TextSecondary)
+            Text("Crop to the 3×3 well plate region", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(8.dp))
         val bitmap = state.bitmap
@@ -190,7 +187,7 @@ internal fun CalibrationCropScreen(
             onClick = onDetect,
             enabled = bitmap != null && crop != null && !state.isDetecting,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MedicalGreen),
+            colors = ButtonDefaults.buttonColors(containerColor = BioGreen),
         ) {
             Text(if (state.isDetecting) "Detecting…" else "Detect Wells")
         }
@@ -217,12 +214,12 @@ internal fun CalibrationAssignScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InflammationFactor.entries.forEach { factor ->
                 val selected = factor == state.factor
-                Card(
+                ClinicalCard(
                     modifier = Modifier.weight(1f).clickable { onFactorChanged(factor) }.then(
-                        if (selected) Modifier.border(2.dp, MedicalBlue, RoundedCornerShape(12.dp)) else Modifier,
+                        if (selected) Modifier.border(2.dp, PrimaryAccent, RoundedCornerShape(12.dp)) else Modifier,
                     ),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (selected) MedicalBlue.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+                        containerColor = if (selected) PrimaryAccent.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
                     ),
                 ) {
                     Text(
@@ -290,7 +287,7 @@ internal fun CalibrationReviewScreen(
             onClick = onSave,
             enabled = state.canSave,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MedicalGreen),
+            colors = ButtonDefaults.buttonColors(containerColor = BioGreen),
         ) {
             Icon(Icons.Default.Check, null)
             Spacer(Modifier.width(6.dp))
@@ -317,7 +314,7 @@ internal fun CalibrationDoneScreen(
         backEnabled = !state.isPersistenceBusy,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.CheckCircle, null, Modifier.size(72.dp), tint = MedicalGreen)
+            Icon(Icons.Default.CheckCircle, null, Modifier.size(72.dp), tint = BioGreen)
             Spacer(Modifier.height(16.dp))
             Text(
                 if (state.factoryRestoreCompleted) "Factory curves restored" else "Calibration saved",
@@ -330,7 +327,7 @@ internal fun CalibrationDoneScreen(
                     state.savedFactor != null -> "The ${state.savedFactor.shortName} user curve is active."
                     else -> "Your calibration flow is complete."
                 },
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(24.dp))
@@ -377,7 +374,6 @@ internal fun CalibrationDoneScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CalibrationScaffold(
     title: String,
@@ -390,22 +386,17 @@ private fun CalibrationScaffold(
     Scaffold(
         modifier = Modifier.testTag(tag),
         topBar = {
-            TopAppBar(
-                title = { Text(title, fontWeight = FontWeight.SemiBold) },
+            JointSenseTopBar(
+                title = title,
                 navigationIcon = {
-                    IconButton(
+                    JointSenseBarAction(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
                         onClick = onBack,
                         enabled = backEnabled,
                         modifier = Modifier.testTag("calibration:top-back"),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
+                    )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MedicalBlue,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
-                ),
             )
         },
     ) { paddingValues ->
@@ -413,7 +404,7 @@ private fun CalibrationScaffold(
             Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Text(step, fontSize = 12.sp, color = TextSecondary)
+            Text(step, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
             content()
         }
