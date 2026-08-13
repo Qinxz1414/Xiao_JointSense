@@ -30,6 +30,7 @@ import cloud.univ.jointsense.measurement.CONTINUE_MEASUREMENT_TAG
 import cloud.univ.jointsense.measurement.CropBounds
 import cloud.univ.jointsense.measurement.MeasurementImage
 import cloud.univ.jointsense.measurement.MeasurementViewModel
+import cloud.univ.jointsense.measurement.RESULT_HOME_ACTION_TAG
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +66,19 @@ class ProductionResultNavigationTest {
         composeRule.onNodeWithTag("production:continued-result").performClick()
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.onNodeWithTag("production-screen:trends").assertIsDisplayed()
+    }
+
+    @Test
+    fun productionHistoricalResultHomeActionClearsToTheRealHomeRoot() {
+        val viewModel = createMeasurementViewModel()
+        showProductionResultHost(viewModel)
+
+        composeRule.onNodeWithTag("production:profile").performClick()
+        composeRule.onNodeWithTag("production:history").performClick()
+        composeRule.onNodeWithTag("production:historical-result").performClick()
+        composeRule.onNodeWithTag(RESULT_HOME_ACTION_TAG).performScrollTo().performClick()
+
+        composeRule.onNodeWithTag("production-screen:home").assertIsDisplayed()
     }
 
     @Test

@@ -50,7 +50,7 @@ private fun ImportedFeatureRouteEntries(
     settings: SettingsViewModel,
     languageController: LanguageController,
 ) {
-    HomeRouteScreen(insights, onStartMeasurement = {}, onOpenReport = {})
+    HomeRouteScreen(insights, onStartMeasurement = {}, onRestoreSamples = {}, onOpenReport = {})
     TrendsRouteScreen(insights)
     ReportRouteScreen(insights)
 
@@ -62,6 +62,7 @@ private fun ImportedFeatureRouteEntries(
         resultId = "result-id",
         onContinueMeasurement = {},
         onReturnToOrigin = {},
+        onGoHome = {},
     )
     HistoryRouteScreen(measurement, onOpenResult = {}, onBack = {})
 

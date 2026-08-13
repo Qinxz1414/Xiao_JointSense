@@ -20,11 +20,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,34 +45,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.core.designsystem.R as DesignSystemR
 import cloud.univ.jointsense.designsystem.chart.ChartDataPoint
-import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.chart.LineChart
 import cloud.univ.jointsense.designsystem.chart.Sparkline
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.GradeBadge
+import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.factorColor
-import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.feature.insights.R
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
-import java.util.Locale
 
-/**
- * Home dashboard — OA inflammation overview per the design mockup:
- * factor cards with sparklines, composite AI, grade bar, 7-day trend
- * and a last-test / test-now footer.
- */
 @Composable
 fun HomeScreen(
     state: HomeUiState,
     onTestNow: () -> Unit,
+    onRestoreSamples: () -> Unit,
     onOpenReport: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
+    val presentation = state.toHomePresentation()
     Scaffold(
-        topBar = { JointSenseTopBar(title = stringResource(R.string.insights_home_title)) }
+        topBar = { JointSenseTopBar(title = stringResource(R.string.insights_home_title)) },
     ) { paddingValues ->
         Column(
             modifier = modifier
@@ -77,17 +75,16 @@ fun HomeScreen(
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(16.dp),
         ) {
-            val allResults = state.allResults
-
-            if (allResults.isEmpty()) {
-                EmptyHome(onTestNow = onTestNow)
+            if (presentation.isEmpty) {
+                EmptyHome(onTestNow = onTestNow, onRestoreSamples = onRestoreSamples)
             } else {
                 DashboardContent(
                     state = state,
+                    presentation = presentation,
                     onTestNow = onTestNow,
-                    onOpenReport = onOpenReport
+                    onOpenReport = onOpenReport,
                 )
             }
         }
@@ -95,65 +92,70 @@ fun HomeScreen(
 }
 
 @Composable
-private fun EmptyHome(onTestNow: () -> Unit) {
+private fun EmptyHome(
+    onTestNow: () -> Unit,
+    onRestoreSamples: () -> Unit,
+) {
     ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
                 modifier = Modifier
                     .size(96.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Image(
                     painter = painterResource(id = DesignSystemR.drawable.jointsense_logo),
                     contentDescription = stringResource(R.string.insights_logo_description),
                     modifier = Modifier.size(72.dp),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
                 )
             }
-
             Spacer(modifier = Modifier.height(16.dp))
-
             Text(
                 text = stringResource(R.string.insights_empty_title),
-                fontSize = 24.sp,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             Text(
                 text = stringResource(R.string.insights_empty_message),
-                fontSize = 13.sp,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                lineHeight = 18.sp
             )
-
             Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = onTestNow,
+            StartMeasurementButton(onTestNow)
+            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onRestoreSamples,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
+                    .testTag(RESTORE_SAMPLES_TAG),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                Icon(Icons.Default.Add, contentDescription = null)
+                Icon(Icons.Default.Restore, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.insights_test_now), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.insights_restore_samples))
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.insights_restore_samples_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -161,12 +163,10 @@ private fun EmptyHome(onTestNow: () -> Unit) {
 @Composable
 private fun DashboardContent(
     state: HomeUiState,
+    presentation: HomePresentation,
     onTestNow: () -> Unit,
-    onOpenReport: () -> Unit
+    onOpenReport: () -> Unit,
 ) {
-    val latest = state.latestValues
-    val ai = state.currentAi
-    val grade = state.currentGrade
     val locale = LocalConfiguration.current.locales[0]
     val dateFormat = remember(locale) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
@@ -177,90 +177,34 @@ private fun DashboardContent(
             maximumFractionDigits = 2
         }
     }
-    val lastTest = state.allResults.maxOf { it.timestamp }
 
-    // Factor cards
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        InflammationFactor.entries.forEach { factor ->
-            val value = latest[factor]
-            val spark = state.factorSeries[factor].orEmpty().takeLast(7).map { it.value }
-            ClinicalCard(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp)
-                ) {
-                    Text(
-                        text = factor.shortName,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = value?.let { stringResource(R.string.insights_value, it) }
-                                ?: stringResource(R.string.value_unavailable),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Text(
-                        text = stringResource(R.string.insights_unit),
-                        fontSize = 9.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Sparkline(
-                        values = spark,
-                        color = factorColor(factor),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(26.dp)
-                    )
-                }
-            }
-        }
-    }
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    // AI composite card
     ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.insights_oa_index),
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = ai?.let { stringResource(R.string.insights_value, it) }
+                        text = presentation.oaIndex?.let(numberFormat::format)
                             ?: stringResource(R.string.value_unavailable),
-                        fontSize = 34.sp,
+                        modifier = Modifier.testTag(OA_INDEX_VALUE_TAG),
+                        style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (grade != null) {
+                    presentation.grade?.let { grade ->
                         Spacer(modifier = Modifier.width(12.dp))
                         val gradeLabel = stringResource(gradeResource(grade))
                         GradeBadge(
@@ -272,15 +216,26 @@ private fun DashboardContent(
                                 grade,
                                 gradeLabel,
                             ),
+                            modifier = Modifier.testTag(OA_GRADE_TAG),
                         )
                     }
+                }
+                presentation.latestTimestamp?.let { timestamp ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.insights_latest_observation_time,
+                            dateFormat.format(Date(timestamp)),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             IconButton(onClick = onOpenReport) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = stringResource(R.string.insights_open_report),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -288,116 +243,146 @@ private fun DashboardContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    // Grade card
     ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = stringResource(R.string.insights_oa_grade),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(10.dp))
             val labels = (0..4).map { stringResource(gradeResource(it)) }
-            val gradeStateDescription = grade?.let {
-                stringResource(R.string.insights_grade_description, it, labels[it])
-            } ?: stringResource(R.string.insights_grade_unavailable)
             GradeScale(
-                currentGrade = grade,
+                currentGrade = presentation.grade,
                 labels = labels,
                 contentDescription = stringResource(R.string.insights_grade_scale_description),
-                stateDescription = gradeStateDescription,
+                stateDescription = presentation.grade?.let {
+                    stringResource(R.string.insights_grade_description, it, labels[it])
+                } ?: stringResource(R.string.insights_grade_unavailable),
             )
         }
     }
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    // Recent 7-day AI trend
-    ClinicalCard(
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
+        presentation.factorValues.forEach { factorValue ->
+            val factor = factorValue.factor
+            val spark = state.factorSeries[factor].orEmpty()
+                .sortedBy(InsightPoint::time)
+                .takeLast(7)
+                .map(InsightPoint::value)
+            ClinicalCard(
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(factorValueTag(factor)),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text(
+                        text = factor.shortName,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = factorValue.value?.let(numberFormat::format)
+                            ?: stringResource(R.string.value_unavailable),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = stringResource(R.string.insights_unit),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Sparkline(
+                        values = spark,
+                        color = factorColor(factor),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(26.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    ClinicalCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(RECENT_TREND_TAG),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = stringResource(R.string.insights_recent_trend),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            val weekSeries = state.aiSeries.filter {
-                it.time >= System.currentTimeMillis() - DAY_MILLIS * 7
-            }.ifEmpty { state.aiSeries.takeLast(7) }
             val dayFormat = remember(locale) { DateFormat.getDateInstance(DateFormat.SHORT, locale) }
-            Box(
+            LineChart(
+                dataPoints = presentation.recentObservations.map {
+                    ChartDataPoint(dayFormat.format(Date(it.time)), it.value)
+                },
+                lineColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
-            ) {
-                LineChart(
-                    dataPoints = weekSeries.map {
-                        ChartDataPoint(
-                            label = dayFormat.format(Date(it.time)),
-                            value = it.value
-                        )
-                    },
-                    lineColor = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxSize(),
-                    yAxisLabel = stringResource(R.string.insights_ai_axis),
-                    formatValue = numberFormat::format,
-                )
-            }
+                    .height(180.dp),
+                yAxisLabel = stringResource(R.string.insights_ai_axis),
+                formatValue = numberFormat::format,
+            )
         }
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
-
-    // Last test + test now footer
-    ClinicalCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.insights_last_test),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = dateFormat.format(Date(lastTest)),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Button(
-                onClick = onTestNow,
-                shape = RoundedCornerShape(12.dp),
-            ) {
-                Text(stringResource(R.string.insights_test_now), fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-
+    Spacer(modifier = Modifier.height(16.dp))
+    StartMeasurementButton(onTestNow)
     Spacer(modifier = Modifier.height(8.dp))
 }
+
+@Composable
+private fun StartMeasurementButton(onTestNow: () -> Unit) {
+    Button(
+        onClick = onTestNow,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .testTag(START_MEASUREMENT_TAG),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.insights_start_new_measurement),
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+private fun factorValueTag(factor: cloud.univ.jointsense.domain.model.InflammationFactor): String = when (factor) {
+    cloud.univ.jointsense.domain.model.InflammationFactor.TNF_ALPHA -> FACTOR_VALUE_TNF_ALPHA_TAG
+    cloud.univ.jointsense.domain.model.InflammationFactor.IL6 -> FACTOR_VALUE_IL6_TAG
+    cloud.univ.jointsense.domain.model.InflammationFactor.IL1_BETA -> FACTOR_VALUE_IL1_BETA_TAG
+}
+
+const val OA_INDEX_VALUE_TAG = "oa_index_value"
+const val OA_GRADE_TAG = "oa_grade"
+const val FACTOR_VALUE_TNF_ALPHA_TAG = "factor_value_tnf_alpha"
+const val FACTOR_VALUE_IL6_TAG = "factor_value_il6"
+const val FACTOR_VALUE_IL1_BETA_TAG = "factor_value_il1_beta"
+const val RECENT_TREND_TAG = "recent_trend"
+const val START_MEASUREMENT_TAG = "start_measurement"
+const val RESTORE_SAMPLES_TAG = "restore_samples"

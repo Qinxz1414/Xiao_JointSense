@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,12 +30,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -66,7 +69,7 @@ fun TrendsScreen(
     modifier: Modifier = Modifier
 ) {
     // 0 = All
-    var periodDays by remember { mutableIntStateOf(7) }
+    var periodDays by rememberSaveable { mutableIntStateOf(7) }
     val periods = listOf(7, 30, 90, 0)
     val locale = LocalConfiguration.current.locales[0]
     val numberFormat = remember(locale) {
@@ -101,7 +104,7 @@ fun TrendsScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                             .clickable { periodDays = days }
-                            .padding(vertical = 8.dp),
+                            .heightIn(min = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -173,8 +176,15 @@ fun TrendsScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        // Legend
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.insights_series_label),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.testTag(TREND_SERIES_LABELS_TAG),
+                        ) {
                             factorSeries.forEach { series ->
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
@@ -194,10 +204,18 @@ fun TrendsScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.insights_concentration_axis),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag(TREND_UNIT_AXIS_LABEL_TAG),
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
+                                .testTag(FACTOR_TREND_CHART_TAG)
                         ) {
                             MultiLineChart(
                                 series = factorSeries,
@@ -207,6 +225,14 @@ fun TrendsScreen(
                                 formatTime = { chartDateFormat.format(Date(it)) },
                             )
                         }
+                        Text(
+                            text = stringResource(R.string.insights_date_axis),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .testTag(TREND_DATE_AXIS_LABEL_TAG),
+                        )
                     }
                 }
 
@@ -237,6 +263,7 @@ fun TrendsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(160.dp)
+                                .testTag(OA_TREND_CHART_TAG)
                         ) {
                             LineChart(
                                 dataPoints = aiSeries.map {
@@ -345,6 +372,12 @@ fun TrendsScreen(
         }
     }
 }
+
+const val FACTOR_TREND_CHART_TAG = "factor_trend_chart"
+const val OA_TREND_CHART_TAG = "oa_trend_chart"
+const val TREND_DATE_AXIS_LABEL_TAG = "trend_date_axis_label"
+const val TREND_UNIT_AXIS_LABEL_TAG = "trend_unit_axis_label"
+const val TREND_SERIES_LABELS_TAG = "trend_series_labels"
 
 @Composable
 private fun KeyEventItem.localizedText(): String = when (kind) {

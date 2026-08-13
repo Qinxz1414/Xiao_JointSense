@@ -18,7 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +47,7 @@ import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.feature.measurement.R
@@ -65,6 +66,7 @@ fun ResultScreen(
     cleanupWarning: String? = null,
     onContinueMeasurement: () -> Unit,
     onReturnToOrigin: () -> Unit,
+    onGoHome: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val locale = LocalConfiguration.current.locales[0]
@@ -74,10 +76,9 @@ fun ResultScreen(
             maximumFractionDigits = 2
         }
     }
-    val results = session?.results ?: emptyList()
-    val latestPerFactor = BaselineMeasurementMetrics.latestPerFactor(results)
-    val ai = BaselineMeasurementMetrics.aiFromResults(results)
-    val grade = ai?.let { BaselineMeasurementMetrics.grade(it) }
+    val presentation = createResultUiModel(session, lastResult)
+    val ai = presentation.oaIndex
+    val grade = presentation.grade
 
     Scaffold(
         topBar = {
@@ -112,6 +113,85 @@ fun ResultScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
+            ClinicalCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.measurement_latest_measurement),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = presentation.measuredFactor?.shortName
+                            ?: stringResource(R.string.value_unavailable),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = presentation.concentration?.let {
+                                aiScaleFormat.format(it.toDouble())
+                            } ?: stringResource(R.string.value_unavailable),
+                            modifier = Modifier.testTag(RESULT_CONCENTRATION_TAG),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.factor_unit),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.measurement_range_status,
+                            presentation.rangeStatus?.let { stringResource(it.labelResource()) }
+                                ?: stringResource(R.string.measurement_range_unknown),
+                        ),
+                        modifier = Modifier.testTag(RESULT_RANGE_STATUS_TAG),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    presentation.features?.let { features ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(
+                                R.string.measurement_rgb_features,
+                                features.rMean,
+                                features.rStd,
+                                features.gMean,
+                                features.gStd,
+                                features.bMean,
+                                features.bStd,
+                            ),
+                            modifier = Modifier.testTag(RESULT_FEATURES_SUMMARY_TAG),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.measurement_tealness,
+                                features.tealness,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // ---- Quantitative analysis card ----
             ClinicalCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -158,7 +238,7 @@ fun ResultScreen(
 
                     // Value rows
                     InflammationFactor.entries.forEach { factor ->
-                        val value = latestPerFactor[factor]
+                        val value = presentation.factorValues.first { it.factor == factor }.value
                         val isJustMeasured = lastResult?.factor == factor
                         Row(
                             modifier = Modifier
@@ -359,16 +439,17 @@ fun ResultScreen(
             }
 
             Button(
-                onClick = onReturnToOrigin,
+                onClick = onGoHome,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
+                    .height(50.dp)
+                    .testTag(RESULT_HOME_ACTION_TAG),
                 shape = RoundedCornerShape(14.dp),
             ) {
-                Icon(Icons.Default.Check, contentDescription = null)
+                Icon(Icons.Default.Home, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    stringResource(R.string.measurement_action_done),
+                    stringResource(R.string.measurement_action_home),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -390,6 +471,17 @@ fun ResultScreen(
 }
 
 const val MEASUREMENT_CLEANUP_WARNING_TAG = "measurement_cleanup_warning"
+const val RESULT_CONCENTRATION_TAG = "result_concentration"
+const val RESULT_RANGE_STATUS_TAG = "result_range_status"
+const val RESULT_FEATURES_SUMMARY_TAG = "result_features_summary"
+const val RESULT_HOME_ACTION_TAG = "result_home_action"
+
+private fun RangeStatus.labelResource(): Int = when (this) {
+    RangeStatus.UNKNOWN -> R.string.measurement_range_unknown
+    RangeStatus.BELOW_RANGE -> R.string.measurement_range_below
+    RangeStatus.IN_RANGE -> R.string.measurement_range_within
+    RangeStatus.ABOVE_RANGE -> R.string.measurement_range_above
+}
 
 private fun gradeResource(grade: Int): Int = when (grade) {
     0 -> R.string.grade_0

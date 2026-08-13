@@ -11,6 +11,7 @@
     <string name="measurement_action_continue">检测另一项因子</string>
     <string name="measurement_action_new_test">开始新检测</string>
     <string name="measurement_action_done">完成</string>
+    <string name="measurement_action_home">返回首页</string>
     <string name="measurement_title_select_image">选择图像</string>
     <string name="measurement_select_image_instructions">拍摄芯片反应腔照片，或从相册选择已有图像。</string>
     <string name="measurement_title_crop">选择分析区域</string>
@@ -22,10 +23,12 @@
     <string name="measurement_title_result">分析结果</string>
     <string name="measurement_cleanup_warning">临时图像清理未能完成，可继续使用本次结果。</string>
     <string name="measurement_quantitative_analysis">定量分析（pg/mL）</string>
+    <string name="measurement_latest_measurement">本次测量结果</string>
     <string name="measurement_well_signal">孔信号 — %1$s %2$.2f pg/mL</string>
     <string name="measurement_value">%1$.2f</string>
     <string name="measurement_grade_unavailable">等级暂无数据</string>
     <string name="measurement_rgb_features">R（均值=%1$.1f，标准差=%2$.1f） G（均值=%3$.1f，标准差=%4$.1f） B（均值=%5$.1f，标准差=%6$.1f）</string>
+    <string name="measurement_tealness">净青色信号（B − R）：%1$.1f</string>
     <string name="measurement_oa_index">OA 炎症综合指数（AI）</string>
     <string name="measurement_oa_grade">OA 炎症等级</string>
     <string name="measurement_oa_grade_description">%1$d 级，%2$s</string>
@@ -34,6 +37,8 @@
     <string name="measurement_range_below">低于检测下限</string>
     <string name="measurement_range_within">处于检测范围内</string>
     <string name="measurement_range_above">高于检测上限</string>
+    <string name="measurement_range_unknown">定量范围状态暂无数据</string>
+    <string name="measurement_range_status">定量范围：%1$s</string>
     <string name="measurement_history_title">检测记录</string>
     <string name="measurement_history_empty_title">暂无检测记录</string>
     <string name="measurement_history_empty_message">完成一次新检测后，结果将显示在这里。</string>

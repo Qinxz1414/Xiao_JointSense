@@ -207,6 +207,7 @@ class MeasurementFlowTest {
                     canAddMore = false,
                     onContinueMeasurement = {},
                     onReturnToOrigin = { returned = true },
+                    onGoHome = {},
                 )
             }
         }
@@ -245,6 +246,7 @@ class MeasurementFlowTest {
                         continued = true
                     },
                     onReturnToOrigin = {},
+                    onGoHome = {},
                 )
             }
         }
@@ -269,6 +271,7 @@ class MeasurementFlowTest {
                     cleanupWarning = "Temporary image cleanup failed",
                     onContinueMeasurement = {},
                     onReturnToOrigin = {},
+                    onGoHome = {},
                 )
             }
         }

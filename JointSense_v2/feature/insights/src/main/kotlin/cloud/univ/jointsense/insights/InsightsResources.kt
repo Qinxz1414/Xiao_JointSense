@@ -24,16 +24,6 @@ internal fun activityResource(grade: Int): Int = when (grade) {
 }
 
 @StringRes
-internal fun riskResource(grade: Int): Int = when (grade) {
-    0 -> R.string.insights_risk_0
-    1 -> R.string.insights_risk_1
-    2 -> R.string.insights_risk_2
-    3 -> R.string.insights_risk_3
-    4 -> R.string.insights_risk_4
-    else -> error("Grade must be between 0 and 4")
-}
-
-@StringRes
 internal fun suggestionResource(suggestion: InsightSuggestion): Int = when (suggestion) {
     InsightSuggestion.CONTINUE_MONITORING -> R.string.report_recommend_continue_monitoring
     InsightSuggestion.LOW_IMPACT_EXERCISE -> R.string.report_recommend_low_impact_exercise

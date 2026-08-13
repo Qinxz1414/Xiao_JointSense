@@ -17,7 +17,6 @@ enum class ReportText {
     GENERATED,
     OA_INDEX,
     GRADE,
-    RISK,
     LATEST_VALUES,
     WEEK_CHANGES,
     OA_WEEK_CHANGE,
@@ -86,10 +85,6 @@ class LocalizedReportFormatter(
                 oaValue,
                 text(ReportText.GRADE),
                 grade,
-                gradeLabel(grade),
-            ) + '\n' + formatted(
-                ReportText.LABELED_VALUE_FORMAT,
-                text(ReportText.RISK),
                 gradeLabel(grade),
             )
         }
@@ -208,7 +203,6 @@ private fun ReportText.resourceId(): Int = when (this) {
     ReportText.GENERATED -> R.string.report_generated
     ReportText.OA_INDEX -> R.string.report_oa_index
     ReportText.GRADE -> R.string.report_grade
-    ReportText.RISK -> R.string.report_risk
     ReportText.LATEST_VALUES -> R.string.report_latest_values
     ReportText.WEEK_CHANGES -> R.string.report_week_changes
     ReportText.OA_WEEK_CHANGE -> R.string.report_oa_week_change

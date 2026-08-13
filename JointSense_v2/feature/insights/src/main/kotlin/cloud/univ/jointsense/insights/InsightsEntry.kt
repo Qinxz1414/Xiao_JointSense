@@ -7,11 +7,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun HomeRouteScreen(
     viewModel: InsightsViewModel,
     onStartMeasurement: () -> Unit,
+    onRestoreSamples: () -> Unit,
     onOpenReport: () -> Unit,
 ) {
     HomeScreen(
         state = viewModel.homeState.collectAsStateWithLifecycle().value,
         onTestNow = onStartMeasurement,
+        onRestoreSamples = onRestoreSamples,
         onOpenReport = onOpenReport,
     )
 }

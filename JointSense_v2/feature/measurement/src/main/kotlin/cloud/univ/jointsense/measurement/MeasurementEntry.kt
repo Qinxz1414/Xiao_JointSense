@@ -273,6 +273,7 @@ fun ResultRouteScreen(
     resultId: String,
     onContinueMeasurement: () -> Unit,
     onReturnToOrigin: () -> Unit,
+    onGoHome: () -> Unit,
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
     val session = state.currentSession ?: state.sessions.firstOrNull { candidate ->
@@ -285,6 +286,7 @@ fun ResultRouteScreen(
         cleanupWarning = state.captureCleanupWarning,
         onContinueMeasurement = onContinueMeasurement,
         onReturnToOrigin = onReturnToOrigin,
+        onGoHome = onGoHome,
     )
 }
 

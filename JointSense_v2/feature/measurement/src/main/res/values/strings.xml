@@ -11,6 +11,7 @@
     <string name="measurement_action_continue">Measure another factor</string>
     <string name="measurement_action_new_test">Start new test</string>
     <string name="measurement_action_done">Done</string>
+    <string name="measurement_action_home">Home</string>
     <string name="measurement_title_select_image">Select image</string>
     <string name="measurement_select_image_instructions">Take a photo of the chip reaction chamber or select an existing image from the gallery.</string>
     <string name="measurement_title_crop">Select analysis area</string>
@@ -22,10 +23,12 @@
     <string name="measurement_title_result">Analysis result</string>
     <string name="measurement_cleanup_warning">Temporary image cleanup could not be completed. You can continue using this result.</string>
     <string name="measurement_quantitative_analysis">Quantitative analysis (pg/mL)</string>
+    <string name="measurement_latest_measurement">Latest measurement</string>
     <string name="measurement_well_signal">Well signal — %1$s %2$.2f pg/mL</string>
     <string name="measurement_value">%1$.2f</string>
     <string name="measurement_grade_unavailable">Grade unavailable</string>
     <string name="measurement_rgb_features">R(μ=%1$.1f, σ=%2$.1f) G(μ=%3$.1f, σ=%4$.1f) B(μ=%5$.1f, σ=%6$.1f)</string>
+    <string name="measurement_tealness">Net tealness (B − R): %1$.1f</string>
     <string name="measurement_oa_index">OA inflammation index (AI)</string>
     <string name="measurement_oa_grade">OA inflammation grade</string>
     <string name="measurement_oa_grade_description">Grade %1$d, %2$s</string>
@@ -34,6 +37,8 @@
     <string name="measurement_range_below">Below the detection range</string>
     <string name="measurement_range_within">Within the detection range</string>
     <string name="measurement_range_above">Above the detection range</string>
+    <string name="measurement_range_unknown">Range status unavailable</string>
+    <string name="measurement_range_status">Quantitative range: %1$s</string>
     <string name="measurement_history_title">Test history</string>
     <string name="measurement_history_empty_title">No test history</string>
     <string name="measurement_history_empty_message">Start a new test to see results here.</string>

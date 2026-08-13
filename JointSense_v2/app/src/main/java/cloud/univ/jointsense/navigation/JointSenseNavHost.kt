@@ -201,6 +201,9 @@ private fun JointSenseNavHostContent(
                                 requireNotNull(sessionCreationDriver)
                                     .request(TopLevelDestination.HOME, sessionNamePrefix)
                             },
+                            onRestoreSamples = {
+                                actions.openTopLevel(TopLevelDestination.PROFILE)
+                            },
                             onOpenReport = {
                                 actions.openTopLevel(TopLevelDestination.REPORT)
                             },
@@ -312,6 +315,10 @@ private fun JointSenseNavHostContent(
                                 }
                             },
                             onReturnToOrigin = returnToOrigin,
+                            onGoHome = {
+                                if (inMeasurement) measurement.finishMeasurement()
+                                actions.goHome()
+                            },
                         )
                     }
                 }

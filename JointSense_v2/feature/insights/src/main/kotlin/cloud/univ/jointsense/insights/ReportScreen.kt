@@ -39,14 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cloud.univ.jointsense.designsystem.chart.GaugeChart
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
@@ -62,13 +61,14 @@ import cloud.univ.jointsense.insights.report.ReportError
 import cloud.univ.jointsense.insights.report.ReportShareResult
 import cloud.univ.jointsense.insights.report.ReportSharing
 import java.io.File
+import java.text.NumberFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * AI Report screen — cartilage inflammation assessment, 7-day change
- * analysis, 14-day risk gauge, rule-based AI suggestions and export.
+ * Research report preview with measured values, evidence-based weekly trend,
+ * observations, and export actions. The fixed disclaimer is export-only.
  */
 @Composable
 fun ReportScreen(
@@ -76,11 +76,18 @@ fun ReportScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val ai = state.currentAi
-    val grade = state.currentGrade
+    val presentation = state.toReportPresentation()
+    val ai = presentation.oaIndex
+    val grade = presentation.grade
     val locale = context.resources.configuration.locales[0]
     val formatter = remember(context.resources, locale) {
         LocalizedReportFormatter.from(context.resources, locale)
+    }
+    val numberFormat = remember(locale) {
+        NumberFormat.getNumberInstance(locale).apply {
+            minimumFractionDigits = 1
+            maximumFractionDigits = 2
+        }
     }
     val reportModelFactory = remember(state) {
         ReportActionModelFactory(stateProvider = { state }, clock = System::currentTimeMillis)
@@ -206,9 +213,11 @@ fun ReportScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // ---- 7-day change card ----
+                // ---- Absolute factor summary ----
                 ClinicalCard(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(REPORT_FACTOR_SUMMARY_TAG),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
@@ -218,7 +227,7 @@ fun ReportScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = stringResource(R.string.insights_change_trend),
+                            text = stringResource(R.string.insights_factor_summary),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -226,6 +235,9 @@ fun ReportScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         InflammationFactor.entries.forEach { factor ->
                             val delta = state.factorDeltaPct7d[factor]
+                            val absolute = presentation.factorValues
+                                .first { it.factor == factor }
+                                .value
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -246,6 +258,18 @@ fun ReportScreen(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
+                                Text(
+                                    text = absolute?.let {
+                                        stringResource(
+                                            R.string.insights_concentration_value,
+                                            numberFormat.format(it),
+                                        )
+                                    } ?: stringResource(R.string.value_unavailable),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
                                 if (delta != null) {
                                     Icon(
                                         imageVector = if (delta >= 0) {
@@ -267,12 +291,6 @@ fun ReportScreen(
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = stringResource(R.string.insights_vs_previous_week),
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
                                 } else {
                                     Text(
                                         text = stringResource(R.string.insights_no_comparison),
@@ -287,9 +305,11 @@ fun ReportScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // ---- Risk gauge card ----
+                // ---- Evidence-based trend interpretation ----
                 ClinicalCard(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(REPORT_TREND_INTERPRETATION_TAG),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
@@ -297,38 +317,35 @@ fun ReportScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.Start
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Text(
+                            text = stringResource(R.string.insights_trend_interpretation),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (presentation.trend == TrendInterpretation.INSUFFICIENT_DATA) {
+                                stringResource(trendInterpretationResource(presentation.trend))
+                            } else {
+                                stringResource(
+                                    trendInterpretationResource(presentation.trend),
+                                    STABLE_TREND_THRESHOLD_PERCENT,
+                                )
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        presentation.weekChangePercent?.let { change ->
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = stringResource(R.string.insights_risk_index),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                text = stringResource(R.string.insights_week_change_value, change),
+                                style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                text = stringResource(R.string.insights_progression_forecast),
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        GaugeChart(
-                            value = ai,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                        )
-                        Text(
-                            text = stringResource(riskResource(grade)),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = gradeColor
-                        )
                     }
                 }
 
@@ -336,7 +353,9 @@ fun ReportScreen(
 
                 // ---- AI suggestions card ----
                 ClinicalCard(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(REPORT_SUGGESTIONS_TAG),
                     shape = RoundedCornerShape(16.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
@@ -429,7 +448,8 @@ fun ReportScreen(
                                 enabled = !isExporting,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp),
+                                    .height(48.dp)
+                                    .testTag(REPORT_EXPORT_PDF_TAG),
                                 shape = RoundedCornerShape(12.dp),
                             ) {
                                 Icon(
@@ -445,7 +465,8 @@ fun ReportScreen(
                                 onClick = ::shareTextReport,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(48.dp),
+                                    .height(48.dp)
+                                    .testTag(REPORT_EXPORT_SHARE_TAG),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Icon(
@@ -478,3 +499,17 @@ private fun ReportError.messageResource(): Int = when (this) {
     ReportError.NO_SHARE_APP -> R.string.report_error_no_share_app
     ReportError.OPEN_FILE -> R.string.report_error_open_file
 }
+
+private fun trendInterpretationResource(trend: TrendInterpretation): Int = when (trend) {
+    TrendInterpretation.RISING -> R.string.insights_trend_rising
+    TrendInterpretation.STABLE -> R.string.insights_trend_stable
+    TrendInterpretation.FALLING -> R.string.insights_trend_falling
+    TrendInterpretation.INSUFFICIENT_DATA -> R.string.insights_trend_insufficient
+}
+
+const val REPORT_FACTOR_SUMMARY_TAG = "report_factor_summary"
+const val REPORT_TREND_INTERPRETATION_TAG = "report_trend_interpretation"
+const val REPORT_SUGGESTIONS_TAG = "report_suggestions"
+const val REPORT_EXPORT_PDF_TAG = "report_export_pdf"
+const val REPORT_EXPORT_SHARE_TAG = "report_export_share"
+private const val STABLE_TREND_THRESHOLD_PERCENT = 10
