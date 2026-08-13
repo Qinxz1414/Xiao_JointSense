@@ -1,6 +1,7 @@
 package cloud.univ.jointsense.designsystem
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,6 +32,23 @@ class ComponentContractTest {
         val loading = File(componentDirectory, "LoadingErrorState.kt").readText()
         assertTrue(loading.contains("message: String?"))
         assertTrue(loading.contains("actionLabel: String?"))
+
+        val gradeBadge = File(componentDirectory, "GradeBadge.kt").readText()
+        assertTrue(
+            Regex("color\\s*=\\s*MaterialTheme\\.colorScheme\\.surface").containsMatchIn(gradeBadge),
+        )
+        assertTrue(
+            Regex("contentColor\\s*=\\s*MaterialTheme\\.colorScheme\\.onSurface").containsMatchIn(gradeBadge),
+        )
+        assertTrue(
+            Regex("\\.background\\(\\s*gradeColor\\(grade\\)\\s*,\\s*CircleShape\\s*\\)")
+                .containsMatchIn(gradeBadge),
+        )
+        assertEquals(
+            "Grade color must be limited to the separate swatch",
+            1,
+            Regex(Regex.escape("gradeColor(grade)")).findAll(gradeBadge).count(),
+        )
     }
 
     @Test

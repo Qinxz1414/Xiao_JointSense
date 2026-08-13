@@ -7,10 +7,13 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.component.GradeBadge
+import cloud.univ.jointsense.designsystem.component.GRADE_BADGE_CONTAINER_TAG
+import cloud.univ.jointsense.designsystem.component.GRADE_BADGE_SWATCH_TAG
 import cloud.univ.jointsense.designsystem.component.LoadingErrorState
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import org.junit.Assert.assertEquals
@@ -74,6 +77,8 @@ class DesignSystemComponentTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Grade 2, Moderate"))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
         composeRule.onNodeWithText("Moderate").assertIsDisplayed()
+        composeRule.onNodeWithTag(GRADE_BADGE_CONTAINER_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(GRADE_BADGE_SWATCH_TAG, useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test

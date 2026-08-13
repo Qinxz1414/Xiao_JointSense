@@ -7,6 +7,18 @@ import org.junit.Test
 
 class ProductionColorRoleAuditTest {
     @Test
+    fun directArgbMatcherRejectsWhitespaceAndQualifiedFormattingVariants() {
+        listOf(
+            "Color(0xFF123456)",
+            "Color ( 0xFF123456 )",
+            "Color(\n    0xFF123456,\n)",
+            "androidx.compose.ui.graphics.Color (\n 0XFF123456\n)",
+        ).forEach { source ->
+            assertTrue("Direct ARGB variant escaped audit: $source", DIRECT_ARGB.containsMatchIn(source))
+        }
+    }
+
+    @Test
     fun genericProductionCallersUseMaterialRoles() {
         val projectRoot = File("../..").canonicalFile
         val forbiddenFixedTokens = Regex(
@@ -44,10 +56,9 @@ class ProductionColorRoleAuditTest {
             "core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/theme/JointSenseColors.kt",
             "core/designsystem/src/main/kotlin/cloud/univ/jointsense/designsystem/theme/JointSenseTheme.kt",
         )
-        val directArgb = Regex("Color\\(0x[0-9A-Fa-f]+")
         val offenders = productionKotlinFiles(projectRoot).mapNotNull { file ->
             val relative = file.relativeTo(projectRoot).invariantSeparatorsPath
-            if (directArgb.containsMatchIn(file.readText()) && relative !in allowed) relative else null
+            if (DIRECT_ARGB.containsMatchIn(file.readText()) && relative !in allowed) relative else null
         }.toList()
 
         assertTrue("Direct ARGB outside theme definitions: $offenders", offenders.isEmpty())
@@ -93,4 +104,10 @@ class ProductionColorRoleAuditTest {
                 "/build/" !in it.invariantSeparatorsPath &&
                 "/src/main/" in it.invariantSeparatorsPath
         }
+
+    private companion object {
+        val DIRECT_ARGB = Regex(
+            "(?:androidx\\.compose\\.ui\\.graphics\\.)?Color\\s*\\(\\s*0[xX][0-9A-Fa-f]+",
+        )
+    }
 }

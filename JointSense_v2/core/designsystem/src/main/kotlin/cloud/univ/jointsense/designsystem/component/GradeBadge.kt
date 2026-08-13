@@ -18,8 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import cloud.univ.jointsense.designsystem.theme.gradeColor
+
+const val GRADE_BADGE_CONTAINER_TAG = "grade_badge_container"
+const val GRADE_BADGE_SWATCH_TAG = "grade_badge_swatch"
 
 @Composable
 fun GradeBadge(
@@ -31,10 +35,12 @@ fun GradeBadge(
 ) {
     require(grade in 0..4) { "Grade must be between 0 and 4" }
     Surface(
-        modifier = modifier.semantics(mergeDescendants = true) {
-            this.contentDescription = contentDescription
-            this.stateDescription = stateDescription
-        },
+        modifier = modifier
+            .testTag(GRADE_BADGE_CONTAINER_TAG)
+            .semantics(mergeDescendants = true) {
+                this.contentDescription = contentDescription
+                this.stateDescription = stateDescription
+            },
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -48,6 +54,7 @@ fun GradeBadge(
             Box(
                 modifier = Modifier
                     .size(10.dp)
+                    .testTag(GRADE_BADGE_SWATCH_TAG)
                     .background(gradeColor(grade), CircleShape),
             )
             Text(
