@@ -74,6 +74,7 @@ data class MeasurementUiState(
     val error: MeasurementError? = null,
     val resumeStage: Stage? = null,
     val resultId: String? = null,
+    val awaitingRepositoryResultId: String? = null,
     val originDestination: String? = null,
     val hasRequestedCameraPermission: Boolean = false,
     val captureCleanupWarning: String? = null,

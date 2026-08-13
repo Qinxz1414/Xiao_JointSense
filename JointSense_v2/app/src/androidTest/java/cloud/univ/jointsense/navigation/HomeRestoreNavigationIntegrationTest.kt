@@ -1,6 +1,7 @@
 package cloud.univ.jointsense.navigation
 
 import androidx.activity.ComponentActivity
+import androidx.room.Room
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -9,13 +10,12 @@ import androidx.compose.ui.test.performClick
 import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import cloud.univ.jointsense.JointSenseApplication
+import cloud.univ.jointsense.database.JointSenseDatabase
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.di.AppContainer
 import cloud.univ.jointsense.insights.RESTORE_SAMPLES_TAG
 import cloud.univ.jointsense.settings.PROFILE_SCREEN_TAG
 import cloud.univ.jointsense.settings.RESTORE_SAMPLES_CONFIRMATION_TAG
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -28,18 +28,22 @@ class HomeRestoreNavigationIntegrationTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private lateinit var container: AppContainer
+    private var database: JointSenseDatabase? = null
 
     @Before
-    fun clearSessionsForEmptyHome() {
-        container = ApplicationProvider
-            .getApplicationContext<JointSenseApplication>()
-            .container
-        runBlocking { container.dataManagement.clearAllData() }
+    fun createIsolatedContainer() {
+        val application = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val isolatedDatabase = Room.inMemoryDatabaseBuilder(
+            application,
+            JointSenseDatabase::class.java,
+        ).build()
+        database = isolatedDatabase
+        container = AppContainer(application, isolatedDatabase)
     }
 
     @After
-    fun restoreBuiltInFixture() {
-        runBlocking { container.dataManagement.restoreBuiltInSamples() }
+    fun closeIsolatedDatabase() {
+        database?.close()
     }
 
     @Test

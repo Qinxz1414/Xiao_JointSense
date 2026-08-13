@@ -67,11 +67,30 @@ class ResultUiModelTest {
 
         assertEquals(InflammationFactor.TNF_ALPHA, model.measuredFactor)
         assertNull(model.concentration)
+        assertNull(model.rangeStatus)
         assertNull(model.features)
         assertNull(model.factorValues.single { it.factor == InflammationFactor.TNF_ALPHA }.value)
         assertNull(model.oaIndex)
         assertNull(model.grade)
         assertTrue(model.factorValues.none { it.value?.isFinite() == false })
+    }
+
+    @Test
+    fun invalidConcentrationCannotRetainAQuantitativeRangeConclusion() {
+        listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY, -1f).forEach { concentration ->
+            listOf(
+                RangeStatus.BELOW_RANGE,
+                RangeStatus.IN_RANGE,
+                RangeStatus.ABOVE_RANGE,
+            ).forEach { status ->
+                val invalid = result(status).copy(concentration = concentration)
+
+                val model = createResultUiModel(session(invalid), invalid)
+
+                assertNull(model.concentration)
+                assertNull(model.rangeStatus)
+            }
+        }
     }
 
     @Test

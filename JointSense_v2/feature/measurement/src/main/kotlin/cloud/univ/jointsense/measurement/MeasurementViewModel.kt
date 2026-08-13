@@ -531,11 +531,13 @@ class MeasurementViewModel(
             if (cleanup == CaptureCleanupResult.Removed) selectedCapture = null
             operation.releaseWhenFinished = true
             updateState {
+                val repositoryResult = findResult(it.sessions, resultId)
                 it.copy(
                     stage = Stage.Success,
                     resultId = resultId,
+                    awaitingRepositoryResultId = resultId.takeIf { repositoryResult == null },
                     image = null,
-                    lastResult = findResult(it.sessions, resultId),
+                    lastResult = repositoryResult,
                     captureCleanupWarning = (cleanup as? CaptureCleanupResult.Failed)?.reason,
                 )
             }
@@ -1103,6 +1105,7 @@ class MeasurementViewModel(
         cropConfirmed = false
         val sessions = state.value.sessions
         val hasReceivedSessionsSnapshot = state.value.hasReceivedSessionsSnapshot
+        val awaitingRepositoryResultId = state.value.awaitingRepositoryResultId
         val origin = state.value.originDestination
         val permissionHistory = state.value.hasRequestedCameraPermission
         val draft = draftIdFactory()
@@ -1110,6 +1113,7 @@ class MeasurementViewModel(
             draftId = draft,
             sessions = sessions,
             hasReceivedSessionsSnapshot = hasReceivedSessionsSnapshot,
+            awaitingRepositoryResultId = awaitingRepositoryResultId,
             originDestination = origin,
             hasRequestedCameraPermission = permissionHistory,
         )
@@ -1149,14 +1153,23 @@ class MeasurementViewModel(
         receivedFromRepository: Boolean = false,
     ) {
         mutableState.update { current ->
+            val repositoryConfirmedAwaitingResult = receivedFromRepository &&
+                current.awaitingRepositoryResultId?.let { id -> findResult(sessions, id) } != null
             current.copy(
                 sessions = sessions,
                 hasReceivedSessionsSnapshot =
                     current.hasReceivedSessionsSnapshot || receivedFromRepository,
+                awaitingRepositoryResultId = if (repositoryConfirmedAwaitingResult) {
+                    null
+                } else {
+                    current.awaitingRepositoryResultId
+                },
                 currentSession = sessions.firstOrNull { it.id == currentSessionId },
                 lastResult = current.resultId?.let { findResult(sessions, it) },
             )
         }
+        savedStateHandle[KEY_AWAITING_REPOSITORY_RESULT_ID] =
+            state.value.awaitingRepositoryResultId
     }
 
     private fun updateState(transform: (MeasurementUiState) -> MeasurementUiState) {
@@ -1181,6 +1194,7 @@ class MeasurementViewModel(
             originDestination = origin,
             hasRequestedCameraPermission = savedStateHandle[KEY_PERMISSION_REQUESTED] ?: false,
             captureCleanupWarning = savedStateHandle[KEY_CAPTURE_CLEANUP_WARNING],
+            awaitingRepositoryResultId = savedStateHandle[KEY_AWAITING_REPOSITORY_RESULT_ID],
         )
     }
 
@@ -1204,6 +1218,7 @@ class MeasurementViewModel(
         savedStateHandle[KEY_CROP_CONFIRMED] = cropConfirmed
         savedStateHandle[KEY_PERMISSION_REQUESTED] = state.hasRequestedCameraPermission
         savedStateHandle[KEY_CAPTURE_CLEANUP_WARNING] = state.captureCleanupWarning
+        savedStateHandle[KEY_AWAITING_REPOSITORY_RESULT_ID] = state.awaitingRepositoryResultId
     }
 
     private fun persistCameraRequest(request: CameraRequestSnapshot?) {
@@ -1424,6 +1439,7 @@ class MeasurementViewModel(
         const val KEY_PERMISSION_REQUEST_ACKNOWLEDGED =
             "measurement.permission.camera.request.acknowledged"
         const val KEY_CAPTURE_CLEANUP_WARNING = "measurement.capture.cleanup.warning"
+        const val KEY_AWAITING_REPOSITORY_RESULT_ID = "measurement.result.awaiting.repository"
         const val KEY_CAMERA_REQUEST_TOKEN = "measurement.camera.request.token"
         const val KEY_CAMERA_REQUEST_DRAFT = "measurement.camera.request.draft"
         const val KEY_CAMERA_CAPTURE_URI = "measurement.camera.capture.uri"

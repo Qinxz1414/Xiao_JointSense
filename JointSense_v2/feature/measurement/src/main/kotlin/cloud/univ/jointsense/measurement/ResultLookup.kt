@@ -27,6 +27,7 @@ fun resolveResultById(
     currentSession: TestSession?,
     sessions: List<TestSession>,
     hasReceivedSessionsSnapshot: Boolean,
+    awaitingRepositoryResultId: String? = null,
 ): ResultResolution {
     currentSession?.results?.firstOrNull { it.id == resultId }?.let { result ->
         return ResultResolution.Found(currentSession, result)
@@ -36,6 +37,7 @@ fun resolveResultById(
             return ResultResolution.Found(session, result)
         }
     }
+    if (awaitingRepositoryResultId == resultId) return ResultResolution.Loading
     return if (hasReceivedSessionsSnapshot) {
         ResultResolution.NotFound
     } else {

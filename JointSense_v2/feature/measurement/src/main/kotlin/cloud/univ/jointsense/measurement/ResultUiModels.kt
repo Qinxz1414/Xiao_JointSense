@@ -32,10 +32,11 @@ fun createResultUiModel(
     val latest = BaselineMeasurementMetrics.latestPerFactor(validResults)
     val oaIndex = BaselineMeasurementMetrics.aiFromResults(validResults)
         ?.takeIf { it.isFinite() && it in 0f..1f }
+    val concentration = lastResult?.concentration?.takeIf { it.isFinite() && it >= 0f }
     return ResultUiModel(
         measuredFactor = lastResult?.factor,
-        concentration = lastResult?.concentration?.takeIf { it.isFinite() && it >= 0f },
-        rangeStatus = lastResult?.rangeStatus,
+        concentration = concentration,
+        rangeStatus = lastResult?.rangeStatus?.takeIf { concentration != null },
         features = lastResult?.features?.takeIf(RgbFeatures::hasOnlyFiniteValues),
         factorValues = inflammationFactorPresentationOrder.map { factor ->
             ResultFactorPresentation(factor, latest[factor]?.takeIf(Float::isFinite))

@@ -170,4 +170,41 @@ class ResultScreenTest {
         composeRule.onAllNodesWithTag(RESULT_FEATURES_SUMMARY_TAG).assertCountEquals(0)
         composeRule.onAllNodesWithText("Infinity", substring = true).assertCountEquals(0)
     }
+
+    @Test
+    fun invalidConcentrationCannotRenderAnApparentlyValidRangeConclusion() {
+        val result = TestResult(
+            id = "invalid-range",
+            sessionId = "session",
+            draftId = null,
+            factor = InflammationFactor.IL6,
+            concentration = Float.NaN,
+            rangeStatus = RangeStatus.ABOVE_RANGE,
+            features = RgbFeatures(1f, 2f, 3f, 1f, 1f, 1f),
+            timestamp = 2L,
+        )
+        val session = TestSession(
+            id = "session",
+            name = "session",
+            createdAt = 1L,
+            source = DataSource.USER,
+            results = listOf(result),
+        )
+        val unknown = composeRule.activity.getString(R.string.measurement_range_unknown)
+        val above = composeRule.activity.getString(R.string.measurement_range_above)
+
+        composeRule.setContent {
+            JointSenseTheme {
+                ResultScreen(
+                    resolution = ResultResolution.Found(session, result),
+                    onContinueMeasurement = {},
+                    onReturnToOrigin = {},
+                    onGoHome = {},
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText(unknown, substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText(above, substring = true).assertCountEquals(0)
+    }
 }

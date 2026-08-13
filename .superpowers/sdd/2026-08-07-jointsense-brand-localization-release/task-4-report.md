@@ -192,3 +192,66 @@ The affected GREEN gate passed:
 - `git diff --check`: clean apart from line-ending conversion notices.
 
 `adb devices -l` reported no connected device or emulator. Instrumentation tests were compiled but were not executed or claimed in fix round 2.
+
+## Fix round 3/5
+
+The third quality-review round closed the remaining two important findings and one test-isolation finding:
+
+- A successful result commit now records `awaitingRepositoryResultId` when the currently observed repository snapshot does not yet contain the returned ID. Shared Result resolution treats only that requested ID as `Loading`, even when an earlier repository snapshot already established that other missing IDs are `NotFound`.
+- The awaiting ID is persisted in `SavedStateHandle`, survives transient cleanup/new-draft copies and Activity/process-style ViewModel recreation, and is cleared only by an `observeSessions()` emission that actually contains the ID. Local `applySessions` calls and unrelated repository snapshots cannot falsely confirm it. Once the delayed Room-style snapshot arrives, the shared feature and app navigation paths resolve the result as `Found` and derive Continue from that result's session.
+- Result presentation now couples its range conclusion to validated concentration evidence. NaN, positive/negative infinity, and negative concentrations expose no concentration and no `BELOW_RANGE`, `IN_RANGE`, or `ABOVE_RANGE` conclusion; the UI displays the existing localized unknown state. All four range states remain available for finite non-negative concentrations.
+- The real production `JointSenseNavHost` restore integration test no longer accesses `JointSenseApplication.container`, clears data, or restores fixtures in the process-wide persistent database. `AppContainer(application)` retains its production persistent default, while its smallest dependency seam accepts a supplied `JointSenseDatabase`; the test supplies a fresh Room in-memory database and closes it in `@After`.
+
+### Fix-round TDD evidence
+
+RED was captured before production implementation. The affected gate failed on the absent `awaitingRepositoryResultId` state and resolution parameter; the new NavHost test also required a database-injection constructor that did not exist. The deterministic delayed repository test starts from an already emitted snapshot, returns from `commitResult`, receives `NavigateToResult`, verifies the interim state is `Loading` rather than `NotFound`, recreates the ViewModel, then emits the stored snapshot and verifies `Found`. Pure and Compose tests pair invalid concentrations with apparently valid range statuses.
+
+The focused GREEN gate passed:
+
+```powershell
+.\gradlew.bat :feature:measurement:testDebugUnitTest `
+  :feature:measurement:compileDebugAndroidTestKotlin `
+  :app:compileDebugAndroidTestKotlin --rerun-tasks
+```
+
+- `BUILD SUCCESSFUL`; 169/169 actionable tasks executed.
+- The minimized private persistent-database factory plus public injected-database constructor was recompiled with app production and Android-test sources: 152/152 actionable tasks executed.
+
+### Final fresh verification
+
+```powershell
+.\gradlew.bat testDebugUnitTest --rerun-tasks
+```
+
+- `BUILD SUCCESSFUL`; 209/209 actionable tasks executed.
+- 45 suites, 276 tests, 0 failures, 0 errors, 0 skipped.
+- Module totals: app 25; core data 6; core database 1; core design system 26; core image 10; calibration 60; insights 37; measurement 101; settings 10.
+- `ResourceParityTest`: 5/5 passed.
+
+```powershell
+.\gradlew.bat :app:compileDebugAndroidTestKotlin `
+  :core:data:compileDebugAndroidTestKotlin `
+  :core:database:compileDebugAndroidTestKotlin `
+  :core:designsystem:compileDebugAndroidTestKotlin `
+  :core:image:compileDebugAndroidTestKotlin `
+  :feature:calibration:compileDebugAndroidTestKotlin `
+  :feature:insights:compileDebugAndroidTestKotlin `
+  :feature:measurement:compileDebugAndroidTestKotlin `
+  :feature:settings:compileDebugAndroidTestKotlin --rerun-tasks
+```
+
+- `BUILD SUCCESSFUL`; 201/201 actionable tasks executed across all nine modules that contain Android tests.
+
+Final artifact gate after the constructor visibility minimization:
+
+```powershell
+.\gradlew.bat :app:lintDebug :app:assembleDebug --rerun-tasks
+```
+
+- `BUILD SUCCESSFUL`; 374/374 actionable tasks executed.
+- Lint: 0 errors, 45 existing warnings.
+- APK: `app/build/outputs/apk/debug/app-debug.apk`, 21,311,538 bytes.
+- SHA-256: `35CA8A82AF5B7C4976D7EC5C8C39DB939BDF7E3FAFA484528CEE4DACCEF415CE`.
+- `git diff --check`: clean apart from line-ending conversion notices.
+
+`adb devices -l` reported no connected device or emulator. Instrumentation tests were compiled but were not executed or claimed in fix round 3.

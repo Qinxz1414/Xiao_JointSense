@@ -281,6 +281,7 @@ fun ResultRouteScreen(
         currentSession = state.currentSession,
         sessions = state.sessions,
         hasReceivedSessionsSnapshot = state.hasReceivedSessionsSnapshot,
+        awaitingRepositoryResultId = state.awaitingRepositoryResultId,
     )
     ResultScreen(
         resolution = resolution,

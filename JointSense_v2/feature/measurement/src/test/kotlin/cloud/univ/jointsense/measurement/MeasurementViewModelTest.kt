@@ -117,6 +117,72 @@ class MeasurementViewModelTest {
     }
 
     @Test
+    fun committedResultWaitsForRepositoryConfirmationInsteadOfBecomingNotFound() = runTest(dispatcher) {
+        val repository = RecordingRepository().apply { delaySnapshotAfterCommit = true }
+        val savedStateHandle = SavedStateHandle()
+        val viewModel = readyViewModel(
+            repository = repository,
+            savedStateHandle = savedStateHandle,
+        )
+        assertTrue(viewModel.state.value.hasReceivedSessionsSnapshot)
+
+        viewModel.onAction(MeasurementAction.Analyze)
+        advanceUntilIdle()
+
+        assertEquals(MeasurementEffect.NavigateToResult("result-1"), viewModel.effects.first())
+        assertEquals("result-1", viewModel.state.value.awaitingRepositoryResultId)
+        assertEquals(
+            ResultResolution.Loading,
+            resolveResultById(
+                resultId = "result-1",
+                currentSession = viewModel.state.value.currentSession,
+                sessions = viewModel.state.value.sessions,
+                hasReceivedSessionsSnapshot = viewModel.state.value.hasReceivedSessionsSnapshot,
+                awaitingRepositoryResultId = viewModel.state.value.awaitingRepositoryResultId,
+            ),
+        )
+
+        viewModel.finishMeasurement()
+        assertEquals("result-1", viewModel.state.value.awaitingRepositoryResultId)
+        val recreated = MeasurementViewModel(
+            repository = repository,
+            analyzer = RecordingAnalyzer(),
+            draftIdFactory = { "recreated-draft" },
+            savedStateHandle = savedStateHandle,
+            decoder = RecordingDecoder(),
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+        )
+        advanceUntilIdle()
+
+        assertEquals("result-1", recreated.state.value.awaitingRepositoryResultId)
+        assertEquals(
+            ResultResolution.Loading,
+            resolveResultById(
+                resultId = "result-1",
+                currentSession = recreated.state.value.currentSession,
+                sessions = recreated.state.value.sessions,
+                hasReceivedSessionsSnapshot = recreated.state.value.hasReceivedSessionsSnapshot,
+                awaitingRepositoryResultId = recreated.state.value.awaitingRepositoryResultId,
+            ),
+        )
+
+        repository.emitDelayedCommitSnapshot()
+        advanceUntilIdle()
+
+        assertNull(recreated.state.value.awaitingRepositoryResultId)
+        assertTrue(
+            resolveResultById(
+                resultId = "result-1",
+                currentSession = recreated.state.value.currentSession,
+                sessions = recreated.state.value.sessions,
+                hasReceivedSessionsSnapshot = recreated.state.value.hasReceivedSessionsSnapshot,
+                awaitingRepositoryResultId = recreated.state.value.awaitingRepositoryResultId,
+            ) is ResultResolution.Found,
+        )
+    }
+
+    @Test
     fun analysisFailureResumesFromReadyToAnalyzeAndRetryReanalyzes() = runTest(dispatcher) {
         val analyzer = RecordingAnalyzer().apply { failuresRemaining = 1 }
         val repository = RecordingRepository()
@@ -1859,12 +1925,13 @@ class MeasurementViewModelTest {
         repository: RecordingRepository = RecordingRepository(),
         analyzer: RecordingAnalyzer = RecordingAnalyzer(),
         draftIdFactory: () -> String = { "draft-1" },
+        savedStateHandle: SavedStateHandle = SavedStateHandle(),
     ): MeasurementViewModel {
         val viewModel = MeasurementViewModel(
             repository = repository,
             analyzer = analyzer,
             draftIdFactory = draftIdFactory,
-            savedStateHandle = SavedStateHandle(),
+            savedStateHandle = savedStateHandle,
             decoder = RecordingDecoder(),
             ioDispatcher = dispatcher,
             defaultDispatcher = dispatcher,
@@ -2173,8 +2240,15 @@ private class RecordingRepository(
     var commitFailuresRemaining = 0
     var suspendCommit = false
     var nonCooperativeCommit = false
+    var delaySnapshotAfterCommit = false
     var commitBoundary: String? = null
         private set
+    private var delayedCommitSnapshot: List<TestSession>? = null
+
+    fun emitDelayedCommitSnapshot() {
+        sessions.value = requireNotNull(delayedCommitSnapshot)
+        delayedCommitSnapshot = null
+    }
 
     fun releaseCommit(id: String = "result-1") {
         if (nonCooperativeCommit) {
@@ -2220,12 +2294,17 @@ private class RecordingRepository(
             features = result.features,
             timestamp = result.timestamp,
         )
-        sessions.value = sessions.value.map { session ->
+        val committedSnapshot = sessions.value.map { session ->
             if (session.id == sessionId && session.results.none { it.draftId == draftId }) {
                 session.copy(results = session.results + stored)
             } else {
                 session
             }
+        }
+        if (delaySnapshotAfterCommit) {
+            delayedCommitSnapshot = committedSnapshot
+        } else {
+            sessions.value = committedSnapshot
         }
         return id
     }

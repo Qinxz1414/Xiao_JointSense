@@ -21,12 +21,10 @@ import cloud.univ.jointsense.settings.locale.LanguageController
  * and handed to feature-owned factories explicitly; no feature reaches back
  * into the application module.
  */
-class AppContainer(application: Application) {
-    val database: JointSenseDatabase = Room.databaseBuilder(
-        application,
-        JointSenseDatabase::class.java,
-        DATABASE_NAME,
-    ).build()
+class AppContainer(
+    application: Application,
+    val database: JointSenseDatabase = createPersistentDatabase(application),
+) {
 
     val testSessions: TestSessionRepository = RoomTestSessionRepository(database)
     val calibrations: CalibrationRepository = RoomCalibrationRepository(database)
@@ -41,5 +39,12 @@ class AppContainer(application: Application) {
 
     private companion object {
         const val DATABASE_NAME = "jointsense.db"
+
+        private fun createPersistentDatabase(application: Application): JointSenseDatabase =
+            Room.databaseBuilder(
+                application,
+                JointSenseDatabase::class.java,
+                DATABASE_NAME,
+            ).build()
     }
 }

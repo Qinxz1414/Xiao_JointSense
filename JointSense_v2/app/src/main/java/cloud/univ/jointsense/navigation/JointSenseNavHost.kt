@@ -308,6 +308,7 @@ private fun JointSenseNavHostContent(
                             currentSession = state.currentSession,
                             sessions = state.sessions,
                             hasReceivedSessionsSnapshot = state.hasReceivedSessionsSnapshot,
+                            awaitingRepositoryResultId = state.awaitingRepositoryResultId,
                         )
                         val found = resolution as? ResultResolution.Found
                         val origin = if (inMeasurement) {
