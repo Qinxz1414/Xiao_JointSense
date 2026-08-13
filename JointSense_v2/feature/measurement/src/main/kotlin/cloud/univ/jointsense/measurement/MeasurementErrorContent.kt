@@ -1,19 +1,10 @@
 package cloud.univ.jointsense.measurement
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import cloud.univ.jointsense.designsystem.component.LoadingErrorState
 
 @Composable
@@ -26,9 +17,7 @@ fun MeasurementProgressContent(
         message = message,
         actionLabel = null,
         onAction = null,
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = modifier.fillMaxSize(),
         progressModifier = Modifier.testTag(MEASUREMENT_PROGRESS_TAG),
     )
 }
@@ -60,30 +49,16 @@ fun MeasurementErrorContent(
         is MeasurementError.CameraLaunchFailed ->
             "The camera could not be opened. ${error.reason} Retry when the camera is available."
     }
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .testTag(MEASUREMENT_ERROR_TAG),
-    ) {
-        LoadingErrorState(
-            isLoading = false,
-            headline = "Measurement interrupted",
-            message = message,
-            actionLabel = "Retry",
-            onAction = onRetry,
-            actionModifier = Modifier.fillMaxWidth().testTag(RETRY_BUTTON_TAG),
-        )
-        if (permission?.permanentlyDenied == true) {
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedButton(
-                onClick = onOpenSettings,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics { contentDescription = "Open settings" },
-            ) {
-                Text("Open settings", modifier = Modifier.testTag("open_settings"))
-            }
-        }
-    }
+    LoadingErrorState(
+        isLoading = false,
+        headline = "Measurement interrupted",
+        message = message,
+        actionLabel = "Retry",
+        onAction = onRetry,
+        actionModifier = Modifier.fillMaxWidth().testTag(RETRY_BUTTON_TAG),
+        secondaryActionLabel = if (permission?.permanentlyDenied == true) "Open settings" else null,
+        onSecondaryAction = if (permission?.permanentlyDenied == true) onOpenSettings else null,
+        secondaryActionModifier = Modifier.fillMaxWidth().testTag("open_settings"),
+        modifier = modifier.fillMaxSize().testTag(MEASUREMENT_ERROR_TAG),
+    )
 }

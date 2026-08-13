@@ -260,62 +260,6 @@ fun GaugeChart(
 }
 
 /**
- * Five-segment OA inflammation grade bar (0..4) with labels and a
- * marker under the active grade.
- */
-@Composable
-fun GradeBar(
-    currentGrade: Int?,
-    modifier: Modifier = Modifier,
-    labels: List<String> = listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")
-) {
-    Column(modifier = modifier) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            for (i in 0..4) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(32.dp)
-                        .padding(horizontal = 2.dp)
-                        .background(GradeColors[i], RoundedCornerShape(6.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "$i",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-                }
-            }
-        }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            for (i in 0..4) {
-                Text(
-                    text = if (i == currentGrade) "▲" else " ",
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 10.sp
-                )
-            }
-        }
-        Row(modifier = Modifier.fillMaxWidth()) {
-            for (i in 0..4) {
-                Text(
-                    text = labels[i],
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 10.sp,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-/**
  * 0..1 AI scale with the grade gradient and a marker at the value.
  */
 @Composable

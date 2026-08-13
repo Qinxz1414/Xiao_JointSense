@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,14 +41,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.core.designsystem.R
 import cloud.univ.jointsense.designsystem.chart.ChartDataPoint
-import cloud.univ.jointsense.designsystem.chart.GradeBar
+import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.chart.LineChart
 import cloud.univ.jointsense.designsystem.chart.Sparkline
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.AiLine
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.text.SimpleDateFormat
@@ -111,7 +109,7 @@ private fun EmptyHome(onTestNow: () -> Unit) {
                 modifier = Modifier
                     .size(96.dp)
                     .clip(CircleShape)
-                    .background(PrimaryAccent.copy(alpha = 0.1f)),
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -149,7 +147,6 @@ private fun EmptyHome(onTestNow: () -> Unit) {
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -297,7 +294,15 @@ private fun DashboardContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
-            GradeBar(currentGrade = grade)
+            val labels = listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")
+            val gradeStateDescription = grade?.let { "Grade $it, ${labels[it]}" }
+                ?: "Grade unavailable"
+            GradeScale(
+                currentGrade = grade,
+                labels = labels,
+                contentDescription = "OA inflammation grade scale",
+                stateDescription = gradeStateDescription,
+            )
         }
     }
 
@@ -375,7 +380,6 @@ private fun DashboardContent(
             Button(
                 onClick = onTestNow,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
             ) {
                 Text("Test Now", fontWeight = FontWeight.SemiBold)
             }

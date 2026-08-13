@@ -46,9 +46,6 @@ import cloud.univ.jointsense.designsystem.chart.TimePoint
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.AiLine
-import cloud.univ.jointsense.designsystem.theme.BioGreen
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.TnfRed
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.text.SimpleDateFormat
@@ -88,14 +85,14 @@ fun TrendsScreen(
                             .weight(1f)
                             .padding(horizontal = 4.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (selected) PrimaryAccent else MaterialTheme.colorScheme.surface)
+                            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                             .clickable { periodDays = days }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = if (days == 0) "All" else "${days}D",
-                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                         )
@@ -273,18 +270,18 @@ fun TrendsScreen(
                                 val (icon, tint, bg) = when (event.kind) {
                                     EventKind.TEST -> Triple(
                                         Icons.Default.Science,
-                                        PrimaryAccent,
-                                        PrimaryAccent.copy(alpha = 0.12f)
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.primaryContainer
                                     )
                                     EventKind.DOWN -> Triple(
                                         Icons.Default.ArrowDownward,
-                                        BioGreen,
-                                        BioGreen.copy(alpha = 0.12f)
+                                        MaterialTheme.colorScheme.tertiary,
+                                        MaterialTheme.colorScheme.tertiaryContainer
                                     )
                                     EventKind.UP -> Triple(
                                         Icons.Default.ArrowUpward,
-                                        TnfRed,
-                                        TnfRed.copy(alpha = 0.12f)
+                                        MaterialTheme.colorScheme.error,
+                                        MaterialTheme.colorScheme.errorContainer
                                     )
                                 }
                                 Box(

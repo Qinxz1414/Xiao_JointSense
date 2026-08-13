@@ -65,7 +65,6 @@ import cloud.univ.jointsense.calibration.CalibrationSelectRouteScreen
 import cloud.univ.jointsense.calibration.CalibrationViewModel
 import cloud.univ.jointsense.calibration.CalibrationViewModelFactory
 import cloud.univ.jointsense.calibration.LegacyCalibrationRevalidator
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.di.AppContainer
 import cloud.univ.jointsense.insights.HomeRouteScreen
 import cloud.univ.jointsense.insights.InsightsViewModel
@@ -361,7 +360,7 @@ private fun JointSenseNavHostContent(
                         .size(56.dp)
                         .border(4.dp, MaterialTheme.colorScheme.surface, CircleShape)
                         .clip(CircleShape)
-                        .background(PrimaryAccent)
+                        .background(MaterialTheme.colorScheme.primary)
                         .clickable {
                             sessionCreationDriver?.request(topLevelDestination)
                         },
@@ -526,7 +525,7 @@ private fun MainBottomBar(
                     Text(
                         text = "Test",
                         fontSize = 10.sp,
-                        color = PrimaryAccent,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
@@ -570,14 +569,14 @@ private fun RowScope.BarTab(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (selected) PrimaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             fontSize = 10.sp,
-            color = if (selected) PrimaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }

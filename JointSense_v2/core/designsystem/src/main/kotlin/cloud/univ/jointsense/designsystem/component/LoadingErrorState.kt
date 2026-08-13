@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,8 +24,11 @@ fun LoadingErrorState(
     modifier: Modifier = Modifier,
     progressModifier: Modifier = Modifier,
     actionModifier: Modifier = Modifier,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
+    secondaryActionModifier: Modifier = Modifier,
 ) {
-    if (!isLoading && message == null) return
+    if (!isLoading && headline == null && message == null && actionLabel == null && secondaryActionLabel == null) return
 
     Column(
         modifier = modifier
@@ -52,6 +56,14 @@ fun LoadingErrorState(
         }
         if (!isLoading && actionLabel != null && onAction != null) {
             Button(onClick = onAction, modifier = actionModifier) { Text(text = actionLabel) }
+        }
+        if (!isLoading && secondaryActionLabel != null && onSecondaryAction != null) {
+            OutlinedButton(
+                onClick = onSecondaryAction,
+                modifier = secondaryActionModifier,
+            ) {
+                Text(text = secondaryActionLabel)
+            }
         }
     }
 }

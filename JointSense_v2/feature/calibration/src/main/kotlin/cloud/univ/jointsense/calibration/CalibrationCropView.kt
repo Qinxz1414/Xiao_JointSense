@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,7 +25,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import kotlin.math.roundToInt
 
 @Composable
@@ -36,6 +36,7 @@ internal fun CalibrationCropView(
     modifier: Modifier = Modifier,
 ) {
     val image = remember(bitmap) { bitmap.asImageBitmap() }
+    val handleColor = MaterialTheme.colorScheme.primary
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
@@ -154,7 +155,7 @@ internal fun CalibrationCropView(
                 Offset(right, bottom),
             ).forEach { point ->
                 drawCircle(Color.White, radius = 5.5f * density, center = point)
-                drawCircle(PrimaryAccent, radius = 4.5f * density, center = point)
+                drawCircle(handleColor, radius = 4.5f * density, center = point)
             }
         }
     }

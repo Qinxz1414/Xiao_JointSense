@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +30,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import kotlin.math.roundToInt
 
 /**
@@ -50,6 +50,7 @@ fun ImageCropView(
 ) {
     val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
     val cornerRadius = 12.dp
+    val handleColor = MaterialTheme.colorScheme.primary
 
     BoxWithConstraints(
         modifier = modifier
@@ -274,7 +275,7 @@ fun ImageCropView(
                     center = corner
                 )
                 drawCircle(
-                    color = PrimaryAccent,
+                    color = handleColor,
                     radius = handleRadius - 2f * density / 2,
                     center = corner
                 )

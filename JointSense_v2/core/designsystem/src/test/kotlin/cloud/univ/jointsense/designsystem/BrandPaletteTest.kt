@@ -6,6 +6,7 @@ import cloud.univ.jointsense.domain.model.InflammationFactor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class BrandPaletteTest {
@@ -18,10 +19,9 @@ class BrandPaletteTest {
     }
 
     @Test
-    fun gradesAreClampedAndNeverUsePurple() {
-        assertEquals(gradeArgb(0), gradeArgb(-1))
-        assertEquals(gradeArgb(4), gradeArgb(5))
-
+    fun gradesRejectInvalidValuesAndNeverUsePurple() {
+        assertThrows(IllegalArgumentException::class.java) { gradeArgb(-1) }
+        assertThrows(IllegalArgumentException::class.java) { gradeArgb(5) }
         val forbiddenPurple = setOf(0xFF8A2BE2, 0xFF7B2CBF, 0xFF9C27B0, 0xFF6200EE)
         val semanticColors = (0..4).map(::gradeArgb) + listOf(
             factorArgb(InflammationFactor.TNF_ALPHA),

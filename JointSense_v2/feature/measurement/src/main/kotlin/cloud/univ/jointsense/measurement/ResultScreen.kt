@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,13 +38,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.chart.AiScaleBar
-import cloud.univ.jointsense.designsystem.chart.GradeBar
+import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.StructureGray
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.TestResult
@@ -99,7 +96,7 @@ fun ResultScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(MEASUREMENT_CLEANUP_WARNING_TAG),
-                    color = Color(0xFF8A4B00),
+                    color = MaterialTheme.colorScheme.error,
                     fontSize = 13.sp,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -146,7 +143,7 @@ fun ResultScreen(
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(color = StructureGray, thickness = 1.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
 
                     // Value rows
                     InflammationFactor.entries.forEach { factor ->
@@ -189,7 +186,7 @@ fun ResultScreen(
                             )
                         }
                         HorizontalDivider(
-                            color = StructureGray.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
                             thickness = 0.5.dp
                         )
                     }
@@ -304,7 +301,13 @@ fun ResultScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    GradeBar(currentGrade = grade)
+                    val labels = listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")
+                    GradeScale(
+                        currentGrade = grade,
+                        labels = labels,
+                        contentDescription = "OA inflammation grade scale",
+                        stateDescription = grade?.let { "Grade $it, ${labels[it]}" } ?: "Grade unavailable",
+                    )
                 }
             }
 
@@ -323,14 +326,14 @@ fun ResultScreen(
                     Icon(
                         Icons.Default.Add,
                         contentDescription = null,
-                        tint = PrimaryAccent
+                        tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         "Continue measurement",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = PrimaryAccent
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -342,7 +345,6 @@ fun ResultScreen(
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
             ) {
                 Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

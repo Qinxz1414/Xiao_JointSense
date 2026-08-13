@@ -11,6 +11,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.WindowInsets
 import cloud.univ.jointsense.designsystem.theme.jointSenseColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,6 +28,7 @@ fun JointSenseTopBar(
         modifier = modifier,
         navigationIcon = navigationIcon,
         actions = actions,
+        windowInsets = WindowInsets(0, 0, 0, 0),
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = semanticColors.topBarContainer,
             scrolledContainerColor = semanticColors.topBarContainer,

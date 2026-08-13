@@ -49,8 +49,6 @@ import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.BioGreen
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.measurement.crop.ImageCropView
 
@@ -94,7 +92,7 @@ fun ImageSelectScreen(
                 imageVector = Icons.Default.CameraAlt,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
-                tint = PrimaryAccent.copy(alpha = 0.3f)
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -124,7 +122,6 @@ fun ImageSelectScreen(
                     .fillMaxWidth()
                     .height(60.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)
             ) {
                 Icon(
                     imageVector = Icons.Default.CameraAlt,
@@ -146,7 +143,7 @@ fun ImageSelectScreen(
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = PrimaryAccent
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             ) {
                 Icon(
@@ -201,7 +198,7 @@ fun ImageCropScreen(
                     imageVector = Icons.Default.Crop,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
-                    tint = PrimaryAccent
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -238,7 +235,6 @@ fun ImageCropScreen(
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BioGreen)
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
@@ -295,7 +291,7 @@ fun FactorSelectScreen(
                 imageVector = Icons.Default.Science,
                 contentDescription = null,
                 modifier = Modifier.size(60.dp),
-                tint = PrimaryAccent.copy(alpha = 0.3f)
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -321,7 +317,7 @@ fun FactorSelectScreen(
                             if (isSelected) {
                                 Modifier.border(
                                     2.dp,
-                                    PrimaryAccent,
+                                    MaterialTheme.colorScheme.primary,
                                     RoundedCornerShape(16.dp)
                                 )
                             } else {
@@ -331,7 +327,7 @@ fun FactorSelectScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelected) {
-                            PrimaryAccent.copy(alpha = 0.08f)
+                            MaterialTheme.colorScheme.primaryContainer
                         } else {
                             MaterialTheme.colorScheme.surface
                         }
@@ -351,7 +347,7 @@ fun FactorSelectScreen(
                                 text = factor.shortName,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSelected) PrimaryAccent else MaterialTheme.colorScheme.onSurface
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = factor.displayName,
@@ -363,7 +359,7 @@ fun FactorSelectScreen(
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Selected",
-                                tint = PrimaryAccent,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -381,7 +377,6 @@ fun FactorSelectScreen(
                     .height(56.dp)
                     .testTag(ANALYZE_BUTTON_TAG),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent),
                 enabled = !isAnalyzing
             ) {
                 if (isAnalyzing) {

@@ -3,8 +3,16 @@ package cloud.univ.jointsense.designsystem.theme
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -16,46 +24,49 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+private val LightRoles = materialColorRoles(darkTheme = false)
+private val DarkRoles = materialColorRoles(darkTheme = true)
+
 private val LightColorScheme = lightColorScheme(
-    primary = JointSenseColors.Primary,
-    onPrimary = Color.White,
+    primary = Color(LightRoles.primary),
+    onPrimary = Color(LightRoles.onPrimary),
     primaryContainer = Color(0xFFD9EFF8),
     onPrimaryContainer = JointSenseColors.Ink,
-    secondary = JointSenseColors.Cyan,
-    onSecondary = Color.White,
+    secondary = Color(LightRoles.secondary),
+    onSecondary = Color(LightRoles.onSecondary),
     tertiary = JointSenseColors.BioGreen,
     onTertiary = Color.White,
-    background = JointSenseColors.Canvas,
-    onBackground = JointSenseColors.Ink,
-    surface = JointSenseColors.Surface,
-    onSurface = JointSenseColors.Ink,
+    background = Color(LightRoles.background),
+    onBackground = Color(LightRoles.onBackground),
+    surface = Color(LightRoles.surface),
+    onSurface = Color(LightRoles.onSurface),
     surfaceVariant = Color(0xFFE8EFF3),
-    onSurfaceVariant = JointSenseColors.SecondaryText,
+    onSurfaceVariant = Color(LightRoles.onSurfaceVariant),
     outline = Color(0xFF718594),
     outlineVariant = JointSenseColors.Structure,
-    error = JointSenseColors.TnfAlpha,
-    onError = Color.White,
+    error = Color(LightRoles.error),
+    onError = Color(LightRoles.onError),
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF67C7E8),
-    onPrimary = Color(0xFF002F40),
+    primary = Color(DarkRoles.primary),
+    onPrimary = Color(DarkRoles.onPrimary),
     primaryContainer = Color(0xFF114B63),
     onPrimaryContainer = Color(0xFFD3F1FB),
-    secondary = Color(0xFF67C7E8),
-    onSecondary = Color(0xFF002F40),
+    secondary = Color(DarkRoles.secondary),
+    onSecondary = Color(DarkRoles.onSecondary),
     tertiary = Color(0xFF78D484),
     onTertiary = Color(0xFF083D12),
-    background = Color(0xFF0D151B),
-    onBackground = Color(0xFFE4EDF2),
-    surface = Color(0xFF17242D),
-    onSurface = Color(0xFFE4EDF2),
+    background = Color(DarkRoles.background),
+    onBackground = Color(DarkRoles.onBackground),
+    surface = Color(DarkRoles.surface),
+    onSurface = Color(DarkRoles.onSurface),
     surfaceVariant = Color(0xFF263640),
-    onSurfaceVariant = Color(0xFFBCCBD3),
+    onSurfaceVariant = Color(DarkRoles.onSurfaceVariant),
     outline = Color(0xFF8EA2AD),
     outlineVariant = Color(0xFF334955),
-    error = JointSenseColors.TnfAlpha,
-    onError = Color.White,
+    error = Color(DarkRoles.error),
+    onError = Color(DarkRoles.onError),
 )
 
 val MaterialTheme.jointSenseColors: JointSenseSemanticColors
@@ -68,6 +79,8 @@ fun JointSenseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
+    val semanticColors = if (darkTheme) DarkSemanticColors else LightSemanticColors
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val view = LocalView.current
     val activity = LocalContext.current.findActivity()
     if (!view.isInEditMode && activity != null) {
@@ -81,13 +94,26 @@ fun JointSenseTheme(
     }
 
     CompositionLocalProvider(
-        LocalJointSenseSemanticColors provides if (darkTheme) DarkSemanticColors else LightSemanticColors,
+        LocalJointSenseSemanticColors provides semanticColors,
     ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
             typography = JointSenseTypography,
-            content = content,
-        )
+        ) {
+            Box(
+                modifier = androidx.compose.ui.Modifier
+                    .fillMaxSize()
+                    .background(semanticColors.statusBarContainer),
+            ) {
+                Surface(
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxSize()
+                        .padding(top = statusBarPadding),
+                    color = MaterialTheme.colorScheme.background,
+                    content = content,
+                )
+            }
+        }
     }
 }
 

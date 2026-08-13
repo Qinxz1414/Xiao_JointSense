@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,10 +49,7 @@ import cloud.univ.jointsense.designsystem.chart.GaugeChart
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.BioGreen
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.TnfRed
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.feature.insights.R
@@ -256,7 +252,7 @@ fun ReportScreen(
                                             Icons.Default.ArrowDownward
                                         },
                                         contentDescription = null,
-                                        tint = if (delta >= 0) TnfRed else BioGreen,
+                                        tint = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -264,7 +260,7 @@ fun ReportScreen(
                                         text = "%.0f%%".format(kotlin.math.abs(delta)),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = if (delta >= 0) TnfRed else BioGreen
+                                        color = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
@@ -359,7 +355,7 @@ fun ReportScreen(
                             ) {
                                 Text(
                                     text = "•",
-                                    color = PrimaryAccent,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontSize = 14.sp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -430,9 +426,6 @@ fun ReportScreen(
                                     .weight(1f)
                                     .height(48.dp),
                                 shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = PrimaryAccent
-                                )
                             ) {
                                 Icon(
                                     Icons.Default.Description,
@@ -454,14 +447,14 @@ fun ReportScreen(
                                     Icons.Default.Share,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
-                                    tint = PrimaryAccent
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     "Share",
                                     fontSize = 14.sp,
                                     maxLines = 1,
-                                    color = PrimaryAccent
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }

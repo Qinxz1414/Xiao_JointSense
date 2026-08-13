@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,8 +61,6 @@ import cloud.univ.jointsense.analysis.calibration.CalibrationValidation
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.BioGreen
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.io.File
 
@@ -100,7 +97,7 @@ internal fun CalibrationSelectScreen(
         onBack = onBack,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Science, null, Modifier.size(80.dp), tint = PrimaryAccent.copy(alpha = 0.3f))
+            Icon(Icons.Default.Science, null, Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
             Spacer(Modifier.height(16.dp))
             Text("Photo the standard ladder plate", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -160,7 +157,7 @@ internal fun CalibrationCropScreen(
             Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Crop, null, Modifier.size(20.dp), tint = PrimaryAccent)
+            Icon(Icons.Default.Crop, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(8.dp))
             Text("Crop to the 3×3 well plate region", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -187,7 +184,6 @@ internal fun CalibrationCropScreen(
             onClick = onDetect,
             enabled = bitmap != null && crop != null && !state.isDetecting,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = BioGreen),
         ) {
             Text(if (state.isDetecting) "Detecting…" else "Detect Wells")
         }
@@ -216,10 +212,10 @@ internal fun CalibrationAssignScreen(
                 val selected = factor == state.factor
                 ClinicalCard(
                     modifier = Modifier.weight(1f).clickable { onFactorChanged(factor) }.then(
-                        if (selected) Modifier.border(2.dp, PrimaryAccent, RoundedCornerShape(12.dp)) else Modifier,
+                        if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier,
                     ),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (selected) PrimaryAccent.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+                        containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                     ),
                 ) {
                     Text(
@@ -287,7 +283,6 @@ internal fun CalibrationReviewScreen(
             onClick = onSave,
             enabled = state.canSave,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = BioGreen),
         ) {
             Icon(Icons.Default.Check, null)
             Spacer(Modifier.width(6.dp))
@@ -314,7 +309,7 @@ internal fun CalibrationDoneScreen(
         backEnabled = !state.isPersistenceBusy,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.CheckCircle, null, Modifier.size(72.dp), tint = BioGreen)
+            Icon(Icons.Default.CheckCircle, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.tertiary)
             Spacer(Modifier.height(16.dp))
             Text(
                 if (state.factoryRestoreCompleted) "Factory curves restored" else "Calibration saved",

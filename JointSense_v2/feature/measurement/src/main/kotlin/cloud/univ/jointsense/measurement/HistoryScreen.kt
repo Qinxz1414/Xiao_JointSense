@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
 import cloud.univ.jointsense.domain.model.TestSession
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -86,7 +85,7 @@ fun HistoryScreen(
                     imageVector = Icons.Default.FolderOpen,
                     contentDescription = null,
                     modifier = Modifier.size(80.dp),
-                    tint = PrimaryAccent.copy(alpha = 0.2f)
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -134,13 +133,13 @@ fun HistoryScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(CircleShape)
-                                    .background(PrimaryAccent.copy(alpha = 0.1f)),
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Science,
                                     contentDescription = null,
-                                    tint = PrimaryAccent,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
@@ -176,13 +175,13 @@ fun HistoryScreen(
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(4.dp))
-                                            .background(PrimaryAccent.copy(alpha = 0.1f))
+                                            .background(MaterialTheme.colorScheme.primaryContainer)
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = "$resultCount/5 tests",
                                             fontSize = 11.sp,
-                                            color = PrimaryAccent,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }

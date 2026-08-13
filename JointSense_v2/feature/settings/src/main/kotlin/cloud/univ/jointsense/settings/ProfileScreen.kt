@@ -49,10 +49,6 @@ import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.core.designsystem.R as DesignSystemR
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
-import cloud.univ.jointsense.designsystem.theme.BioGreen
-import cloud.univ.jointsense.designsystem.theme.PrimaryAccent
-import cloud.univ.jointsense.designsystem.theme.StructureGray
-import cloud.univ.jointsense.designsystem.theme.TnfRed
 
 /** Profile tab — app info, history entry, data management, and about. */
 @Composable
@@ -93,7 +89,7 @@ internal fun SettingsScreen(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(CircleShape)
-                            .background(PrimaryAccent.copy(alpha = 0.1f)),
+                            .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
@@ -139,31 +135,31 @@ internal fun SettingsScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     ProfileEntry(
                         icon = Icons.Default.History,
-                        tint = PrimaryAccent,
+                        tint = MaterialTheme.colorScheme.primary,
                         title = "Test History",
                         subtitle = "Browse and manage saved test sessions",
                         onClick = onOpenHistory
                     )
-                    HorizontalDivider(color = StructureGray, thickness = 1.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     ProfileEntry(
                         icon = Icons.AutoMirrored.Filled.HelpOutline,
-                        tint = PrimaryAccent,
+                        tint = MaterialTheme.colorScheme.primary,
                         title = "About the Model",
                         subtitle = "How the RGB + LASSO prediction works",
                         onClick = { showAboutDialog = true }
                     )
-                    HorizontalDivider(color = StructureGray, thickness = 1.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     ProfileEntry(
                         icon = Icons.Default.Science,
-                        tint = BioGreen,
+                        tint = MaterialTheme.colorScheme.tertiary,
                         title = "Calibrate Standard Curve",
                         subtitle = calibrationSubtitle(state),
                         onClick = onCalibrate
                     )
-                    HorizontalDivider(color = StructureGray, thickness = 1.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     ProfileEntry(
                         icon = Icons.Default.Delete,
-                        tint = TnfRed,
+                        tint = MaterialTheme.colorScheme.error,
                         title = "Clear All Data",
                         subtitle = "Delete every saved session on this device",
                         onClick = { showClearDialog = true }
@@ -197,7 +193,7 @@ internal fun SettingsScreen(
                         showClearDialog = false
                     }
                 ) {
-                    Text("Delete", color = TnfRed)
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
