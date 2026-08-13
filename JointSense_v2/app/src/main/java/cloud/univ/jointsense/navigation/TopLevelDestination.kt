@@ -1,7 +1,9 @@
 package cloud.univ.jointsense.navigation
 
+import androidx.annotation.Keep
 import kotlinx.serialization.Serializable
 
+@Keep
 @Serializable
 enum class TopLevelDestination {
     HOME,

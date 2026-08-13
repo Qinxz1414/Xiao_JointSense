@@ -5,17 +5,8 @@
     <string name="nav_test">Test</string>
     <string name="nav_report">Report</string>
     <string name="nav_profile">Profile</string>
-    <string name="language_title">Language</string>
-    <string name="language_system">System</string>
-    <string name="language_simplified_chinese">Simplified Chinese</string>
-    <string name="language_english">English</string>
-    <string name="action_back">Back</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_retry">Retry</string>
-    <string name="migration_status_completed">Migration completed</string>
-    <string name="migration_status_already_completed">Migration already completed</string>
-    <string name="migration_status_skipped">Migration skipped</string>
-    <string name="migration_status_failed">Migration failed</string>
     <string name="migration_preparing_data">Preparing your saved data…</string>
     <string name="migration_error_title">We couldn’t prepare your saved data</string>
     <string name="migration_error_message">Your existing data has not been changed. You can retry, or start with an empty database.</string>

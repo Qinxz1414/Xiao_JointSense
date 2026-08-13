@@ -151,7 +151,7 @@ class BrandResourceTest {
         val themedRound = parseAdaptiveIcon(appResource("mipmap-anydpi-v33/ic_launcher_round.xml"))
         val manifestFile = File("../../app/src/main/AndroidManifest.xml")
 
-        val expectedAdaptive = AdaptiveIcon(BACKGROUND, FOREGROUND, null)
+        val expectedAdaptive = AdaptiveIcon(BACKGROUND, FOREGROUND, MONOCHROME_DRAWABLE)
         assertEquals(expectedAdaptive, adaptive)
         assertEquals(expectedAdaptive, adaptiveRound)
         val expectedThemed = AdaptiveIcon(BACKGROUND, FOREGROUND, MONOCHROME_DRAWABLE)
