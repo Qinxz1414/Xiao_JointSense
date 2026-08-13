@@ -100,7 +100,7 @@ internal fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
-                            painter = painterResource(id = DesignSystemR.drawable.logo),
+                            painter = painterResource(id = DesignSystemR.drawable.jointsense_logo),
                             contentDescription = "JointSense Logo",
                             modifier = Modifier.size(48.dp),
                             contentScale = ContentScale.Fit

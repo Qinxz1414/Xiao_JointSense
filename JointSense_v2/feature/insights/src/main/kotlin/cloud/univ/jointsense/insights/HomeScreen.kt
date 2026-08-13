@@ -118,7 +118,7 @@ private fun EmptyHome(onTestNow: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.logo),
+                    painter = painterResource(id = R.drawable.jointsense_logo),
                     contentDescription = "JointSense Logo",
                     modifier = Modifier.size(72.dp),
                     contentScale = ContentScale.Fit
