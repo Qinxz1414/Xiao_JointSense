@@ -69,8 +69,36 @@ class SettingsViewModelTest {
         calibrations.calibrations.value = emptyList()
         testScheduler.advanceUntilIdle()
 
-        assertEquals(SettingsUiState(), viewModel.state.value)
+        assertEquals(SettingsUiState(countsLoaded = true), viewModel.state.value)
         collection.cancel()
+    }
+
+    @Test
+    fun countsStartUnavailableAndEagerlyStayCurrentWithoutAUiCollector() = runTest(dispatcher) {
+        val sessions = FakeSettingsSessionRepository(emptyList())
+        val calibrations = FakeSettingsCalibrationRepository(emptyList())
+        val viewModel = SettingsViewModel(sessions, calibrations, FakeDataManagementRepository())
+
+        assertFalse(viewModel.state.value.countsLoaded)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.state.value.countsLoaded)
+        assertEquals(0, viewModel.state.value.sessionCount)
+
+        sessions.sessions.value = listOf(
+            sessionWithTwoResults(),
+            sessionWithTwoResults().copy(id = "built-in", source = DataSource.BUILT_IN),
+        )
+        calibrations.calibrations.value = listOf(
+            calibration(InflammationFactor.TNF_ALPHA),
+            calibration(InflammationFactor.IL6, CalibrationStatus.NEEDS_REVIEW),
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(2, viewModel.state.value.sessionCount)
+        assertEquals(4, viewModel.state.value.measurementCount)
+        assertEquals(1, viewModel.state.value.builtInSampleCount)
+        assertEquals(1, viewModel.state.value.calibrationCount)
+        assertEquals(1, viewModel.state.value.calibrationReviewCount)
     }
 
     @Test

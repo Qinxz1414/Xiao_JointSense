@@ -3,7 +3,9 @@ package cloud.univ.jointsense.settings
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -25,7 +27,6 @@ class SettingsScreenTest {
     @Test
     fun profileShowsGroupedEntriesAndLanguageSelectionClosesBeforeApply() {
         var languageAtApply: LanguageOption? = null
-        var dialogWasClosedAtApply = false
         composeRule.setContent {
             JointSenseTheme {
                 SettingsScreen(
@@ -34,11 +35,11 @@ class SettingsScreenTest {
                         builtInSampleCount = 12,
                         calibrationCount = 2,
                         calibrationReviewCount = 1,
+                        countsLoaded = true,
                     ),
                     selectedLanguage = LanguageOption.ENGLISH,
                     readCurrentLanguage = { LanguageOption.ENGLISH },
                     onApplyLanguage = {
-                        dialogWasClosedAtApply = true
                         languageAtApply = it
                     },
                     onOpenHistory = {},
@@ -71,7 +72,6 @@ class SettingsScreenTest {
         composeRule.onNodeWithTag(LANGUAGE_ZH_CN_TAG).assertDoesNotExist()
         composeRule.runOnIdle {
             assertEquals(LanguageOption.SIMPLIFIED_CHINESE, languageAtApply)
-            assertEquals(true, dialogWasClosedAtApply)
         }
     }
 
@@ -99,39 +99,72 @@ class SettingsScreenTest {
     }
 
     @Test
-    fun clearAndRestoreDialogsDescribeExactScopesAndConfirmTheStateMachine() {
+    fun clearDialogDescribesExactScopeAndConfirmsTheStateMachine() {
         var confirmations = 0
-        fun render(action: DataActionType) {
-            composeRule.setContent {
-                JointSenseTheme {
-                    SettingsScreen(
-                        state = SettingsUiState(dataAction = DataAction.Pending(action)),
-                        selectedLanguage = LanguageOption.SYSTEM,
-                        readCurrentLanguage = { LanguageOption.SYSTEM },
-                        onApplyLanguage = {}, onOpenHistory = {}, onCalibrate = {}, onOpenAbout = {},
-                        onRequestClearAll = {}, onRequestRestoreSamples = {},
-                        onConfirmDataAction = { confirmations += 1 },
-                        onDismissDataAction = {}, onRetryDataAction = {},
-                        onConsumeDataActionResult = {},
-                    )
-                }
+        composeRule.setContent {
+            JointSenseTheme {
+                SettingsScreen(
+                    state = SettingsUiState(dataAction = DataAction.Pending(DataActionType.CLEAR_ALL)),
+                    selectedLanguage = LanguageOption.SYSTEM,
+                    readCurrentLanguage = { LanguageOption.SYSTEM },
+                    onApplyLanguage = {}, onOpenHistory = {}, onCalibrate = {}, onOpenAbout = {},
+                    onRequestClearAll = {}, onRequestRestoreSamples = {},
+                    onConfirmDataAction = { confirmations += 1 },
+                    onDismissDataAction = {}, onRetryDataAction = {}, onConsumeDataActionResult = {},
+                )
             }
         }
-
-        render(DataActionType.CLEAR_ALL)
         composeRule.onNodeWithTag(CONFIRM_CLEAR_ALL_TAG).assertIsDisplayed()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings_clear_scope), substring = true)
             .assertIsDisplayed()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings_delete)).performClick()
+        composeRule.runOnIdle { assertEquals(1, confirmations) }
+    }
 
-        render(DataActionType.RESTORE_BUILT_IN_SAMPLES)
+    @Test
+    fun restoreDialogDescribesExactScopeAndConfirmsTheStateMachine() {
+        var confirmations = 0
+        composeRule.setContent {
+            JointSenseTheme {
+                SettingsScreen(
+                    state = SettingsUiState(
+                        dataAction = DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+                    ),
+                    selectedLanguage = LanguageOption.SYSTEM,
+                    readCurrentLanguage = { LanguageOption.SYSTEM },
+                    onApplyLanguage = {}, onOpenHistory = {}, onCalibrate = {}, onOpenAbout = {},
+                    onRequestClearAll = {}, onRequestRestoreSamples = {},
+                    onConfirmDataAction = { confirmations += 1 },
+                    onDismissDataAction = {}, onRetryDataAction = {}, onConsumeDataActionResult = {},
+                )
+            }
+        }
         composeRule.onNodeWithTag(CONFIRM_RESTORE_SAMPLES_TAG).assertIsDisplayed()
         composeRule.onNodeWithText(
             composeRule.activity.getString(R.string.settings_restore_samples_calibration_note),
             substring = true,
         ).assertIsDisplayed()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.settings_restore_samples_confirm)).performClick()
-        composeRule.runOnIdle { assertEquals(2, confirmations) }
+        composeRule.runOnIdle { assertEquals(1, confirmations) }
+    }
+
+    @Test
+    fun profileShowsLocalizedPlaceholdersBeforeCountsLoad() {
+        val loading = composeRule.activity.getString(R.string.settings_counts_loading)
+        composeRule.setContent {
+            JointSenseTheme {
+                SettingsScreen(
+                    state = SettingsUiState(countsLoaded = false),
+                    selectedLanguage = LanguageOption.SYSTEM,
+                    readCurrentLanguage = { LanguageOption.SYSTEM },
+                    onApplyLanguage = {}, onOpenHistory = {}, onCalibrate = {}, onOpenAbout = {},
+                    onRequestClearAll = {}, onRequestRestoreSamples = {}, onConfirmDataAction = {},
+                    onDismissDataAction = {}, onRetryDataAction = {}, onConsumeDataActionResult = {},
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText(loading).assertCountEquals(3)
     }
 
     @Test

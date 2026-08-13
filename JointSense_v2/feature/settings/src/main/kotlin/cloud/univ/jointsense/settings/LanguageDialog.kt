@@ -90,3 +90,13 @@ private fun LanguageRow(
 const val LANGUAGE_SYSTEM_TAG = "language_system"
 const val LANGUAGE_ZH_CN_TAG = "language_zh_cn"
 const val LANGUAGE_EN_TAG = "language_en"
+
+internal fun completeLanguageSelection(
+    current: LanguageOption,
+    selected: LanguageOption,
+    close: () -> Unit,
+    apply: (LanguageOption) -> Unit,
+) {
+    close()
+    if (selected != current) apply(selected)
+}

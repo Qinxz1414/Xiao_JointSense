@@ -30,6 +30,7 @@ sealed interface DataAction {
 }
 
 data class SettingsUiState(
+    val countsLoaded: Boolean = false,
     val sessionCount: Int = 0,
     val measurementCount: Int = 0,
     val builtInSampleCount: Int = 0,
@@ -57,6 +58,7 @@ class SettingsViewModel(
         dataAction,
     ) { observedSessions, observedCalibrations, action ->
         SettingsUiState(
+            countsLoaded = true,
             sessionCount = observedSessions.size,
             measurementCount = observedSessions.sumOf { it.results.size },
             builtInSampleCount = observedSessions.count { it.source == DataSource.BUILT_IN },
@@ -70,7 +72,7 @@ class SettingsViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        started = SharingStarted.Eagerly,
         initialValue = SettingsUiState(),
     )
 

@@ -138,6 +138,8 @@ class ResourceParityTest {
         }
         assertEquals(ENGLISH_OA_TERM, settingsEn.text("settings_about_index_heading"))
         assertEquals(CHINESE_OA_TERM, settingsZh.text("settings_about_index_heading"))
+        assertEquals("Tealness is defined as BMean − RMean.", settingsEn.text("settings_about_tealness"))
+        assertEquals("青色信号（tealness）定义为 BMean − RMean。", settingsZh.text("settings_about_tealness"))
         localizedModules.forEach { module ->
             listOf("values", "values-zh-rCN").forEach { directory ->
                 resources(module, directory).forEach { (key, entry) ->

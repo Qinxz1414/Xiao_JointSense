@@ -5,6 +5,7 @@
     <string name="settings_app_name">JointSense</string>
     <string name="settings_app_summary">面向 OA 科研的手机照片色度分析</string>
     <string name="settings_counts">%1$s · %2$s</string>
+    <string name="settings_counts_loading">正在加载已存储数据…</string>
     <plurals name="settings_session_count">
         <item quantity="other">%1$d 个检测会话</item>
     </plurals>
@@ -68,7 +69,7 @@
     <string name="settings_about_version">版本 %1$s</string>
     <string name="settings_about_method_heading">照片色度分析</string>
     <string name="settings_about_rgb_features">对选定的反应腔裁剪区域提取 6 项特征：红、绿、蓝三通道均值及各通道标准差。</string>
-    <string name="settings_about_tealness">净青色信号定义为 BMean − RMean。</string>
+    <string name="settings_about_tealness">青色信号（tealness）定义为 BMean − RMean。</string>
     <string name="settings_about_curve_heading">标准曲线定量</string>
     <string name="settings_about_curve_behavior">对应因子存在启用中的用户校准曲线时优先使用该曲线，否则使用工厂标准曲线；通过分段线性反演得到浓度，并标注低于范围、范围内或高于范围。</string>
     <string name="settings_about_factory_ranges">工厂曲线浓度范围：TNF-α 0–200 pg/mL、IL-6 0–500 pg/mL、IL-1β 0–200 pg/mL。</string>

@@ -5,6 +5,7 @@
     <string name="settings_app_name">JointSense</string>
     <string name="settings_app_summary">Smartphone-photo colorimetry for OA research</string>
     <string name="settings_counts">%1$s · %2$s</string>
+    <string name="settings_counts_loading">Loading stored data…</string>
     <plurals name="settings_session_count">
         <item quantity="one">%1$d session</item>
         <item quantity="other">%1$d sessions</item>
@@ -73,7 +74,7 @@
     <string name="settings_about_version">Version %1$s</string>
     <string name="settings_about_method_heading">Photo colorimetry</string>
     <string name="settings_about_rgb_features">The selected reaction-chamber crop is summarized by six features: red, green, and blue channel means plus their channel standard deviations.</string>
-    <string name="settings_about_tealness">Net tealness is BMean − RMean.</string>
+    <string name="settings_about_tealness">Tealness is defined as BMean − RMean.</string>
     <string name="settings_about_curve_heading">Standard-curve quantification</string>
     <string name="settings_about_curve_behavior">An active user calibration curve is used for its factor; otherwise the factory standard curve is used. Concentration is obtained by piecewise-linear inversion and labeled below range, in range, or above range.</string>
     <string name="settings_about_factory_ranges">Factory concentration ranges: TNF-α 0–200 pg/mL, IL-6 0–500 pg/mL, and IL-1β 0–200 pg/mL.</string>

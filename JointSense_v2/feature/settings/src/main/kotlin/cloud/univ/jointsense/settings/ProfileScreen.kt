@@ -124,14 +124,18 @@ internal fun SettingsScreen(
                         icon = Icons.Default.Restore,
                         tint = MaterialTheme.colorScheme.primary,
                         title = stringResource(R.string.settings_restore_samples),
-                        subtitle = stringResource(
-                            R.string.settings_restore_samples_summary,
-                            pluralStringResource(
-                                R.plurals.settings_builtin_sample_count,
-                                state.builtInSampleCount,
-                                state.builtInSampleCount,
-                            ),
-                        ),
+                        subtitle = if (state.countsLoaded) {
+                            stringResource(
+                                R.string.settings_restore_samples_summary,
+                                pluralStringResource(
+                                    R.plurals.settings_builtin_sample_count,
+                                    state.builtInSampleCount,
+                                    state.builtInSampleCount,
+                                ),
+                            )
+                        } else {
+                            stringResource(R.string.settings_counts_loading)
+                        },
                         testTag = SETTINGS_RESTORE_SAMPLES_TAG,
                         onClick = onRequestRestoreSamples,
                     ),
@@ -167,8 +171,12 @@ internal fun SettingsScreen(
         LanguageDialog(
             selected = snapshot,
             onSelect = { option ->
-                languageDialogSelection = null
-                if (option != snapshot) onApplyLanguage(option)
+                completeLanguageSelection(
+                    current = snapshot,
+                    selected = option,
+                    close = { languageDialogSelection = null },
+                    apply = onApplyLanguage,
+                )
             },
             onDismiss = { languageDialogSelection = null },
         )
@@ -220,11 +228,15 @@ private fun IdentityCard(state: SettingsUiState) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = stringResource(
-                        R.string.settings_counts,
-                        pluralStringResource(R.plurals.settings_session_count, state.sessionCount, state.sessionCount),
-                        pluralStringResource(R.plurals.settings_measurement_count, state.measurementCount, state.measurementCount),
-                    ),
+                    text = if (state.countsLoaded) {
+                        stringResource(
+                            R.string.settings_counts,
+                            pluralStringResource(R.plurals.settings_session_count, state.sessionCount, state.sessionCount),
+                            pluralStringResource(R.plurals.settings_measurement_count, state.measurementCount, state.measurementCount),
+                        )
+                    } else {
+                        stringResource(R.string.settings_counts_loading)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -316,6 +328,7 @@ private fun languageLabel(option: LanguageOption): String = stringResource(
 
 @Composable
 private fun calibrationSummary(state: SettingsUiState): String = when {
+    !state.countsLoaded -> stringResource(R.string.settings_counts_loading)
     state.calibrationCount > 0 && state.calibrationReviewCount > 0 -> stringResource(
         R.string.settings_calibration_combined,
         pluralStringResource(R.plurals.settings_calibration_active, state.calibrationCount, state.calibrationCount),
