@@ -161,7 +161,9 @@ private fun quantifyWithUserCalibration(
     } catch (_: IllegalArgumentException) {
         return null
     }
-    return curve.quantify(blankSubtractedSignal)
+    return curve.quantify(blankSubtractedSignal).takeIf { result ->
+        result.concentration.isFinite() && result.concentration >= 0f
+    }
 }
 
 private fun List<CalibrationKnot>.areStructurallyValid(blank: CalibrationKnot): Boolean =

@@ -4,6 +4,7 @@ import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StandardCurveTest {
@@ -92,5 +93,34 @@ class StandardCurveTest {
 
         assertEquals(10f, curve.quantify(3f).concentration, 0.001f)
         assertEquals(50f, curve.quantify(17f).concentration, 0.001f)
+    }
+
+    @Test
+    fun finiteExtremeConcentrationInterpolatesWithoutFloatOverflow() {
+        val extreme = StandardCurve(
+            listOf(CurveKnot(0f, 0f), CurveKnot(Float.MAX_VALUE, 10f)),
+        )
+
+        val midpoint = extreme.quantify(5f)
+
+        assertTrue(midpoint.concentration.isFinite())
+        assertTrue(midpoint.concentration >= 0f)
+        assertEquals(Float.MAX_VALUE / 2f, midpoint.concentration, Float.MAX_VALUE * 1e-6f)
+        assertEquals(RangeStatus.IN_RANGE, midpoint.rangeStatus)
+        assertEquals(
+            QuantificationResult(Float.MAX_VALUE, RangeStatus.IN_RANGE),
+            extreme.quantify(10f),
+        )
+        assertEquals(
+            QuantificationResult(Float.MAX_VALUE, RangeStatus.ABOVE_RANGE),
+            extreme.quantify(11f),
+        )
+    }
+
+    @Test
+    fun constructorRejectsNegativeConcentration() {
+        assertThrows(IllegalArgumentException::class.java) {
+            StandardCurve(listOf(CurveKnot(-1f, 0f), CurveKnot(1f, 10f)))
+        }
     }
 }

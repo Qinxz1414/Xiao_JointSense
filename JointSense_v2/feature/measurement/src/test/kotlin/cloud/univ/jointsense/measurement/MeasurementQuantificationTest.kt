@@ -7,6 +7,7 @@ import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MeasurementQuantificationTest {
@@ -103,6 +104,27 @@ class MeasurementQuantificationTest {
             expected,
             quantifyMeasurementSignal(factor, rawSignal, active.copy(factor = InflammationFactor.IL6)),
         )
+    }
+
+    @Test
+    fun photoDomainMidpointWithExtremeFiniteUserConcentrationStaysFinite() {
+        val calibration = userCalibration(
+            listOf(
+                CalibrationKnot(0, 0f, 0f, 0f, 0f, isBlank = true),
+                CalibrationKnot(1, Float.MAX_VALUE, 10f, 10f, 10f, isBlank = false),
+            ),
+        )
+
+        val result = quantifyMeasurementSignal(
+            factor = InflammationFactor.TNF_ALPHA,
+            rawSignal = 5f,
+            userCalibration = calibration,
+        )
+
+        assertTrue(result.concentration.isFinite())
+        assertTrue(result.concentration >= 0f)
+        assertEquals(Float.MAX_VALUE / 2f, result.concentration, Float.MAX_VALUE * 1e-6f)
+        assertEquals(RangeStatus.IN_RANGE, result.rangeStatus)
     }
 
     private fun userKnots(blankRawSignal: Float) = listOf(

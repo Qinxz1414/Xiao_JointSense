@@ -5,8 +5,10 @@ import cloud.univ.jointsense.domain.model.RangeStatus
 class StandardCurve(knots: List<CurveKnot>) {
     private val knots = knots.sortedBy(CurveKnot::signal).also {
         require(it.size >= 2) { "A standard curve needs at least two knots." }
-        require(it.all { knot -> knot.concentration.isFinite() && knot.signal.isFinite() }) {
-            "Curve knots must be finite."
+        require(it.all { knot ->
+            knot.concentration.isFinite() && knot.concentration >= 0f && knot.signal.isFinite()
+        }) {
+            "Curve knots must have finite, non-negative concentrations and finite signals."
         }
         require(it.zipWithNext().all { (a, b) ->
             b.signal >= a.signal && b.concentration > a.concentration
@@ -36,8 +38,19 @@ class StandardCurve(knots: List<CurveKnot>) {
         val lower = upper - 1
         val a = knots[lower]
         val b = knots[upper]
-        val concentration = a.concentration + (b.concentration - a.concentration) *
-            (signal - a.signal) / (b.signal - a.signal)
-        return QuantificationResult(concentration, RangeStatus.IN_RANGE)
+        val interpolationFraction =
+            (signal.toDouble() - a.signal.toDouble()) /
+                (b.signal.toDouble() - a.signal.toDouble())
+        val concentration =
+            a.concentration.toDouble() +
+                (b.concentration.toDouble() - a.concentration.toDouble()) * interpolationFraction
+        check(concentration.isFinite() && concentration >= 0.0) {
+            "Curve interpolation must produce a finite, non-negative concentration."
+        }
+        val representedConcentration = concentration.toFloat()
+        check(representedConcentration.isFinite() && representedConcentration >= 0f) {
+            "Curve concentration must be representable as a finite, non-negative Float."
+        }
+        return QuantificationResult(representedConcentration, RangeStatus.IN_RANGE)
     }
 }
