@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="factor_unit" translatable="false">pg/mL</string>
+</resources>

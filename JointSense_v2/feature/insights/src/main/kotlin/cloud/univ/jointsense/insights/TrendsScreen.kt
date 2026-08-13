@@ -34,6 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,7 +50,9 @@ import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
-import java.text.SimpleDateFormat
+import cloud.univ.jointsense.feature.insights.R
+import java.text.DateFormat
+import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
 
@@ -63,9 +68,19 @@ fun TrendsScreen(
     // 0 = All
     var periodDays by remember { mutableIntStateOf(7) }
     val periods = listOf(7, 30, 90, 0)
+    val locale = LocalConfiguration.current.locales[0]
+    val numberFormat = remember(locale) {
+        NumberFormat.getNumberInstance(locale).apply {
+            minimumFractionDigits = 1
+            maximumFractionDigits = 2
+        }
+    }
+    val chartDateFormat = remember(locale) {
+        DateFormat.getDateInstance(DateFormat.SHORT, locale)
+    }
 
     Scaffold(
-        topBar = { JointSenseTopBar(title = "Trend Analysis") }
+        topBar = { JointSenseTopBar(title = stringResource(R.string.insights_trends_title)) }
     ) { paddingValues ->
         Column(
             modifier = modifier
@@ -90,7 +105,11 @@ fun TrendsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (days == 0) "All" else "${days}D",
+                            text = if (days == 0) {
+                                stringResource(R.string.insights_period_all)
+                            } else {
+                                stringResource(R.string.insights_period_days, days)
+                            },
                             color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 13.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
@@ -126,7 +145,7 @@ fun TrendsScreen(
                     shape = RoundedCornerShape(16.dp),
                 ) {
                     Text(
-                        text = "No measurements in this period.\nRun a test to start tracking trends.",
+                        text = stringResource(R.string.insights_trends_empty),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(32.dp),
@@ -148,7 +167,7 @@ fun TrendsScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "Inflammatory Factor Trends (pg/mL)",
+                            text = stringResource(R.string.insights_factor_trends),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -182,7 +201,10 @@ fun TrendsScreen(
                         ) {
                             MultiLineChart(
                                 series = factorSeries,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                yAxisLabel = stringResource(R.string.insights_unit),
+                                formatValue = numberFormat::format,
+                                formatTime = { chartDateFormat.format(Date(it)) },
                             )
                         }
                     }
@@ -202,13 +224,15 @@ fun TrendsScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "OA Inflammation Index (AI) Trend",
+                            text = stringResource(R.string.insights_ai_trend),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        val dayFormat = remember { SimpleDateFormat("MM/dd", Locale.getDefault()) }
+                        val dayFormat = remember(locale) {
+                            DateFormat.getDateInstance(DateFormat.SHORT, locale)
+                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -223,7 +247,8 @@ fun TrendsScreen(
                                 },
                                 lineColor = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.fillMaxSize(),
-                                yAxisLabel = "AI"
+                                yAxisLabel = stringResource(R.string.insights_ai_axis),
+                                formatValue = numberFormat::format,
                             )
                         }
                     }
@@ -243,7 +268,7 @@ fun TrendsScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "Key Events",
+                            text = stringResource(R.string.insights_key_events),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -251,13 +276,13 @@ fun TrendsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         if (events.isEmpty()) {
                             Text(
-                                text = "No events in this period.",
+                                text = stringResource(R.string.insights_no_events),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp
                             )
                         }
-                        val eventFormat = remember {
-                            SimpleDateFormat("MM/dd", Locale.getDefault())
+                        val eventFormat = remember(locale) {
+                            DateFormat.getDateInstance(DateFormat.SHORT, locale)
                         }
                         events.forEach { event ->
                             Row(
@@ -300,7 +325,7 @@ fun TrendsScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = event.text,
+                                        text = event.localizedText(),
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
@@ -319,4 +344,24 @@ fun TrendsScreen(
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
+}
+
+@Composable
+private fun KeyEventItem.localizedText(): String = when (kind) {
+    EventKind.TEST -> pluralStringResource(
+        R.plurals.insights_event_test,
+        requireNotNull(measurementCount),
+        measurementCount,
+        aiValue?.let { stringResource(R.string.insights_event_ai_value, it) }.orEmpty(),
+    )
+    EventKind.UP -> stringResource(
+        R.string.insights_event_ai_up,
+        requireNotNull(previousAi),
+        requireNotNull(currentAi),
+    )
+    EventKind.DOWN -> stringResource(
+        R.string.insights_event_ai_down,
+        requireNotNull(previousAi),
+        requireNotNull(currentAi),
+    )
 }

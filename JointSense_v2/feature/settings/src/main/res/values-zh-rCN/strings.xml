@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">个人中心</string>
+    <string name="settings_logo_description">JointSense 标志</string>
+    <string name="settings_app_name">JointSense</string>
+    <string name="settings_app_summary">OA 炎症监测 · v1.0</string>
+    <string name="settings_counts">%1$s，%2$s</string>
+    <plurals name="settings_session_count">
+        <item quantity="other">%1$d 个检测会话</item>
+    </plurals>
+    <plurals name="settings_measurement_count">
+        <item quantity="other">%1$d 项测量</item>
+    </plurals>
+    <string name="settings_history">检测记录</string>
+    <string name="settings_history_summary">浏览和管理已保存的检测会话</string>
+    <string name="settings_about_model">关于分析模型</string>
+    <string name="settings_about_summary">了解 RGB 色度分析与模型方法</string>
+    <string name="settings_calibrate">标准曲线校准</string>
+    <string name="settings_clear_all">清除全部数据</string>
+    <string name="settings_clear_summary">删除本设备上的检测会话和用户校准</string>
+    <string name="settings_clear_title">清除全部数据？</string>
+    <plurals name="settings_clear_message">
+        <item quantity="other">本设备上的 %1$d 个检测会话和所有用户校准曲线将被永久删除。</item>
+    </plurals>
+    <string name="settings_delete">删除</string>
+    <string name="settings_cancel">取消</string>
+    <string name="settings_ok">确定</string>
+    <string name="settings_about_model_body">JointSense 基于芯片反应腔图像估算 TNF-α、IL-6 和 IL-1β。六项 RGB 特征（各通道均值与标准差）输入因子专属分析模型；OA 炎症综合指数将三项因子合成为 0 至 1 的分数，并映射至 0 至 4 级。\n\n本科研版本的模型系数为占位数据，仍需经验证的训练模型导出替换。</string>
+    <plurals name="settings_calibration_review">
+        <item quantity="other">%1$d 项校准需要复核</item>
+    </plurals>
+    <plurals name="settings_calibration_active">
+        <item quantity="other">%1$d 条用户曲线已启用</item>
+    </plurals>
+    <string name="settings_calibration_empty">拍摄标准板可提高定量准确性</string>
+</resources>

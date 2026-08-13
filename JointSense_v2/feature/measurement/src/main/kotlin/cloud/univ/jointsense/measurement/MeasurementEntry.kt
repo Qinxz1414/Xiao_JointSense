@@ -20,11 +20,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.feature.measurement.R
 
 @Composable
 fun ImageSelectRouteScreen(
@@ -142,20 +144,20 @@ fun ImageSelectRouteScreen(
                 )
             },
             onBack = onBack,
-            sessionName = state.currentSession?.name ?: "New Test",
+            sessionName = state.currentSession?.name ?: stringResource(R.string.measurement_new_test),
         )
-        Stage.Decoding -> MeasurementProgressContent("Preparing image…")
+        Stage.Decoding -> MeasurementProgressContent(stringResource(R.string.measurement_progress_preparing_image))
         Stage.RecoverableError -> MeasurementErrorContent(
             error = state.error ?: MeasurementError.ImageUnreadable,
             onRetry = { viewModel.onAction(MeasurementAction.Retry) },
             onOpenSettings = { context.openApplicationSettings() },
         )
-        Stage.ReadyToCrop -> MeasurementProgressContent("Opening crop editor…")
+        Stage.ReadyToCrop -> MeasurementProgressContent(stringResource(R.string.measurement_progress_opening_crop))
         Stage.ReadyToAnalyze,
         Stage.Analyzing,
         Stage.Persisting,
         Stage.Success,
-        -> MeasurementProgressContent("Restoring measurement…")
+        -> MeasurementProgressContent(stringResource(R.string.measurement_progress_restoring))
     }
 }
 
@@ -203,13 +205,13 @@ fun CropRouteScreen(
             onRetry = { viewModel.onAction(MeasurementAction.Retry) },
             onOpenSettings = {},
         )
-        Stage.Decoding -> MeasurementProgressContent("Restoring image…")
-        Stage.ReadyToAnalyze -> MeasurementProgressContent("Opening factor selection…")
+        Stage.Decoding -> MeasurementProgressContent(stringResource(R.string.measurement_progress_restoring_image))
+        Stage.ReadyToAnalyze -> MeasurementProgressContent(stringResource(R.string.measurement_progress_opening_factor))
         Stage.Analyzing,
         Stage.Persisting,
         Stage.Success,
-        -> MeasurementProgressContent("Measurement in progress…")
-        Stage.AwaitingImage -> MeasurementProgressContent("Returning to image selection…")
+        -> MeasurementProgressContent(stringResource(R.string.measurement_progress_in_progress))
+        Stage.AwaitingImage -> MeasurementProgressContent(stringResource(R.string.measurement_progress_returning_image))
     }
 }
 
@@ -256,11 +258,11 @@ fun FactorSelectRouteScreen(
             onRetry = { viewModel.onAction(MeasurementAction.Retry) },
             onOpenSettings = {},
         )
-        Stage.Success -> MeasurementProgressContent("Opening result…")
+        Stage.Success -> MeasurementProgressContent(stringResource(R.string.measurement_progress_opening_result))
         Stage.AwaitingImage,
         Stage.Decoding,
         Stage.ReadyToCrop,
-        -> MeasurementProgressContent("Restoring measurement…")
+        -> MeasurementProgressContent(stringResource(R.string.measurement_progress_restoring))
     }
 }
 

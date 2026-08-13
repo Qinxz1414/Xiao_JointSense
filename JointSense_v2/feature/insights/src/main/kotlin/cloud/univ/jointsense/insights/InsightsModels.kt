@@ -13,8 +13,24 @@ enum class EventKind { TEST, UP, DOWN }
 data class KeyEventItem(
     val time: Long,
     val kind: EventKind,
-    val text: String,
+    val measurementCount: Int? = null,
+    val aiValue: Float? = null,
+    val previousAi: Float? = null,
+    val currentAi: Float? = null,
 )
+
+enum class InsightSuggestion {
+    CONTINUE_MONITORING,
+    LOW_IMPACT_EXERCISE,
+    DISCUSS_WITH_CLINICIAN,
+    AVOID_OVERLOAD,
+    REGULAR_MONITORING,
+    SEEK_CLINICAL_REVIEW,
+    REDUCE_JOINT_LOAD,
+    FOLLOW_TREATMENT_PLAN,
+    RETEST_SOONER,
+    CURRENT_PLAN_EFFECTIVE,
+}
 
 data class HomeUiState(
     val allResults: List<TestResult> = emptyList(),
@@ -46,12 +62,4 @@ internal val InflammationFactor.shortName: String
         InflammationFactor.IL1_BETA -> "IL-1β"
     }
 
-internal val InflammationFactor.displayName: String
-    get() = when (this) {
-        InflammationFactor.IL6 -> "Interleukin-6"
-        InflammationFactor.TNF_ALPHA -> "Tumor Necrosis Factor-α"
-        InflammationFactor.IL1_BETA -> "Interleukin-1β"
-    }
-
-internal const val FACTOR_UNIT = "pg/mL"
 internal const val DAY_MILLIS = 86_400_000L

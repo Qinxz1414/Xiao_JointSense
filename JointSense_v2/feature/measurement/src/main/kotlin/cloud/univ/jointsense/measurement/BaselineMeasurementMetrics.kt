@@ -50,8 +50,7 @@ internal object BaselineMeasurementMetrics {
         }
     }
 
-    fun gradeLabel(grade: Int): String =
-        listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")[validGrade(grade)]
+    fun requireValidGrade(grade: Int): Int = validGrade(grade)
 
     fun wellColor(intensity: Float): Color {
         val index = (intensity.coerceIn(0f, 1f) * (WellPalette.size - 1)).roundToInt()
@@ -70,12 +69,3 @@ internal val InflammationFactor.shortName: String
         InflammationFactor.TNF_ALPHA -> "TNF-α"
         InflammationFactor.IL1_BETA -> "IL-1β"
     }
-
-internal val InflammationFactor.displayName: String
-    get() = when (this) {
-        InflammationFactor.IL6 -> "Interleukin-6"
-        InflammationFactor.TNF_ALPHA -> "Tumor Necrosis Factor-α"
-        InflammationFactor.IL1_BETA -> "Interleukin-1β"
-    }
-
-internal const val FACTOR_UNIT = "pg/mL"

@@ -99,10 +99,7 @@ class SettingsViewModelTest {
         assertFalse(viewModel.state.value.hasCalibration)
         assertEquals(1, viewModel.state.value.calibrationReviewCount)
         assertTrue(viewModel.state.value.hasCalibrationNeedingReview)
-        assertEquals(
-            "Calibration needs review (1 factor(s))",
-            calibrationSubtitle(viewModel.state.value),
-        )
+        assertEquals(CalibrationSubtitle.Review(1), calibrationSubtitle(viewModel.state.value))
         collection.cancel()
     }
 

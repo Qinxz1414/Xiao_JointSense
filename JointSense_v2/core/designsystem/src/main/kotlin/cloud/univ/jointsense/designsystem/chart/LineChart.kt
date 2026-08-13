@@ -38,9 +38,10 @@ data class ChartDataPoint(
 @Composable
 fun LineChart(
     dataPoints: List<ChartDataPoint>,
+    yAxisLabel: String,
+    formatValue: (Float) -> String,
     lineColor: Color = MaterialTheme.colorScheme.primary,
     modifier: Modifier = Modifier,
-    yAxisLabel: String = "pg/mL"
 ) {
     if (dataPoints.isEmpty()) return
     val axisColor = MaterialTheme.colorScheme.outline
@@ -106,7 +107,7 @@ fun LineChart(
 
             // Y-axis label
             drawContext.canvas.nativeCanvas.drawText(
-                "%.1f".format(value),
+                formatValue(value),
                 paddingLeft - 8f,
                 y + 4f,
                 android.graphics.Paint().apply {
@@ -159,7 +160,7 @@ fun LineChart(
 
             // Value label
             drawContext.canvas.nativeCanvas.drawText(
-                "%.2f".format(dataPoints[0].value),
+                formatValue(dataPoints[0].value),
                 x,
                 y - 14f,
                 android.graphics.Paint().apply {
@@ -237,7 +238,7 @@ fun LineChart(
 
                 // Value label above point
                 drawContext.canvas.nativeCanvas.drawText(
-                    "%.2f".format(dataPoints[i].value),
+                    formatValue(dataPoints[i].value),
                     points[i].x,
                     points[i].y - 14f,
                     android.graphics.Paint().apply {

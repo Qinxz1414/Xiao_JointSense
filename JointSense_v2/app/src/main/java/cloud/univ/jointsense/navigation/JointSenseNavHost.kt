@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +65,7 @@ import cloud.univ.jointsense.calibration.CalibrationSelectRouteScreen
 import cloud.univ.jointsense.calibration.CalibrationViewModel
 import cloud.univ.jointsense.calibration.CalibrationViewModelFactory
 import cloud.univ.jointsense.calibration.LegacyCalibrationRevalidator
+import cloud.univ.jointsense.R
 import cloud.univ.jointsense.di.AppContainer
 import cloud.univ.jointsense.insights.HomeRouteScreen
 import cloud.univ.jointsense.insights.InsightsViewModel
@@ -140,6 +142,7 @@ private fun JointSenseNavHostContent(
     val measurementViewModel = featureViewModels?.measurement ?: testMeasurementViewModel
     val currentEntry by navController.currentBackStackEntryAsState()
     val topLevelDestination = currentEntry?.destination?.topLevelDestination()
+    val sessionCreationErrorMessage = stringResource(R.string.session_creation_error)
     val snackbarHostState = remember { SnackbarHostState() }
     val measurementState = measurementViewModel?.state
         ?.collectAsStateWithLifecycle()?.value
@@ -162,9 +165,9 @@ private fun JointSenseNavHostContent(
         )
     }
 
-    LaunchedEffect(sessionCreationError) {
-        val message = sessionCreationError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
+    LaunchedEffect(sessionCreationError, sessionCreationErrorMessage) {
+        sessionCreationError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(sessionCreationErrorMessage)
         measurementViewModel?.consumeSessionCreationError()
     }
 
@@ -367,7 +370,7 @@ private fun JointSenseNavHostContent(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "New test",
+                        contentDescription = stringResource(R.string.new_test),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(26.dp),
                     )
@@ -393,6 +396,7 @@ private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModel
             analyzer = container.measurementAnalysis,
             decoder = SampledBitmapDecoder(context.contentResolver),
             context = context,
+            sessionNamePrefix = { context.getString(R.string.session_name_prefix) },
         )
     }
     val settingsFactory = remember(container) {
@@ -505,13 +509,13 @@ private fun MainBottomBar(
             ) {
                 BarTab(
                     icon = Icons.Default.Home,
-                    label = "Home",
+                    label = stringResource(R.string.nav_home),
                     selected = activeDestination == TopLevelDestination.HOME,
                     onClick = { onDestination(TopLevelDestination.HOME) },
                 )
                 BarTab(
                     icon = Icons.AutoMirrored.Filled.ShowChart,
-                    label = "Trends",
+                    label = stringResource(R.string.nav_trends),
                     selected = activeDestination == TopLevelDestination.TRENDS,
                     onClick = { onDestination(TopLevelDestination.TRENDS) },
                 )
@@ -522,7 +526,7 @@ private fun MainBottomBar(
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     Text(
-                        text = "Test",
+                        text = stringResource(R.string.nav_test),
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
@@ -531,13 +535,13 @@ private fun MainBottomBar(
                 }
                 BarTab(
                     icon = Icons.Default.Description,
-                    label = "Report",
+                    label = stringResource(R.string.nav_report),
                     selected = activeDestination == TopLevelDestination.REPORT,
                     onClick = { onDestination(TopLevelDestination.REPORT) },
                 )
                 BarTab(
                     icon = Icons.Default.Person,
-                    label = "Profile",
+                    label = stringResource(R.string.nav_profile),
                     selected = activeDestination == TopLevelDestination.PROFILE,
                     onClick = { onDestination(TopLevelDestination.PROFILE) },
                 )

@@ -18,9 +18,12 @@
     <string name="migration_status_failed">数据迁移失败</string>
     <string name="migration_preparing_data">正在准备已保存的数据…</string>
     <string name="migration_error_title">无法准备已保存的数据</string>
-    <string name="migration_error_message">现有数据尚未被更改。你可以重试，或使用空数据库开始。\n\n详细信息：%1$s</string>
+    <string name="migration_error_message">现有数据尚未被更改。你可以重试，或使用空数据库开始。</string>
     <string name="migration_start_empty">使用空数据库</string>
     <string name="migration_start_empty_confirm_title">确定使用空数据库开始吗？</string>
     <string name="migration_start_empty_confirm_message">这会删除 Room 中可能存在的部分导入数据并跳过旧数据导入，但不会修改原有的旧版文件。</string>
     <string name="migration_start_empty_confirm_action">确认使用空数据库</string>
+    <string name="new_test">新建检测</string>
+    <string name="session_name_prefix">检测</string>
+    <string name="session_creation_error">无法开始新的检测，请重试。</string>
 </resources>

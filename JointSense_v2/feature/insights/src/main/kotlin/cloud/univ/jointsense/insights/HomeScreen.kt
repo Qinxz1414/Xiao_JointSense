@@ -33,12 +33,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cloud.univ.jointsense.core.designsystem.R
+import cloud.univ.jointsense.core.designsystem.R as DesignSystemR
 import cloud.univ.jointsense.designsystem.chart.ChartDataPoint
 import cloud.univ.jointsense.designsystem.component.GradeScale
 import cloud.univ.jointsense.designsystem.chart.LineChart
@@ -48,7 +50,9 @@ import cloud.univ.jointsense.designsystem.component.GradeBadge
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
-import java.text.SimpleDateFormat
+import cloud.univ.jointsense.feature.insights.R
+import java.text.DateFormat
+import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
 
@@ -65,7 +69,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     Scaffold(
-        topBar = { JointSenseTopBar(title = "OA Inflammation Monitor") }
+        topBar = { JointSenseTopBar(title = stringResource(R.string.insights_home_title)) }
     ) { paddingValues ->
         Column(
             modifier = modifier
@@ -111,8 +115,8 @@ private fun EmptyHome(onTestNow: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.jointsense_logo),
-                    contentDescription = "JointSense Logo",
+                    painter = painterResource(id = DesignSystemR.drawable.jointsense_logo),
+                    contentDescription = stringResource(R.string.insights_logo_description),
                     modifier = Modifier.size(72.dp),
                     contentScale = ContentScale.Fit
                 )
@@ -121,7 +125,7 @@ private fun EmptyHome(onTestNow: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "JointSense",
+                text = stringResource(R.string.insights_empty_title),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -130,7 +134,7 @@ private fun EmptyHome(onTestNow: () -> Unit) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "No tests yet.\nRun your first detection to build your\ninflammation dashboard.",
+                text = stringResource(R.string.insights_empty_message),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -148,7 +152,7 @@ private fun EmptyHome(onTestNow: () -> Unit) {
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Test Now", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.insights_test_now), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -163,7 +167,16 @@ private fun DashboardContent(
     val latest = state.latestValues
     val ai = state.currentAi
     val grade = state.currentGrade
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val locale = LocalConfiguration.current.locales[0]
+    val dateFormat = remember(locale) {
+        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
+    }
+    val numberFormat = remember(locale) {
+        NumberFormat.getNumberInstance(locale).apply {
+            minimumFractionDigits = 1
+            maximumFractionDigits = 2
+        }
+    }
     val lastTest = state.allResults.maxOf { it.timestamp }
 
     // Factor cards
@@ -193,14 +206,15 @@ private fun DashboardContent(
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = value?.let { "%.2f".format(it) } ?: "—",
+                            text = value?.let { stringResource(R.string.insights_value, it) }
+                                ?: stringResource(R.string.value_unavailable),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Text(
-                        text = "pg/mL",
+                        text = stringResource(R.string.insights_unit),
                         fontSize = 9.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -233,26 +247,31 @@ private fun DashboardContent(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "OA Inflammation Index (AI)",
+                    text = stringResource(R.string.insights_oa_index),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = ai?.let { "%.2f".format(it) } ?: "—",
+                        text = ai?.let { stringResource(R.string.insights_value, it) }
+                            ?: stringResource(R.string.value_unavailable),
                         fontSize = 34.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     if (grade != null) {
                         Spacer(modifier = Modifier.width(12.dp))
-                        val gradeLabel = BaselineInsightsMetrics.gradeLabel(grade)
+                        val gradeLabel = stringResource(gradeResource(grade))
                         GradeBadge(
                             grade = grade,
                             label = gradeLabel,
-                            contentDescription = "OA inflammation grade",
-                            stateDescription = "Grade $grade, $gradeLabel",
+                            contentDescription = stringResource(R.string.insights_oa_grade),
+                            stateDescription = stringResource(
+                                R.string.insights_grade_description,
+                                grade,
+                                gradeLabel,
+                            ),
                         )
                     }
                 }
@@ -260,7 +279,7 @@ private fun DashboardContent(
             IconButton(onClick = onOpenReport) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Open AI report",
+                    contentDescription = stringResource(R.string.insights_open_report),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -281,18 +300,19 @@ private fun DashboardContent(
                 .padding(16.dp)
         ) {
             Text(
-                text = "OA Inflammation Grade",
+                text = stringResource(R.string.insights_oa_grade),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
-            val labels = listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")
-            val gradeStateDescription = grade?.let { "Grade $it, ${labels[it]}" }
-                ?: "Grade unavailable"
+            val labels = (0..4).map { stringResource(gradeResource(it)) }
+            val gradeStateDescription = grade?.let {
+                stringResource(R.string.insights_grade_description, it, labels[it])
+            } ?: stringResource(R.string.insights_grade_unavailable)
             GradeScale(
                 currentGrade = grade,
                 labels = labels,
-                contentDescription = "OA inflammation grade scale",
+                contentDescription = stringResource(R.string.insights_grade_scale_description),
                 stateDescription = gradeStateDescription,
             )
         }
@@ -312,7 +332,7 @@ private fun DashboardContent(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Recent Trend (7 days)",
+                text = stringResource(R.string.insights_recent_trend),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -320,7 +340,7 @@ private fun DashboardContent(
             val weekSeries = state.aiSeries.filter {
                 it.time >= System.currentTimeMillis() - DAY_MILLIS * 7
             }.ifEmpty { state.aiSeries.takeLast(7) }
-            val dayFormat = remember { SimpleDateFormat("MM/dd", Locale.getDefault()) }
+            val dayFormat = remember(locale) { DateFormat.getDateInstance(DateFormat.SHORT, locale) }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -335,7 +355,8 @@ private fun DashboardContent(
                     },
                     lineColor = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.fillMaxSize(),
-                    yAxisLabel = "AI"
+                    yAxisLabel = stringResource(R.string.insights_ai_axis),
+                    formatValue = numberFormat::format,
                 )
             }
         }
@@ -357,7 +378,7 @@ private fun DashboardContent(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Last test",
+                    text = stringResource(R.string.insights_last_test),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -373,7 +394,7 @@ private fun DashboardContent(
                 onClick = onTestNow,
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text("Test Now", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.insights_test_now), fontWeight = FontWeight.SemiBold)
             }
         }
     }

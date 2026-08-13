@@ -136,6 +136,11 @@ class LocalizedReportFormatterTest {
             ReportText.RECOMMEND_FOLLOW_TREATMENT_PLAN -> "Follow the treatment plan."
             ReportText.RECOMMEND_RETEST_SOONER -> "Retest sooner."
             ReportText.RECOMMEND_CURRENT_PLAN_EFFECTIVE -> "Continue observation."
+            ReportText.PAGE_HEADER_FORMAT -> "%1\$s • %2\$s: %3\$s"
+            ReportText.INDEX_GRADE_FORMAT -> "%1\$s: %2\$s (%3\$s %4\$d, %5\$s)"
+            ReportText.LABELED_VALUE_FORMAT -> "%1\$s: %2\$s"
+            ReportText.CONCENTRATION_FORMAT -> "%1\$s pg/mL"
+            ReportText.BULLET_FORMAT -> "• %1\$s"
         }
     }
 
@@ -170,6 +175,11 @@ class LocalizedReportFormatterTest {
             ReportText.RECOMMEND_FOLLOW_TREATMENT_PLAN -> "遵循治疗计划。"
             ReportText.RECOMMEND_RETEST_SOONER -> "提前复测。"
             ReportText.RECOMMEND_CURRENT_PLAN_EFFECTIVE -> "继续观察。"
+            ReportText.PAGE_HEADER_FORMAT -> "%1\$s • %2\$s：%3\$s"
+            ReportText.INDEX_GRADE_FORMAT -> "%1\$s：%2\$s（%3\$s %4\$d，%5\$s）"
+            ReportText.LABELED_VALUE_FORMAT -> "%1\$s：%2\$s"
+            ReportText.CONCENTRATION_FORMAT -> "%1\$s pg/mL"
+            ReportText.BULLET_FORMAT -> "• %1\$s"
         }
     }
 

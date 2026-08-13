@@ -121,7 +121,16 @@ class ReportModelMapperTest {
     private fun tokenFormatter() = LocalizedReportFormatter(
         locale = java.util.Locale.US,
         timeZone = java.util.TimeZone.getTimeZone("UTC"),
-        text = ReportText::name,
+        text = { key ->
+            when (key) {
+                ReportText.PAGE_HEADER_FORMAT -> "%1\$s • %2\$s: %3\$s"
+                ReportText.INDEX_GRADE_FORMAT -> "%1\$s: %2\$s (%3\$s %4\$d, %5\$s)"
+                ReportText.LABELED_VALUE_FORMAT -> "%1\$s: %2\$s"
+                ReportText.CONCENTRATION_FORMAT -> "%1\$s pg/mL"
+                ReportText.BULLET_FORMAT -> "• %1\$s"
+                else -> key.name
+            }
+        },
     )
 
     private fun ReportRecommendation.reportToken(): ReportText = when (this) {

@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -112,11 +113,11 @@ fun ReportScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             JointSenseTopBar(
-                title = "AI Report",
+                title = stringResource(R.string.insights_report_screen_title),
                 actions = {
                     JointSenseBarAction(
                         icon = Icons.Default.Share,
-                        contentDescription = "Share summary",
+                        contentDescription = stringResource(R.string.insights_share_summary),
                         onClick = ::shareTextReport,
                     )
                 }
@@ -137,7 +138,7 @@ fun ReportScreen(
                     shape = RoundedCornerShape(16.dp),
                 ) {
                     Text(
-                        text = "No data yet.\nRun a test to generate your AI report.",
+                        text = stringResource(R.string.insights_report_empty),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(32.dp),
@@ -178,21 +179,22 @@ fun ReportScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Cartilage Inflammation Assessment",
+                                text = stringResource(R.string.insights_cartilage_assessment),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = BaselineInsightsMetrics.activityLabel(grade),
+                                text = stringResource(activityResource(grade)),
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "AI %.2f - %s (grade %d)".format(
+                                text = stringResource(
+                                    R.string.insights_ai_grade_summary,
                                     ai,
-                                    BaselineInsightsMetrics.gradeLabel(grade),
+                                    stringResource(gradeResource(grade)),
                                     grade,
                                 ),
                                 fontSize = 12.sp,
@@ -216,7 +218,7 @@ fun ReportScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "Change Trend (Last 7 Days)",
+                            text = stringResource(R.string.insights_change_trend),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -257,20 +259,23 @@ fun ReportScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "%.0f%%".format(kotlin.math.abs(delta)),
+                                        text = stringResource(
+                                            if (delta >= 0) R.string.insights_change_up else R.string.insights_change_down,
+                                            kotlin.math.abs(delta),
+                                        ),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "vs prev. week",
+                                        text = stringResource(R.string.insights_vs_previous_week),
                                         fontSize = 10.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 } else {
                                     Text(
-                                        text = "— no comparison",
+                                        text = stringResource(R.string.insights_no_comparison),
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -299,14 +304,14 @@ fun ReportScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Risk Index",
+                                text = stringResource(R.string.insights_risk_index),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
-                                text = "14-day OA progression forecast",
+                                text = stringResource(R.string.insights_progression_forecast),
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -319,7 +324,7 @@ fun ReportScreen(
                                 .height(120.dp)
                         )
                         Text(
-                            text = BaselineInsightsMetrics.riskLabel(grade),
+                            text = stringResource(riskResource(grade)),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = gradeColor
@@ -341,7 +346,7 @@ fun ReportScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "AI Suggestions",
+                            text = stringResource(R.string.insights_suggestions),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -354,13 +359,13 @@ fun ReportScreen(
                                     .padding(vertical = 3.dp)
                             ) {
                                 Text(
-                                    text = "•",
+                                    text = stringResource(R.string.bullet),
                                     color = MaterialTheme.colorScheme.primary,
                                     fontSize = 14.sp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = line,
+                                    text = stringResource(suggestionResource(line)),
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     lineHeight = 18.sp
@@ -384,7 +389,7 @@ fun ReportScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "Export Report",
+                            text = stringResource(R.string.insights_export_report),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -433,7 +438,7 @@ fun ReportScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("PDF Report", fontSize = 14.sp, maxLines = 1)
+                                Text(stringResource(R.string.insights_pdf_report), fontSize = 14.sp, maxLines = 1)
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             OutlinedButton(
@@ -451,7 +456,7 @@ fun ReportScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    "Share",
+                                    stringResource(R.string.insights_share_chooser),
                                     fontSize = 14.sp,
                                     maxLines = 1,
                                     color = MaterialTheme.colorScheme.primary

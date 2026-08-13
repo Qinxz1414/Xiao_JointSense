@@ -24,7 +24,7 @@ internal fun MigrationErrorScreen(
     LoadingErrorState(
         isLoading = false,
         headline = stringResource(R.string.migration_error_title),
-        message = stringResource(R.string.migration_error_message, state.reason),
+        message = stringResource(R.string.migration_error_message),
         actionLabel = if (state.canRetry) stringResource(R.string.action_retry) else null,
         onAction = if (state.canRetry) onRetry else null,
         actionModifier = Modifier.fillMaxWidth(),

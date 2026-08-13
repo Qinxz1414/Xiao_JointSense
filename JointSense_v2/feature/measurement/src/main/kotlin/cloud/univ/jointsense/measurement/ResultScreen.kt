@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +47,7 @@ import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.feature.measurement.R
 
 /**
  * Analysis result screen — quantitative values for the three factors,
@@ -70,11 +72,11 @@ fun ResultScreen(
     Scaffold(
         topBar = {
             JointSenseTopBar(
-                title = "Analysis Result",
+                title = stringResource(R.string.measurement_title_result),
                 navigationIcon = {
                     JointSenseBarAction(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.measurement_action_back),
                         onClick = onReturnToOrigin,
                     )
                 },
@@ -89,9 +91,9 @@ fun ResultScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            cleanupWarning?.let { warning ->
+            cleanupWarning?.let {
                 Text(
-                    text = "Temporary image cleanup warning: $warning",
+                    text = stringResource(R.string.measurement_cleanup_warning),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag(MEASUREMENT_CLEANUP_WARNING_TAG),
@@ -112,7 +114,7 @@ fun ResultScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Quantitative Analysis (pg/mL)",
+                        text = stringResource(R.string.measurement_quantitative_analysis),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -172,14 +174,15 @@ fun ResultScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
-                                text = value?.let { "%.2f".format(it) } ?: "—",
+                                text = value?.let { stringResource(R.string.measurement_value, it) }
+                                    ?: stringResource(R.string.value_unavailable),
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (value != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                    text = FACTOR_UNIT,
+                                    text = stringResource(R.string.factor_unit),
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -210,18 +213,21 @@ fun ResultScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "Well signal - ${result.factor.shortName} " +
-                                        "(ELISA palette)",
+                                    text = stringResource(
+                                        R.string.measurement_well_signal,
+                                        result.factor.shortName,
+                                        result.concentration,
+                                    ),
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "R(μ=%.1f, σ=%.1f) G(μ=%.1f, σ=%.1f) B(μ=%.1f, σ=%.1f)"
-                                        .format(
-                                            result.features.rMean, result.features.rStd,
-                                            result.features.gMean, result.features.gStd,
-                                            result.features.bMean, result.features.bStd
-                                        ),
+                                    text = stringResource(
+                                        R.string.measurement_rgb_features,
+                                        result.features.rMean, result.features.rStd,
+                                        result.features.gMean, result.features.gStd,
+                                        result.features.bMean, result.features.bStd,
+                                    ),
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -245,7 +251,7 @@ fun ResultScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "OA Inflammation Index (AI)",
+                        text = stringResource(R.string.measurement_oa_index),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -253,19 +259,24 @@ fun ResultScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = ai?.let { "%.2f".format(it) } ?: "—",
+                            text = ai?.let { stringResource(R.string.measurement_value, it) }
+                                ?: stringResource(R.string.value_unavailable),
                             fontSize = 34.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         if (grade != null) {
                             Spacer(modifier = Modifier.width(12.dp))
-                            val gradeLabel = BaselineMeasurementMetrics.gradeLabel(grade)
+                            val gradeLabel = stringResource(gradeResource(grade))
                             GradeBadge(
                                 grade = grade,
                                 label = gradeLabel,
-                                contentDescription = "OA inflammation grade",
-                                stateDescription = "Grade $grade, $gradeLabel",
+                                contentDescription = stringResource(R.string.measurement_oa_grade),
+                                stateDescription = stringResource(
+                                    R.string.measurement_oa_grade_description,
+                                    grade,
+                                    gradeLabel,
+                                ),
                             )
                         }
                     }
@@ -288,18 +299,20 @@ fun ResultScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "OA Inflammation Grade",
+                        text = stringResource(R.string.measurement_oa_grade),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    val labels = listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")
+                    val labels = (0..4).map { stringResource(gradeResource(it)) }
                     GradeScale(
                         currentGrade = grade,
                         labels = labels,
-                        contentDescription = "OA inflammation grade scale",
-                        stateDescription = grade?.let { "Grade $it, ${labels[it]}" } ?: "Grade unavailable",
+                        contentDescription = stringResource(R.string.measurement_oa_grade_scale_description),
+                        stateDescription = grade?.let {
+                            stringResource(R.string.measurement_oa_grade_description, it, labels[it])
+                        } ?: stringResource(R.string.measurement_grade_unavailable),
                     )
                 }
             }
@@ -323,7 +336,7 @@ fun ResultScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Continue measurement",
+                        stringResource(R.string.measurement_action_continue),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
@@ -342,7 +355,7 @@ fun ResultScreen(
                 Icon(Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Return",
+                    stringResource(R.string.measurement_action_done),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -351,7 +364,7 @@ fun ResultScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Results are stored automatically on this device.",
+                text = stringResource(R.string.measurement_result_saved),
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 fontSize = 11.sp,
@@ -364,3 +377,12 @@ fun ResultScreen(
 }
 
 const val MEASUREMENT_CLEANUP_WARNING_TAG = "measurement_cleanup_warning"
+
+private fun gradeResource(grade: Int): Int = when (grade) {
+    0 -> R.string.grade_0
+    1 -> R.string.grade_1
+    2 -> R.string.grade_2
+    3 -> R.string.grade_3
+    4 -> R.string.grade_4
+    else -> error("Grade must be between 0 and 4")
+}

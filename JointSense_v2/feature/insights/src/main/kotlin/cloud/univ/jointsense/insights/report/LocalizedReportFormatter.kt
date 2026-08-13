@@ -41,6 +41,11 @@ enum class ReportText {
     RECOMMEND_FOLLOW_TREATMENT_PLAN,
     RECOMMEND_RETEST_SOONER,
     RECOMMEND_CURRENT_PLAN_EFFECTIVE,
+    PAGE_HEADER_FORMAT,
+    INDEX_GRADE_FORMAT,
+    LABELED_VALUE_FORMAT,
+    CONCENTRATION_FORMAT,
+    BULLET_FORMAT,
 }
 
 data class FormattedReport(
@@ -71,45 +76,57 @@ class LocalizedReportFormatter(
         val grade = model.grade?.takeIf { it in 0..4 }
         val sections = mutableListOf<String>()
 
-        sections += buildString {
-            append(text(ReportText.OA_INDEX))
-            append(": ")
-            append(model.oaIndex?.let(::decimal) ?: text(ReportText.NOT_MEASURED))
-            if (grade != null) {
-                append(" (")
-                append(text(ReportText.GRADE))
-                append(' ')
-                append(grade)
-                append(", ")
-                append(gradeLabel(grade))
-                append(')')
-                append('\n')
-                append(text(ReportText.RISK))
-                append(": ")
-                append(gradeLabel(grade))
-            }
+        val oaValue = model.oaIndex?.let(::decimal) ?: text(ReportText.NOT_MEASURED)
+        sections += if (grade == null) {
+            formatted(ReportText.LABELED_VALUE_FORMAT, text(ReportText.OA_INDEX), oaValue)
+        } else {
+            formatted(
+                ReportText.INDEX_GRADE_FORMAT,
+                text(ReportText.OA_INDEX),
+                oaValue,
+                text(ReportText.GRADE),
+                grade,
+                gradeLabel(grade),
+            ) + '\n' + formatted(
+                ReportText.LABELED_VALUE_FORMAT,
+                text(ReportText.RISK),
+                gradeLabel(grade),
+            )
         }
 
         sections += buildList {
             add(text(ReportText.LATEST_VALUES))
             InflammationFactor.entries.forEach { factor ->
                 val value = model.latestConcentrations[factor]
-                add("${factor.label()}: ${value?.let { "${decimal(it)} pg/mL" } ?: text(ReportText.NOT_MEASURED)}")
+                val displayed = value?.let {
+                    formatted(ReportText.CONCENTRATION_FORMAT, decimal(it))
+                } ?: text(ReportText.NOT_MEASURED)
+                add(formatted(ReportText.LABELED_VALUE_FORMAT, factor.label(), displayed))
             }
         }.joinToString("\n")
 
         sections += buildList {
             add(text(ReportText.WEEK_CHANGES))
             InflammationFactor.entries.forEach { factor ->
-                add("${factor.label()}: ${model.weekChanges[factor]?.let(::percent) ?: text(ReportText.NO_COMPARISON)}")
+                add(formatted(
+                    ReportText.LABELED_VALUE_FORMAT,
+                    factor.label(),
+                    model.weekChanges[factor]?.let(::percent) ?: text(ReportText.NO_COMPARISON),
+                ))
             }
-            add("${text(ReportText.OA_WEEK_CHANGE)}: ${model.oaWeekChange?.let(::percent) ?: text(ReportText.NO_COMPARISON)}")
+            add(formatted(
+                ReportText.LABELED_VALUE_FORMAT,
+                text(ReportText.OA_WEEK_CHANGE),
+                model.oaWeekChange?.let(::percent) ?: text(ReportText.NO_COMPARISON),
+            ))
         }.joinToString("\n")
 
         if (model.recommendations.isNotEmpty()) {
             sections += buildList {
                 add(text(ReportText.RECOMMENDATIONS))
-                model.recommendations.forEach { add("• ${text(it.reportText())}") }
+                model.recommendations.forEach {
+                    add(formatted(ReportText.BULLET_FORMAT, text(it.reportText())))
+                }
             }.joinToString("\n")
         }
 
@@ -119,7 +136,12 @@ class LocalizedReportFormatter(
 
         return FormattedReport(
             title = text(ReportText.TITLE),
-            pageHeader = "${text(ReportText.PAGE_HEADER)} • ${text(ReportText.GENERATED)}: $generated",
+            pageHeader = formatted(
+                ReportText.PAGE_HEADER_FORMAT,
+                text(ReportText.PAGE_HEADER),
+                text(ReportText.GENERATED),
+                generated,
+            ),
             body = sections.joinToString("\n\n"),
         )
     }
@@ -140,6 +162,9 @@ class LocalizedReportFormatter(
         }.format(value)
         return if (value > 0.0) "+$formatted" else formatted
     }
+
+    private fun formatted(template: ReportText, vararg arguments: Any): String =
+        String.format(locale, text(template), *arguments)
 
     private fun gradeLabel(grade: Int): String = text(
         when (grade) {
@@ -207,4 +232,9 @@ private fun ReportText.resourceId(): Int = when (this) {
     ReportText.RECOMMEND_FOLLOW_TREATMENT_PLAN -> R.string.report_recommend_follow_treatment_plan
     ReportText.RECOMMEND_RETEST_SOONER -> R.string.report_recommend_retest_sooner
     ReportText.RECOMMEND_CURRENT_PLAN_EFFECTIVE -> R.string.report_recommend_current_plan_effective
+    ReportText.PAGE_HEADER_FORMAT -> R.string.report_page_header_format
+    ReportText.INDEX_GRADE_FORMAT -> R.string.report_index_grade_format
+    ReportText.LABELED_VALUE_FORMAT -> R.string.report_labeled_value_format
+    ReportText.CONCENTRATION_FORMAT -> R.string.report_concentration_format
+    ReportText.BULLET_FORMAT -> R.string.report_bullet_format
 }

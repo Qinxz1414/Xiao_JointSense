@@ -43,12 +43,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.core.designsystem.R as DesignSystemR
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
+import cloud.univ.jointsense.feature.settings.R
 
 /** Profile tab — app info, history entry, data management, and about. */
 @Composable
@@ -63,7 +66,7 @@ internal fun SettingsScreen(
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { JointSenseTopBar(title = "Profile") }
+        topBar = { JointSenseTopBar(title = stringResource(R.string.settings_title)) }
     ) { paddingValues ->
         Column(
             modifier = modifier
@@ -94,7 +97,7 @@ internal fun SettingsScreen(
                     ) {
                         Image(
                             painter = painterResource(id = DesignSystemR.drawable.jointsense_logo),
-                            contentDescription = "JointSense Logo",
+                            contentDescription = stringResource(R.string.settings_logo_description),
                             modifier = Modifier.size(48.dp),
                             contentScale = ContentScale.Fit
                         )
@@ -102,21 +105,32 @@ internal fun SettingsScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
-                            text = "JointSense",
+                            text = stringResource(R.string.settings_app_name),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "OA Inflammation Monitor  ·  v1.0",
+                            text = stringResource(R.string.settings_app_summary),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "${state.sessionCount} session(s), " +
-                                "${state.measurementCount} measurement(s)",
+                            text = stringResource(
+                                R.string.settings_counts,
+                                pluralStringResource(
+                                    R.plurals.settings_session_count,
+                                    state.sessionCount,
+                                    state.sessionCount,
+                                ),
+                                pluralStringResource(
+                                    R.plurals.settings_measurement_count,
+                                    state.measurementCount,
+                                    state.measurementCount,
+                                ),
+                            ),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -136,55 +150,63 @@ internal fun SettingsScreen(
                     ProfileEntry(
                         icon = Icons.Default.History,
                         tint = MaterialTheme.colorScheme.primary,
-                        title = "Test History",
-                        subtitle = "Browse and manage saved test sessions",
+                        title = stringResource(R.string.settings_history),
+                        subtitle = stringResource(R.string.settings_history_summary),
                         onClick = onOpenHistory
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     ProfileEntry(
                         icon = Icons.AutoMirrored.Filled.HelpOutline,
                         tint = MaterialTheme.colorScheme.primary,
-                        title = "About the Model",
-                        subtitle = "How the RGB + LASSO prediction works",
+                        title = stringResource(R.string.settings_about_model),
+                        subtitle = stringResource(R.string.settings_about_summary),
                         onClick = { showAboutDialog = true }
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     ProfileEntry(
                         icon = Icons.Default.Science,
                         tint = MaterialTheme.colorScheme.tertiary,
-                        title = "Calibrate Standard Curve",
-                        subtitle = calibrationSubtitle(state),
+                        title = stringResource(R.string.settings_calibrate),
+                        subtitle = when (val summary = calibrationSubtitle(state)) {
+                            is CalibrationSubtitle.Review -> pluralStringResource(
+                                R.plurals.settings_calibration_review,
+                                summary.count,
+                                summary.count,
+                            )
+                            is CalibrationSubtitle.Active -> pluralStringResource(
+                                R.plurals.settings_calibration_active,
+                                summary.count,
+                                summary.count,
+                            )
+                            CalibrationSubtitle.Empty -> stringResource(R.string.settings_calibration_empty)
+                        },
                         onClick = onCalibrate
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
                     ProfileEntry(
                         icon = Icons.Default.Delete,
                         tint = MaterialTheme.colorScheme.error,
-                        title = "Clear All Data",
-                        subtitle = "Delete every saved session on this device",
+                        title = stringResource(R.string.settings_clear_all),
+                        subtitle = stringResource(R.string.settings_clear_summary),
                         onClick = { showClearDialog = true }
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Research prototype - not for medical diagnosis.",
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("Clear all data?") },
+            title = { Text(stringResource(R.string.settings_clear_title)) },
             text = {
-                Text("All ${state.sessionCount} test session(s) will be permanently deleted from this device.")
+                Text(pluralStringResource(
+                    R.plurals.settings_clear_message,
+                    state.sessionCount,
+                    state.sessionCount,
+                ))
             },
             confirmButton = {
                 TextButton(
@@ -193,12 +215,12 @@ internal fun SettingsScreen(
                         showClearDialog = false
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.settings_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.settings_cancel))
                 }
             }
         )
@@ -207,35 +229,30 @@ internal fun SettingsScreen(
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
-            title = { Text("About the model") },
+            title = { Text(stringResource(R.string.settings_about_model)) },
             text = {
-                Text(
-                    "JointSense quantifies TNF-α, IL-6 and IL-1β from chip " +
-                        "reaction chamber images. Six RGB features (channel " +
-                        "means and standard deviations) selected by LASSO " +
-                        "regression feed a per-factor linear model; the OA " +
-                        "Inflammation Index (AI) combines the three factors " +
-                        "into a 0-1 score mapped to grades 0-4.\n\n" +
-                        "Model coefficients shipped with this build are " +
-                        "placeholders pending the trained export. Result " +
-                        "colors follow the ELISA well palette defined in " +
-                        "the project Rule."
-                )
+                Text(stringResource(R.string.settings_about_model_body))
             },
             confirmButton = {
                 TextButton(onClick = { showAboutDialog = false }) {
-                    Text("OK")
+                    Text(stringResource(R.string.settings_ok))
                 }
             }
         )
     }
 }
 
-internal fun calibrationSubtitle(state: SettingsUiState): String = when {
+internal sealed interface CalibrationSubtitle {
+    data class Review(val count: Int) : CalibrationSubtitle
+    data class Active(val count: Int) : CalibrationSubtitle
+    data object Empty : CalibrationSubtitle
+}
+
+internal fun calibrationSubtitle(state: SettingsUiState): CalibrationSubtitle = when {
     state.hasCalibrationNeedingReview ->
-        "Calibration needs review (${state.calibrationReviewCount} factor(s))"
-    state.hasCalibration -> "User curve active (${state.calibrationCount} factor(s))"
-    else -> "Capture a standard plate to improve accuracy"
+        CalibrationSubtitle.Review(state.calibrationReviewCount)
+    state.hasCalibration -> CalibrationSubtitle.Active(state.calibrationCount)
+    else -> CalibrationSubtitle.Empty
 }
 
 @Composable

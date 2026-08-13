@@ -48,19 +48,7 @@ internal object BaselineInsightsMetrics {
         }
     }
 
-    fun gradeLabel(grade: Int): String =
-        listOf("No risk", "Mild", "Moderate", "Severe", "Very severe")[validGrade(grade)]
-
-    fun activityLabel(grade: Int): String = listOf(
-        "Minimal OA activity",
-        "Low OA activity",
-        "Moderate OA activity",
-        "High OA activity",
-        "Very high OA activity",
-    )[validGrade(grade)]
-
-    fun riskLabel(grade: Int): String =
-        listOf("Very low risk", "Low risk", "Medium risk", "High risk", "Very high risk")[validGrade(grade)]
+    fun requireValidGrade(grade: Int): Int = validGrade(grade)
 
     fun aiSeries(sessions: List<TestSession>): List<InsightPoint> = sessions
         .filter { it.results.isNotEmpty() }
@@ -108,8 +96,8 @@ internal object BaselineInsightsMetrics {
             events += KeyEventItem(
                 time = timestamp,
                 kind = EventKind.TEST,
-                text = "Test completed - ${session.results.size} measurement(s)" +
-                    (aiByTimestamp[timestamp]?.let { ", AI %.2f".format(it) } ?: ""),
+                measurementCount = session.results.size,
+                aiValue = aiByTimestamp[timestamp],
             )
         }
         for (index in 1 until series.size) {
@@ -120,38 +108,38 @@ internal object BaselineInsightsMetrics {
                 events += KeyEventItem(
                     time = current.time,
                     kind = if (delta > 0) EventKind.UP else EventKind.DOWN,
-                    text = "AI index ${if (delta > 0) "rose" else "dropped"} " +
-                        "from %.2f to %.2f".format(previous.value, current.value),
+                    previousAi = previous.value,
+                    currentAi = current.value,
                 )
             }
         }
         return events.sortedByDescending(KeyEventItem::time).take(10)
     }
 
-    fun suggestions(grade: Int, weekDeltaPct: Float?): List<String> {
+    fun suggestions(grade: Int, weekDeltaPct: Float?): List<InsightSuggestion> {
         validGrade(grade)
         return buildList {
             when {
                 grade <= 1 -> {
-                    add("Continue the current care and monitoring plan.")
-                    add("Maintain regular, low-impact joint-friendly exercise.")
+                    add(InsightSuggestion.CONTINUE_MONITORING)
+                    add(InsightSuggestion.LOW_IMPACT_EXERCISE)
                 }
                 grade == 2 -> {
-                    add("Discuss the result with your clinician at the next visit.")
-                    add("Prefer low-impact activity and avoid joint overloading.")
-                    add("Keep a regular monitoring cadence (2-3 times / week).")
+                    add(InsightSuggestion.DISCUSS_WITH_CLINICIAN)
+                    add(InsightSuggestion.AVOID_OVERLOAD)
+                    add(InsightSuggestion.REGULAR_MONITORING)
                 }
                 else -> {
-                    add("Seek clinical review promptly for treatment adjustment.")
-                    add("Reduce joint load; pause high-impact activity.")
-                    add("Follow the prescribed treatment plan and re-test after therapy.")
+                    add(InsightSuggestion.SEEK_CLINICAL_REVIEW)
+                    add(InsightSuggestion.REDUCE_JOINT_LOAD)
+                    add(InsightSuggestion.FOLLOW_TREATMENT_PLAN)
                 }
             }
             when {
                 weekDeltaPct != null && weekDeltaPct > 10f ->
-                    add("Inflammatory markers trended up vs last week - re-check sooner.")
+                    add(InsightSuggestion.RETEST_SOONER)
                 weekDeltaPct != null && weekDeltaPct < -10f ->
-                    add("Markers trended down vs last week - current plan appears effective.")
+                    add(InsightSuggestion.CURRENT_PLAN_EFFECTIVE)
             }
         }
     }

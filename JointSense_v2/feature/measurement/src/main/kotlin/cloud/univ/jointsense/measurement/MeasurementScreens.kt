@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,7 @@ import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.feature.measurement.R
 import cloud.univ.jointsense.measurement.crop.ImageCropView
 
 const val MEASUREMENT_PROGRESS_TAG = "measurement_progress"
@@ -75,7 +77,7 @@ fun ImageSelectScreen(
             JointSenseTopBar(
                 title = sessionName,
                 navigationIcon = {
-                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
+                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.measurement_action_back), onBack)
                 },
             )
         }
@@ -98,7 +100,7 @@ fun ImageSelectScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "Select Image",
+                text = stringResource(R.string.measurement_title_select_image),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
@@ -107,7 +109,7 @@ fun ImageSelectScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Take a photo of the chip reaction chamber\nor select an existing image from gallery",
+                text = stringResource(R.string.measurement_select_image_instructions),
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -129,7 +131,7 @@ fun ImageSelectScreen(
                     modifier = Modifier.size(28.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
-                Text("Take Photo", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.measurement_action_take_photo), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -152,7 +154,7 @@ fun ImageSelectScreen(
                     modifier = Modifier.size(28.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
-                Text("Select from Gallery", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.measurement_action_gallery), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -174,9 +176,9 @@ fun ImageCropScreen(
     Scaffold(
         topBar = {
             JointSenseTopBar(
-                title = "Select Analysis Area",
+                title = stringResource(R.string.measurement_title_crop),
                 navigationIcon = {
-                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
+                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.measurement_action_back), onBack)
                 },
             )
         }
@@ -202,7 +204,7 @@ fun ImageCropScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Drag to move, drag corners to resize the selection area",
+                    text = stringResource(R.string.measurement_crop_instructions),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -239,7 +241,7 @@ fun ImageCropScreen(
                     Icon(Icons.Default.Check, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Confirm Selection",
+                        stringResource(R.string.measurement_action_confirm_selection),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -266,11 +268,11 @@ fun FactorSelectScreen(
     Scaffold(
         topBar = {
             JointSenseTopBar(
-                title = "Select Detection Factor",
+                title = stringResource(R.string.measurement_title_factor),
                 navigationIcon = {
                     JointSenseBarAction(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.measurement_action_back),
                         onClick = onBack,
                         enabled = backEnabled,
                     )
@@ -297,7 +299,7 @@ fun FactorSelectScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Choose the inflammation factor\nyou want to detect",
+                text = stringResource(R.string.measurement_factor_instructions),
                 fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -350,7 +352,7 @@ fun FactorSelectScreen(
                                 color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = factor.displayName,
+                                text = stringResource(factor.displayNameResource()),
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -358,7 +360,7 @@ fun FactorSelectScreen(
                         if (isSelected) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Selected",
+                                contentDescription = stringResource(R.string.measurement_selected),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -388,12 +390,12 @@ fun FactorSelectScreen(
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Analyzing...", fontSize = 18.sp)
+                    Text(stringResource(R.string.measurement_analyzing), fontSize = 18.sp)
                 } else {
                     Icon(Icons.Default.Science, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "Start Analysis",
+                        stringResource(R.string.measurement_action_start_analysis),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -403,4 +405,10 @@ fun FactorSelectScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+internal fun InflammationFactor.displayNameResource(): Int = when (this) {
+    InflammationFactor.IL6 -> R.string.factor_il6_name
+    InflammationFactor.TNF_ALPHA -> R.string.factor_tnf_alpha_name
+    InflammationFactor.IL1_BETA -> R.string.factor_il1_beta_name
 }

@@ -6,9 +6,9 @@ import org.junit.Test
 
 class BaselineMeasurementMetricsTest {
     @Test
-    fun validGradesPreserveLabels() {
-        assertEquals("No risk", BaselineMeasurementMetrics.gradeLabel(0))
-        assertEquals("Very severe", BaselineMeasurementMetrics.gradeLabel(4))
+    fun validGradesPreserveValues() {
+        assertEquals(0, BaselineMeasurementMetrics.requireValidGrade(0))
+        assertEquals(4, BaselineMeasurementMetrics.requireValidGrade(4))
         assertEquals(0, BaselineMeasurementMetrics.grade(0f))
         assertEquals(4, BaselineMeasurementMetrics.grade(1f))
     }
@@ -17,7 +17,7 @@ class BaselineMeasurementMetricsTest {
     fun corruptGradesFailAtTheBoundaryInsteadOfClamping() {
         listOf(-1, 5).forEach { grade ->
             assertThrows(IllegalArgumentException::class.java) {
-                BaselineMeasurementMetrics.gradeLabel(grade)
+                BaselineMeasurementMetrics.requireValidGrade(grade)
             }
         }
     }

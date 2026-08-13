@@ -35,4 +35,72 @@
     <string name="report_error_empty_file">The report file is empty and was not shared.</string>
     <string name="report_error_no_share_app">No compatible app is available to share this report.</string>
     <string name="report_error_open_file">The report file could not be opened for sharing.</string>
+    <string name="report_page_header_format">%1$s • %2$s: %3$s</string>
+    <string name="report_index_grade_format">%1$s: %2$s (%3$s %4$d, %5$s)</string>
+    <string name="report_labeled_value_format">%1$s: %2$s</string>
+    <string name="report_concentration_format">%1$s pg/mL</string>
+    <string name="report_bullet_format">• %1$s</string>
+    <string name="insights_home_title">OA inflammation monitor</string>
+    <string name="insights_logo_description">JointSense logo</string>
+    <string name="insights_empty_title">JointSense</string>
+    <string name="insights_empty_message">No tests yet. Run your first detection to build your inflammation dashboard.</string>
+    <string name="insights_test_now">Test now</string>
+    <string name="insights_oa_index">OA inflammation index (AI)</string>
+    <string name="insights_oa_grade">OA inflammation grade</string>
+    <string name="insights_grade_description">Grade %1$d, %2$s</string>
+    <string name="insights_grade_unavailable">Grade unavailable</string>
+    <string name="insights_grade_scale_description">OA inflammation grade scale</string>
+    <string name="insights_open_report">Open AI report</string>
+    <string name="insights_recent_trend">Recent trend (7 days)</string>
+    <string name="insights_last_test">Last test</string>
+    <string name="insights_value">%1$.2f</string>
+    <string name="insights_report_screen_title">AI report</string>
+    <string name="insights_share_summary">Share summary</string>
+    <string name="insights_report_empty">No data yet. Run a test to generate your AI report.</string>
+    <string name="insights_cartilage_assessment">Cartilage inflammation assessment</string>
+    <string name="insights_ai_grade_summary">AI %1$.2f — %2$s (grade %3$d)</string>
+    <string name="insights_change_trend">Change trend (last 7 days)</string>
+    <string name="insights_percent_absolute">%1$.0f%%</string>
+    <string name="insights_change_up">Increased %1$.0f%%</string>
+    <string name="insights_change_down">Decreased %1$.0f%%</string>
+    <string name="insights_vs_previous_week">vs previous week</string>
+    <string name="insights_no_comparison">— no comparison</string>
+    <string name="insights_risk_index">Risk index</string>
+    <string name="insights_progression_forecast">14-day OA progression forecast</string>
+    <string name="insights_suggestions">AI suggestions</string>
+    <string name="insights_export_report">Export report</string>
+    <string name="insights_pdf_report">PDF report</string>
+    <string name="insights_share_chooser">Share</string>
+    <string name="insights_trends_title">Trend analysis</string>
+    <string name="insights_period_all">All</string>
+    <string name="insights_period_days">%1$dD</string>
+    <string name="insights_trends_empty">No measurements in this period. Run a test to start tracking trends.</string>
+    <string name="insights_factor_trends">Inflammatory biomarker trends (pg/mL)</string>
+    <string name="insights_ai_trend">OA inflammation index (AI) trend</string>
+    <string name="insights_key_events">Key events</string>
+    <string name="insights_no_events">No events in this period.</string>
+    <plurals name="insights_event_test">
+        <item quantity="one">Test completed — %1$d measurement%2$s</item>
+        <item quantity="other">Test completed — %1$d measurements%2$s</item>
+    </plurals>
+    <string name="insights_event_ai_value">, AI %1$.2f</string>
+    <string name="insights_event_ai_up">AI index rose from %1$.2f to %2$.2f</string>
+    <string name="insights_event_ai_down">AI index decreased from %1$.2f to %2$.2f</string>
+    <string name="insights_activity_0">Minimal OA activity</string>
+    <string name="insights_activity_1">Low OA activity</string>
+    <string name="insights_activity_2">Moderate OA activity</string>
+    <string name="insights_activity_3">High OA activity</string>
+    <string name="insights_activity_4">Very high OA activity</string>
+    <string name="insights_risk_0">Very low risk</string>
+    <string name="insights_risk_1">Low risk</string>
+    <string name="insights_risk_2">Medium risk</string>
+    <string name="insights_risk_3">High risk</string>
+    <string name="insights_risk_4">Very high risk</string>
+    <string name="factor_il6_name">Interleukin-6</string>
+    <string name="factor_tnf_alpha_name">Tumor necrosis factor α</string>
+    <string name="factor_il1_beta_name">Interleukin-1β</string>
+    <string name="insights_unit" translatable="false">pg/mL</string>
+    <string name="insights_ai_axis" translatable="false">AI</string>
+    <string name="value_unavailable" translatable="false">—</string>
+    <string name="bullet" translatable="false">•</string>
 </resources>

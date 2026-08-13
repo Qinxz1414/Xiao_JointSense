@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -62,6 +63,7 @@ import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.feature.calibration.R
 import java.io.File
 
 @Composable
@@ -91,18 +93,18 @@ internal fun CalibrationSelectScreen(
     }
 
     CalibrationScaffold(
-        title = "Calibrate Standard Curve",
-        step = "Step 1 / 5 · Capture standard plate",
+        title = stringResource(R.string.calibration_title),
+        step = stringResource(R.string.calibration_step_select),
         tag = "calibration:select",
         onBack = onBack,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Science, null, Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
             Spacer(Modifier.height(16.dp))
-            Text("Photo the standard ladder plate", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.calibration_capture_title), fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Use the kit's 3×3 standard plate for one factor.",
+                stringResource(R.string.calibration_capture_instructions),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
@@ -114,7 +116,7 @@ internal fun CalibrationSelectScreen(
             ) {
                 Icon(Icons.Default.CameraAlt, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Take Photo")
+                Text(stringResource(R.string.calibration_take_photo))
             }
             Spacer(Modifier.height(12.dp))
             Button(
@@ -124,16 +126,16 @@ internal fun CalibrationSelectScreen(
             ) {
                 Icon(Icons.Default.PhotoLibrary, null)
                 Spacer(Modifier.width(8.dp))
-                Text("From Gallery")
+                Text(stringResource(R.string.calibration_from_gallery))
             }
-            state.errorMessage?.let { ErrorText(it) }
+            state.errorMessage?.let { ErrorText(localizedStateMessage(it)) }
             state.legacyWarning?.let { warning ->
-                ErrorText(warning.message)
+                ErrorText(localizedStateMessage(warning.message))
                 TextButton(
                     onClick = onRetryLegacyReview,
                     enabled = !state.isRevalidatingLegacy && !state.isPersistenceBusy,
                 ) {
-                    Text(if (state.isRevalidatingLegacy) "Retrying…" else "Retry legacy review")
+                    Text(stringResource(if (state.isRevalidatingLegacy) R.string.calibration_retrying else R.string.calibration_retry_legacy))
                 }
             }
         }
@@ -148,8 +150,8 @@ internal fun CalibrationCropScreen(
     onBack: () -> Unit,
 ) {
     CalibrationScaffold(
-        title = "Calibrate Standard Curve",
-        step = "Step 2 / 5 · Crop to plate",
+        title = stringResource(R.string.calibration_title),
+        step = stringResource(R.string.calibration_step_crop),
         tag = "calibration:crop",
         onBack = onBack,
     ) {
@@ -159,7 +161,7 @@ internal fun CalibrationCropScreen(
         ) {
             Icon(Icons.Default.Crop, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(8.dp))
-            Text("Crop to the 3×3 well plate region", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.calibration_crop_instructions), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(8.dp))
         val bitmap = state.bitmap
@@ -177,7 +179,7 @@ internal fun CalibrationCropScreen(
                 )
             }
         } else {
-            Text("The selected image is unavailable. Go back and choose it again.")
+            Text(stringResource(R.string.calibration_image_unavailable))
         }
         Spacer(Modifier.height(16.dp))
         Button(
@@ -185,9 +187,9 @@ internal fun CalibrationCropScreen(
             enabled = bitmap != null && crop != null && !state.isDetecting,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Text(if (state.isDetecting) "Detecting…" else "Detect Wells")
+            Text(stringResource(if (state.isDetecting) R.string.calibration_detecting else R.string.calibration_detect_wells))
         }
-        state.errorMessage?.let { ErrorText(it) }
+        state.errorMessage?.let { ErrorText(localizedStateMessage(it)) }
     }
 }
 
@@ -200,12 +202,12 @@ internal fun CalibrationAssignScreen(
     onBack: () -> Unit,
 ) {
     CalibrationScaffold(
-        title = "Calibrate Standard Curve",
-        step = "Step 3 / 5 · Assign concentrations",
+        title = stringResource(R.string.calibration_title),
+        step = stringResource(R.string.calibration_step_assign),
         tag = "calibration:assign",
         onBack = onBack,
     ) {
-        Text("Factor being calibrated", fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.calibration_factor_label), fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InflammationFactor.entries.forEach { factor ->
@@ -232,10 +234,10 @@ internal fun CalibrationAssignScreen(
             OutlinedTextField(
                 value = text,
                 onValueChange = { onConcentrationChanged(index, it) },
-                label = { Text("Well ${index + 1} concentration") },
+                label = { Text(stringResource(R.string.calibration_well_concentration, index + 1)) },
                 supportingText = {
-                    if (index in state.concentrationFieldErrors) Text("Enter a non-negative number")
-                    else Text("signal ${state.signals.getOrElse(index) { Float.NaN }}")
+                    if (index in state.concentrationFieldErrors) Text(stringResource(R.string.calibration_concentration_error))
+                    else Text(stringResource(R.string.calibration_signal, state.signals.getOrElse(index) { Float.NaN }))
                 },
                 isError = index in state.concentrationFieldErrors,
                 singleLine = true,
@@ -244,9 +246,9 @@ internal fun CalibrationAssignScreen(
             )
         }
         Button(onClick = onReview, Modifier.fillMaxWidth().height(52.dp)) {
-            Text("Review Curve")
+            Text(stringResource(R.string.calibration_review_curve))
         }
-        validationErrorText(state.validation)?.let { message -> ErrorText(message) }
+        validationErrorResource(state.validation)?.let { message -> ErrorText(stringResource(message)) }
     }
 }
 
@@ -257,26 +259,30 @@ internal fun CalibrationReviewScreen(
     onBack: () -> Unit,
 ) {
     CalibrationScaffold(
-        title = "Calibrate Standard Curve",
-        step = "Step 4 / 5 · Review & save",
+        title = stringResource(R.string.calibration_title),
+        step = stringResource(R.string.calibration_step_review),
         tag = "calibration:review",
         onBack = onBack,
         backEnabled = !state.isPersistenceBusy,
     ) {
-        Text("${state.factor.shortName} standard curve", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.calibration_curve_title, state.factor.shortName), fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         when (val validation = state.validation) {
             is CalibrationValidation.Valid -> validation.knots.forEach { knot ->
                 Text(
-                    "${formatConcentration(knot.concentration)} pg/mL · raw %.1f · fitted %.1f".format(
+                    stringResource(
+                        R.string.calibration_knot_summary,
+                        knot.concentration,
                         knot.rawSignal,
                         knot.fittedSignal,
                     ),
                     modifier = Modifier.padding(vertical = 3.dp),
                 )
             }
-            is CalibrationValidation.Invalid -> ErrorText(validationErrorText(validation) ?: "Calibration is invalid")
-            null -> ErrorText("Return to Assign and review the readings first")
+            is CalibrationValidation.Invalid -> ErrorText(
+                stringResource(validationErrorResource(validation) ?: R.string.calibration_invalid),
+            )
+            null -> ErrorText(stringResource(R.string.calibration_return_assign))
         }
         Spacer(Modifier.height(16.dp))
         Button(
@@ -286,9 +292,9 @@ internal fun CalibrationReviewScreen(
         ) {
             Icon(Icons.Default.Check, null)
             Spacer(Modifier.width(6.dp))
-            Text(if (state.isSaving) "Saving…" else "Save Curve")
+            Text(stringResource(if (state.isSaving) R.string.calibration_saving else R.string.calibration_save_curve))
         }
-        state.errorMessage?.let { ErrorText(it) }
+        state.errorMessage?.let { ErrorText(localizedStateMessage(it)) }
     }
 }
 
@@ -302,8 +308,8 @@ internal fun CalibrationDoneScreen(
 ) {
     var showRestoreDialog by rememberSaveable { mutableStateOf(false) }
     CalibrationScaffold(
-        title = "Calibrate Standard Curve",
-        step = "Step 5 / 5 · Done",
+        title = stringResource(R.string.calibration_title),
+        step = stringResource(R.string.calibration_step_done),
         tag = "calibration:done",
         onBack = onBack,
         backEnabled = !state.isPersistenceBusy,
@@ -312,15 +318,15 @@ internal fun CalibrationDoneScreen(
             Icon(Icons.Default.CheckCircle, null, Modifier.size(72.dp), tint = MaterialTheme.colorScheme.tertiary)
             Spacer(Modifier.height(16.dp))
             Text(
-                if (state.factoryRestoreCompleted) "Factory curves restored" else "Calibration saved",
+                stringResource(if (state.factoryRestoreCompleted) R.string.calibration_factory_restored else R.string.calibration_saved),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 when {
-                    state.factoryRestoreCompleted -> "All user calibration curves were removed."
-                    state.savedFactor != null -> "The ${state.savedFactor.shortName} user curve is active."
-                    else -> "Your calibration flow is complete."
+                    state.factoryRestoreCompleted -> stringResource(R.string.calibration_factory_removed)
+                    state.savedFactor != null -> stringResource(R.string.calibration_user_curve_active, state.savedFactor.shortName)
+                    else -> stringResource(R.string.calibration_complete)
                 },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -331,28 +337,28 @@ internal fun CalibrationDoneScreen(
                 enabled = !state.isPersistenceBusy,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) {
-                Text("Calibrate Another Factor")
+                Text(stringResource(R.string.calibration_another_factor))
             }
             TextButton(
                 onClick = { showRestoreDialog = true },
                 enabled = !state.isPersistenceBusy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Restore factory curve")
+                Text(stringResource(R.string.calibration_restore_factory))
             }
             Button(
                 onClick = onDone,
                 enabled = !state.isPersistenceBusy,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text("Done") }
-            state.errorMessage?.let { ErrorText(it) }
+            ) { Text(stringResource(R.string.calibration_done)) }
+            state.errorMessage?.let { ErrorText(localizedStateMessage(it)) }
         }
     }
     if (showRestoreDialog) {
         AlertDialog(
             onDismissRequest = { showRestoreDialog = false },
-            title = { Text("Restore factory curves?") },
-            text = { Text("This removes every user calibration for all factors.") },
+            title = { Text(stringResource(R.string.calibration_restore_title)) },
+            text = { Text(stringResource(R.string.calibration_restore_message)) },
             confirmButton = {
                 TextButton(
                     enabled = !state.isRestoringFactory,
@@ -360,10 +366,10 @@ internal fun CalibrationDoneScreen(
                         showRestoreDialog = false
                         onRestoreConfirmed()
                     },
-                ) { Text("Restore") }
+                ) { Text(stringResource(R.string.calibration_restore)) }
             },
             dismissButton = {
-                TextButton(onClick = { showRestoreDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showRestoreDialog = false }) { Text(stringResource(R.string.calibration_cancel)) }
             },
         )
     }
@@ -386,7 +392,7 @@ private fun CalibrationScaffold(
                 navigationIcon = {
                     JointSenseBarAction(
                         icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.calibration_back),
                         onClick = onBack,
                         enabled = backEnabled,
                         modifier = Modifier.testTag("calibration:top-back"),
@@ -415,16 +421,33 @@ private fun ErrorText(message: String) {
     )
 }
 
-private fun validationErrorText(validation: CalibrationValidation?): String? {
+private fun validationErrorResource(validation: CalibrationValidation?): Int? {
     val errors = (validation as? CalibrationValidation.Invalid)?.errors ?: return null
     return when {
-        CalibrationError.MissingBlank in errors -> "Exactly one blank (0 pg/mL) is required."
-        CalibrationError.MultipleBlanks in errors -> "Only one blank (0 pg/mL) is allowed."
-        CalibrationError.DuplicateNonBlankConcentration in errors -> "Non-blank concentrations must be unique."
-        CalibrationError.WrongReadingCount in errors -> "All nine well readings are required."
-        CalibrationError.DynamicRangeTooLow in errors -> "Signal range is too low to save this curve."
+        CalibrationError.MissingBlank in errors -> R.string.calibration_error_missing_blank
+        CalibrationError.MultipleBlanks in errors -> R.string.calibration_error_multiple_blanks
+        CalibrationError.DuplicateNonBlankConcentration in errors -> R.string.calibration_error_duplicate_concentration
+        CalibrationError.WrongReadingCount in errors -> R.string.calibration_error_reading_count
+        CalibrationError.DynamicRangeTooLow in errors -> R.string.calibration_error_dynamic_range
         CalibrationError.NonMonotonicBeyondTolerance in errors ->
-            "The readings need too much monotonic correction; check the plate and concentrations."
-        else -> "Correct the highlighted calibration readings."
+            R.string.calibration_error_monotonic
+        else -> R.string.calibration_error_highlighted
     }
 }
+
+@Composable
+private fun localizedStateMessage(message: String): String = stringResource(
+    when (message) {
+        "Unable to detect calibration wells" -> R.string.calibration_error_detect
+        "Calibration save was cancelled" -> R.string.calibration_error_save_cancelled
+        "Unable to save calibration" -> R.string.calibration_error_save
+        "Factory restore was cancelled" -> R.string.calibration_error_restore_cancelled
+        "Unable to restore factory curves" -> R.string.calibration_error_restore
+        "Some legacy calibrations could not be reviewed automatically" -> R.string.calibration_error_legacy_partial
+        "Legacy calibration review was cancelled" -> R.string.calibration_error_legacy_cancelled
+        "Unable to review legacy calibrations automatically" -> R.string.calibration_error_legacy
+        "Saved crop no longer fits this image; review calibration again" -> R.string.calibration_error_crop_restored
+        "Unable to read calibration image" -> R.string.calibration_error_read_image
+        else -> R.string.calibration_error_generic
+    },
+)

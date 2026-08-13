@@ -31,8 +31,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -43,7 +47,8 @@ import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.domain.model.TestSession
-import java.text.SimpleDateFormat
+import cloud.univ.jointsense.feature.measurement.R
+import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -59,14 +64,17 @@ fun HistoryScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val dateFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+    val locale = LocalConfiguration.current.locales[0]
+    val dateFormat = remember(locale) {
+        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
+    }
 
     Scaffold(
         topBar = {
             JointSenseTopBar(
-                title = "Test History",
+                title = stringResource(R.string.measurement_history_title),
                 navigationIcon = {
-                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
+                    JointSenseBarAction(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.measurement_action_back), onBack)
                 },
             )
         }
@@ -91,7 +99,7 @@ fun HistoryScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "No Test History",
+                    text = stringResource(R.string.measurement_history_empty_title),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -100,7 +108,7 @@ fun HistoryScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Start a new test to see results here",
+                    text = stringResource(R.string.measurement_history_empty_message),
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
@@ -169,7 +177,7 @@ fun HistoryScreen(
                                 val factorsSummary = session.results
                                     .map { it.factor.shortName }
                                     .distinct()
-                                    .joinToString(", ")
+                                    .joinToString(stringResource(R.string.measurement_factor_separator))
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
@@ -179,7 +187,11 @@ fun HistoryScreen(
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = "$resultCount/5 tests",
+                                            text = pluralStringResource(
+                                                R.plurals.measurement_history_result_count_plural,
+                                                resultCount,
+                                                resultCount,
+                                            ),
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                             fontWeight = FontWeight.Medium
@@ -204,7 +216,10 @@ fun HistoryScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = "Delete",
+                                    contentDescription = stringResource(
+                                        R.string.measurement_history_delete_session,
+                                        session.name,
+                                    ),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -223,9 +238,4 @@ fun HistoryScreen(
             }
         }
     }
-}
-
-@Composable
-private fun remember(function: () -> SimpleDateFormat): SimpleDateFormat {
-    return androidx.compose.runtime.remember { function() }
 }

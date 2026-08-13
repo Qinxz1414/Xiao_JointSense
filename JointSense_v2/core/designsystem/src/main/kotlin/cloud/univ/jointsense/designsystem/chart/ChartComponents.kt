@@ -33,9 +33,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.theme.GradeColors
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -51,8 +48,6 @@ data class ChartSeries(
     val color: Color,
     val points: List<TimePoint>
 )
-
-private val dayFormat = SimpleDateFormat("MM/dd", Locale.getDefault())
 
 /**
  * Tiny inline trend line used inside the home factor cards.
@@ -103,8 +98,10 @@ fun Sparkline(
 @Composable
 fun MultiLineChart(
     series: List<ChartSeries>,
+    yAxisLabel: String,
+    formatValue: (Float) -> String,
+    formatTime: (Long) -> String,
     modifier: Modifier = Modifier,
-    yAxisLabel: String = "pg/mL"
 ) {
     val allPoints = series.flatMap { it.points }
     if (allPoints.isEmpty()) return
@@ -148,7 +145,7 @@ fun MultiLineChart(
                 drawLine(gridColor, Offset(paddingLeft, gy), Offset(paddingLeft + chartWidth, gy), 1f)
             }
             drawContext.canvas.nativeCanvas.drawText(
-                "%.1f".format(gv),
+                formatValue(gv),
                 paddingLeft - 8f,
                 gy + textSize(4f),
                 android.graphics.Paint().apply {
@@ -173,7 +170,7 @@ fun MultiLineChart(
             val t = tMin + (tMax - tMin) * i / xTicks
             val tx = x(t)
             drawContext.canvas.nativeCanvas.drawText(
-                dayFormat.format(Date(t)),
+                formatTime(t),
                 tx,
                 paddingTop + chartHeight + textSize(14f),
                 android.graphics.Paint().apply {
