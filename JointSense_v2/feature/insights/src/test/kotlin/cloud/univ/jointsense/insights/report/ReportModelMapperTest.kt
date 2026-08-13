@@ -99,6 +99,21 @@ class ReportModelMapperTest {
     }
 
     @Test
+    fun exportPropagatesOnlyFiniteFactorComparisons() {
+        val model = ReportUiState(
+            factorDeltaPct7d = mapOf(
+                InflammationFactor.TNF_ALPHA to 25f,
+                InflammationFactor.IL6 to Float.NaN,
+                InflammationFactor.IL1_BETA to Float.NEGATIVE_INFINITY,
+            ),
+        ).toReportModel(generatedAtEpochMillis = 99L)
+
+        assertEquals(0.25, model.weekChanges[InflammationFactor.TNF_ALPHA]!!, 0.0001)
+        assertNull(model.weekChanges[InflammationFactor.IL6])
+        assertNull(model.weekChanges[InflammationFactor.IL1_BETA])
+    }
+
+    @Test
     fun everyValidGradePreservesItsLabelAdviceAndExactDisclaimerScope() {
         val formatter = tokenFormatter()
         val expectedRecommendations = mapOf(

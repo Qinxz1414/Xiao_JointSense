@@ -80,7 +80,8 @@ import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
 import cloud.univ.jointsense.measurement.MeasurementViewModel
 import cloud.univ.jointsense.measurement.MeasurementViewModelFactory
 import cloud.univ.jointsense.measurement.ResultRouteScreen
-import cloud.univ.jointsense.measurement.locateResultById
+import cloud.univ.jointsense.measurement.ResultResolution
+import cloud.univ.jointsense.measurement.resolveResultById
 import cloud.univ.jointsense.settings.SettingsRouteScreen
 import cloud.univ.jointsense.settings.SettingsViewModel
 import cloud.univ.jointsense.settings.SettingsViewModelFactory
@@ -302,12 +303,13 @@ private fun JointSenseNavHostContent(
                     Destination(if (forceProductionResult) null else screenSlot, route, actions) {
                         val measurement = requireNotNull(measurementViewModel)
                         val state = measurement.state.collectAsStateWithLifecycle().value
-                        val located = locateResultById(
-                            route.resultId,
-                            state.currentSession,
-                            state.sessions,
+                        val resolution = resolveResultById(
+                            resultId = route.resultId,
+                            currentSession = state.currentSession,
+                            sessions = state.sessions,
+                            hasReceivedSessionsSnapshot = state.hasReceivedSessionsSnapshot,
                         )
-                        val canContinue = located?.session?.results?.size?.let { it < 5 } == true
+                        val found = resolution as? ResultResolution.Found
                         val origin = if (inMeasurement) {
                             state.originDestination?.let { encoded ->
                                 runCatching { TopLevelDestination.valueOf(encoded) }.getOrNull()
@@ -319,8 +321,8 @@ private fun JointSenseNavHostContent(
                             viewModel = measurement,
                             resultId = route.resultId,
                             onContinueMeasurement = {
-                                if (located != null && canContinue) {
-                                    measurement.selectSession(located.session.id)
+                                if (found?.canContinue == true) {
+                                    measurement.selectSession(found.session.id)
                                     measurement.startNewTestInSession()
                                     actions.continueMeasurementFromResult(origin)
                                 }

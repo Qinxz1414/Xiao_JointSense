@@ -65,19 +65,28 @@ internal object BaselineInsightsMetrics {
         factor: InflammationFactor,
         now: Long,
     ): Float? {
-        val recent = results.filter {
-            it.factor == factor && it.timestamp > now - DAY_MILLIS * 7
-        }
-        val previous = results.filter {
+        val boundary = now - DAY_MILLIS * 7
+        val previousBoundary = now - DAY_MILLIS * 14
+        val valid = results.filter {
             it.factor == factor &&
-                it.timestamp <= now - DAY_MILLIS * 7 &&
-                it.timestamp > now - DAY_MILLIS * 14
+                it.timestamp <= now &&
+                it.concentration.isFinite() &&
+                it.concentration >= 0f
+        }
+        val recent = valid.filter {
+            it.timestamp > boundary
+        }
+        val previous = valid.filter {
+            it.timestamp <= boundary && it.timestamp > previousBoundary
         }
         if (recent.isEmpty() || previous.isEmpty()) return null
         val currentMean = recent.map { it.concentration.toDouble() }.average()
         val previousMean = previous.map { it.concentration.toDouble() }.average()
-        if (previousMean <= 0.0) return null
-        return ((currentMean - previousMean) / previousMean * 100.0).toFloat()
+        if (!currentMean.isFinite() || !previousMean.isFinite() || previousMean <= 0.0) return null
+        return ((currentMean - previousMean) / previousMean * 100.0)
+            .takeIf(Double::isFinite)
+            ?.toFloat()
+            ?.takeIf(Float::isFinite)
     }
 
     fun aiWeekDeltaPct(series: List<InsightPoint>, now: Long): Float? {

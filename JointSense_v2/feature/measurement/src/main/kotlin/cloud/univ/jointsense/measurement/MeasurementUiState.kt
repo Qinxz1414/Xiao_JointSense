@@ -79,6 +79,7 @@ data class MeasurementUiState(
     val captureCleanupWarning: String? = null,
     // Transitional Phase-1 surface. Task 5 moves callers to the formal fields above.
     val sessions: List<TestSession> = emptyList(),
+    val hasReceivedSessionsSnapshot: Boolean = false,
     val currentSession: TestSession? = null,
     val image: MeasurementImage? = null,
     val lastResult: TestResult? = null,

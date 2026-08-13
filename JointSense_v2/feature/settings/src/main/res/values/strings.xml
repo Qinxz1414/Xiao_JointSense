@@ -29,7 +29,8 @@
     <string name="settings_cancel">Cancel</string>
     <string name="settings_ok">OK</string>
     <string name="settings_restore_samples_title">Restore built-in samples?</string>
-    <string name="settings_restore_samples_message">Built-in sample sessions will be added back to this device. Restoring built-in sample sessions does not change or restore user calibration curves.</string>
+    <string name="settings_restore_samples_message">Built-in sample sessions will be added back to this device.</string>
+    <string name="settings_restore_samples_calibration_note">Restoring built-in sample sessions does not change or restore user calibration curves.</string>
     <string name="settings_restore_samples_confirm">Restore samples</string>
     <string name="settings_restore_samples_success_title">Samples restored</string>
     <string name="settings_restore_samples_success_message">Built-in sample sessions are available again. User calibration curves were not changed.</string>

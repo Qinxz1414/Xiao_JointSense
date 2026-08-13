@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +60,38 @@ import java.text.NumberFormat
  * the composite OA Inflammation Index with its 0-1 scale, the 0-4
  * grade bar and retest / save actions (design: 分析结果).
  */
+@Composable
+fun ResultScreen(
+    resolution: ResultResolution,
+    cleanupWarning: String? = null,
+    onContinueMeasurement: () -> Unit,
+    onReturnToOrigin: () -> Unit,
+    onGoHome: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (resolution) {
+        ResultResolution.Loading -> ResultLoadingScreen(
+            onBack = onReturnToOrigin,
+            modifier = modifier,
+        )
+        ResultResolution.NotFound -> ResultNotFoundScreen(
+            onBack = onReturnToOrigin,
+            onGoHome = onGoHome,
+            modifier = modifier,
+        )
+        is ResultResolution.Found -> ResultScreen(
+            session = resolution.session,
+            lastResult = resolution.result,
+            canAddMore = resolution.canContinue,
+            cleanupWarning = cleanupWarning,
+            onContinueMeasurement = onContinueMeasurement,
+            onReturnToOrigin = onReturnToOrigin,
+            onGoHome = onGoHome,
+            modifier = modifier,
+        )
+    }
+}
+
 @Composable
 fun ResultScreen(
     session: TestSession?,
@@ -483,6 +516,55 @@ fun ResultScreen(
 }
 
 @Composable
+private fun ResultLoadingScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        topBar = {
+            JointSenseTopBar(
+                title = stringResource(R.string.measurement_title_result),
+                navigationIcon = {
+                    JointSenseBarAction(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.measurement_action_back),
+                        onClick = onBack,
+                    )
+                },
+            )
+        },
+    ) { paddingValues ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(24.dp)
+                .testTag(RESULT_LOADING_TAG),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Spacer(modifier = Modifier.weight(1f))
+            CircularProgressIndicator()
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.measurement_result_loading_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.measurement_result_loading_message),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
 private fun ResultNotFoundScreen(
     onBack: () -> Unit,
     onGoHome: () -> Unit,
@@ -558,6 +640,7 @@ const val RESULT_HOME_ACTION_TAG = "result_home_action"
 const val RESULT_NOT_FOUND_TAG = "result_not_found"
 const val RESULT_NOT_FOUND_BACK_TAG = "result_not_found_back"
 const val RESULT_NOT_FOUND_HOME_TAG = "result_not_found_home"
+const val RESULT_LOADING_TAG = "result_loading"
 
 private fun RangeStatus.labelResource(): Int = when (this) {
     RangeStatus.UNKNOWN -> R.string.measurement_range_unknown

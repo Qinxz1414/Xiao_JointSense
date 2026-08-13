@@ -74,6 +74,25 @@ class ResultUiModelTest {
         assertTrue(model.factorValues.none { it.value?.isFinite() == false })
     }
 
+    @Test
+    fun finiteRawExtremesWithOverflowingTealnessAreUnavailable() {
+        val overflow = result(RangeStatus.IN_RANGE).copy(
+            features = RgbFeatures(
+                rMean = -Float.MAX_VALUE,
+                gMean = 0f,
+                bMean = Float.MAX_VALUE,
+                rStd = Float.MAX_VALUE,
+                gStd = Float.MAX_VALUE,
+                bStd = Float.MAX_VALUE,
+            ),
+        )
+
+        val model = createResultUiModel(session(overflow), overflow)
+
+        assertTrue(overflow.features.tealness.isInfinite())
+        assertNull(model.features)
+    }
+
     private fun result(status: RangeStatus) = TestResult(
         id = "result",
         sessionId = "session",

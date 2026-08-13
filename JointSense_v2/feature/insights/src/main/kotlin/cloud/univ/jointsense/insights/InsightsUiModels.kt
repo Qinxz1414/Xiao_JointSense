@@ -6,6 +6,7 @@ import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 data class FactorPresentation(
     val factor: InflammationFactor,
     val value: Float?,
+    val weekChangePercent: Float? = null,
 )
 
 data class HomePresentation(
@@ -64,7 +65,11 @@ fun ReportUiState.toReportPresentation(): ReportPresentation {
         oaIndex = validAi,
         grade = currentGrade?.takeIf { validAi != null && it in 0..4 },
         factorValues = inflammationFactorPresentationOrder.map { factor ->
-            FactorPresentation(factor, latestValues[factor]?.takeIf { it.isFinite() && it >= 0f })
+            FactorPresentation(
+                factor = factor,
+                value = latestValues[factor]?.takeIf { it.isFinite() && it >= 0f },
+                weekChangePercent = factorDeltaPct7d[factor]?.takeIf(Float::isFinite),
+            )
         },
         weekChangePercent = validWeekChange,
         trend = trendInterpretation(validWeekChange),

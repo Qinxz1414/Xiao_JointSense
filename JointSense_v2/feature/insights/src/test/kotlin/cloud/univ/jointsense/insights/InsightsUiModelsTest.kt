@@ -124,6 +124,21 @@ class InsightsUiModelsTest {
     }
 
     @Test
+    fun reportPreviewPropagatesOnlyFiniteFactorComparisons() {
+        val model = ReportUiState(
+            factorDeltaPct7d = mapOf(
+                InflammationFactor.TNF_ALPHA to 25f,
+                InflammationFactor.IL6 to Float.NaN,
+                InflammationFactor.IL1_BETA to Float.POSITIVE_INFINITY,
+            ),
+        ).toReportPresentation()
+
+        assertEquals(25f, model.factorValues[0].weekChangePercent)
+        assertNull(model.factorValues[1].weekChangePercent)
+        assertNull(model.factorValues[2].weekChangePercent)
+    }
+
+    @Test
     fun reportTrendUsesEvidenceBasedWeeklyChangeMapping() {
         assertEquals(TrendInterpretation.INSUFFICIENT_DATA, trendInterpretation(null))
         assertEquals(TrendInterpretation.RISING, trendInterpretation(10.01f))

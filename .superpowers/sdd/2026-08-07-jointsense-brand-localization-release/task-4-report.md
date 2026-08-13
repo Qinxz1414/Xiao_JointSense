@@ -126,3 +126,69 @@ After implementation and concurrency review, the affected JVM suites and all fou
 The final terminology audit replaced unconditional “weekly change” headings with “available comparison” / “有可用基线时” wording. `ResourceParityTest`, the full insights JVM suite, and `:app:assembleDebug` passed after this wording-only refinement; the APK size and hash above are from that final artifact.
 
 `adb devices -l` again reported no connected device, so the Android instrumentation suites were compiled but not executed or claimed in fix round 1.
+
+## Fix round 2/5
+
+The second specification and code-review round closed every requested edge case:
+
+- Per-factor seven-day comparison now ignores future timestamps, negative concentrations, and all non-finite inputs. The exact seven-day boundary belongs to the baseline window; a valid current-window observation and a finite, strictly positive baseline are both required. Zero/non-finite baselines, missing current evidence, and non-finite results publish no delta.
+- The finite weekly comparison is stored in `FactorPresentation` for Report preview, while export applies the same finite-only contract; dedicated preview and export tests lock both propagation paths.
+- Result lookup now resolves to `Loading`, `Found`, or `NotFound`. The repository-snapshot marker becomes true only after `observeSessions()` emits; local session selection cannot forge the marker, transient measurement cleanup preserves an observed marker, and ViewModel recreation waits for the new repository instance's first emission again.
+- Production feature and app navigation both use the shared resolution. `Loading` shows localized progress, exposes only Back-to-origin, and cannot invoke Continue or Home. `Found.canContinue` is the only path that can continue a session; `NotFound` is shown only after repository evidence exists.
+- Result feature presentation requires all six raw RGB values and the derived net-tealness value to be finite. Opposing `Float.MAX_VALUE` values that overflow the derived value now suppress both feature summaries and never render `Infinity`.
+- A production `JointSenseNavHost` instrumentation test clicks the real Home restore action and verifies Profile is active with the restore confirmation visible. Its JUnit `@After` fixture restoration runs after assertion failures as well as success.
+- Profile restore-copy tests now read the active localized resources instead of assuming a process locale. The calibration note is a separate paired English/Simplified-Chinese resource, covered by `ResourceParityTest`.
+
+### Fix-round TDD evidence
+
+RED was observed before production implementation: the affected gate failed on the intentionally missing factor comparison field, repository snapshot marker, result-resolution API/loading resources, and production Profile screen tag. Tests covered exact-boundary/future/negative/NaN/infinity/zero/no-current factor evidence, preview/export propagation, delayed repository Flow plus recreation, all three Result states, feature overflow, real NavHost restore navigation, and localized Profile copy.
+
+The affected GREEN gate passed:
+
+```powershell
+.\gradlew.bat :feature:insights:testDebugUnitTest `
+  :feature:measurement:testDebugUnitTest `
+  :feature:settings:compileDebugAndroidTestKotlin `
+  :feature:measurement:compileDebugAndroidTestKotlin `
+  :app:compileDebugAndroidTestKotlin
+```
+
+- `BUILD SUCCESSFUL`; 182 actionable tasks.
+- A final strengthened Loading-only Back assertion was recompiled independently: `:feature:measurement:compileDebugAndroidTestKotlin --rerun-tasks`, 43/43 actionable tasks executed.
+
+### Final fresh verification
+
+```powershell
+.\gradlew.bat testDebugUnitTest --rerun-tasks
+```
+
+- `BUILD SUCCESSFUL`; 209/209 actionable tasks executed.
+- 45 suites, 274 tests, 0 failures, 0 errors, 0 skipped.
+- Module totals: app 25; core data 6; core database 1; core design system 26; core image 10; calibration 60; insights 37; measurement 99; settings 10.
+- The app suite includes the 5/5 passing `ResourceParityTest` contract, including the new Result loading and restore calibration-note resources.
+
+```powershell
+.\gradlew.bat :app:compileDebugAndroidTestKotlin `
+  :core:data:compileDebugAndroidTestKotlin `
+  :core:database:compileDebugAndroidTestKotlin `
+  :core:designsystem:compileDebugAndroidTestKotlin `
+  :core:image:compileDebugAndroidTestKotlin `
+  :feature:calibration:compileDebugAndroidTestKotlin `
+  :feature:insights:compileDebugAndroidTestKotlin `
+  :feature:measurement:compileDebugAndroidTestKotlin `
+  :feature:settings:compileDebugAndroidTestKotlin --rerun-tasks
+```
+
+- `BUILD SUCCESSFUL`; 201/201 actionable tasks executed across all nine modules with Android tests.
+
+```powershell
+.\gradlew.bat :app:lintDebug :app:assembleDebug --rerun-tasks
+```
+
+- `BUILD SUCCESSFUL`; 374/374 actionable tasks executed.
+- Lint: 0 errors, 45 existing warnings.
+- APK: `app/build/outputs/apk/debug/app-debug.apk`, 21,311,538 bytes.
+- SHA-256: `C73F6264EF4BBB43A19FD0E6AFF9468E9F0ED25B192C99B29CCA0F957207A7CF`.
+- `git diff --check`: clean apart from line-ending conversion notices.
+
+`adb devices -l` reported no connected device or emulator. Instrumentation tests were compiled but were not executed or claimed in fix round 2.

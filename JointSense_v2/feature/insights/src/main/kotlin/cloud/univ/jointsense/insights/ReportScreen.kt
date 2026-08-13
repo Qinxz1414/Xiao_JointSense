@@ -235,10 +235,10 @@ fun ReportScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         inflammationFactorPresentationOrder.forEach { factor ->
-                            val delta = state.factorDeltaPct7d[factor]?.takeIf(Float::isFinite)
-                            val absolute = presentation.factorValues
+                            val factorPresentation = presentation.factorValues
                                 .first { it.factor == factor }
-                                .value
+                            val delta = factorPresentation.weekChangePercent
+                            val absolute = factorPresentation.value
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

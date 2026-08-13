@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
+import cloud.univ.jointsense.feature.settings.R
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -21,6 +22,8 @@ class ProfileRestoreSamplesTest {
     @Test
     fun pendingRestoreShowsExplicitCalibrationSafeConfirmationAndConfirmsOnce() {
         var confirms = 0
+        val calibrationMessage = composeRule.activity.getString(R.string.settings_restore_samples_calibration_note)
+        val restoreLabel = composeRule.activity.getString(R.string.settings_restore_samples_confirm)
         composeRule.setContent {
             JointSenseTheme {
                 SettingsScreen(
@@ -35,10 +38,8 @@ class ProfileRestoreSamplesTest {
         }
 
         composeRule.onNodeWithTag(RESTORE_SAMPLES_CONFIRMATION_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText(
-            "Restoring built-in sample sessions does not change or restore user calibration curves.",
-        ).assertIsDisplayed()
-        composeRule.onNodeWithText("Restore samples").performClick()
+        composeRule.onNodeWithText(calibrationMessage, substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText(restoreLabel).performClick()
         composeRule.runOnIdle { assertEquals(1, confirms) }
     }
 
@@ -46,6 +47,7 @@ class ProfileRestoreSamplesTest {
     fun restoreConfirmationCanBeCancelledWithoutConfirming() {
         var confirms = 0
         var cancels = 0
+        val cancelLabel = composeRule.activity.getString(R.string.settings_cancel)
         composeRule.setContent {
             JointSenseTheme {
                 SettingsScreen(
@@ -59,7 +61,7 @@ class ProfileRestoreSamplesTest {
             }
         }
 
-        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onNodeWithText(cancelLabel).performClick()
         composeRule.runOnIdle {
             assertEquals(0, confirms)
             assertEquals(1, cancels)

@@ -23,6 +23,8 @@
     <string name="measurement_title_result">Analysis result</string>
     <string name="measurement_result_not_found_title">Result not found</string>
     <string name="measurement_result_not_found_message">The requested result is no longer available on this device. Return to the previous page or go to Home.</string>
+    <string name="measurement_result_loading_title">Loading result</string>
+    <string name="measurement_result_loading_message">Waiting for saved measurements on this device…</string>
     <string name="measurement_cleanup_warning">Temporary image cleanup could not be completed. You can continue using this result.</string>
     <string name="measurement_quantitative_analysis">Quantitative analysis (pg/mL)</string>
     <string name="measurement_latest_measurement">Latest measurement</string>

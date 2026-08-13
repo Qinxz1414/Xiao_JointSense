@@ -1,11 +1,83 @@
 package cloud.univ.jointsense.insights
 
+import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.RangeStatus
+import cloud.univ.jointsense.domain.model.RgbFeatures
+import cloud.univ.jointsense.domain.model.TestResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class BaselineInsightsMetricsTest {
+    @Test
+    fun factorWeeklyDeltaAssignsTheExactBoundaryToBaselineAndNowToCurrent() {
+        val change = BaselineInsightsMetrics.factorDeltaPct7d(
+            results = listOf(
+                factorResult(NOW - DAY_MILLIS * 7, 20f),
+                factorResult(NOW, 30f),
+            ),
+            factor = InflammationFactor.TNF_ALPHA,
+            now = NOW,
+        )
+
+        assertEquals(50f, change!!, 0.001f)
+    }
+
+    @Test
+    fun factorWeeklyDeltaIgnoresFutureNegativeAndNonFiniteRecords() {
+        val change = BaselineInsightsMetrics.factorDeltaPct7d(
+            results = listOf(
+                factorResult(NOW - DAY_MILLIS * 8, 10f),
+                factorResult(NOW - DAY_MILLIS * 7, -10f),
+                factorResult(NOW - DAY_MILLIS * 7, Float.NaN),
+                factorResult(NOW - DAY_MILLIS, 20f),
+                factorResult(NOW - 1, Float.POSITIVE_INFINITY),
+                factorResult(NOW, Float.NEGATIVE_INFINITY),
+                factorResult(NOW + 1, 1_000f),
+            ),
+            factor = InflammationFactor.TNF_ALPHA,
+            now = NOW,
+        )
+
+        assertEquals(100f, change!!, 0.001f)
+    }
+
+    @Test
+    fun factorWeeklyDeltaRequiresValidBaselineAndCurrentWindows() {
+        assertNull(
+            BaselineInsightsMetrics.factorDeltaPct7d(
+                listOf(factorResult(NOW - DAY_MILLIS * 7, 10f)),
+                InflammationFactor.TNF_ALPHA,
+                NOW,
+            ),
+        )
+        listOf(0f, -1f, Float.NaN, Float.POSITIVE_INFINITY).forEach { invalidBaseline ->
+            assertNull(
+                BaselineInsightsMetrics.factorDeltaPct7d(
+                    listOf(
+                        factorResult(NOW - DAY_MILLIS * 7, invalidBaseline),
+                        factorResult(NOW, 20f),
+                    ),
+                    InflammationFactor.TNF_ALPHA,
+                    NOW,
+                ),
+            )
+        }
+        listOf(-1f, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY).forEach { invalidCurrent ->
+            assertNull(
+                BaselineInsightsMetrics.factorDeltaPct7d(
+                    listOf(
+                        factorResult(NOW - DAY_MILLIS * 7, 10f),
+                        factorResult(NOW, invalidCurrent),
+                    ),
+                    InflammationFactor.TNF_ALPHA,
+                    NOW,
+                ),
+            )
+        }
+    }
+
     @Test
     fun weeklyChangeRequiresAnObservationAtLeastSevenDaysOld() {
         assertNull(BaselineInsightsMetrics.aiWeekDeltaPct(emptyList(), NOW))
@@ -120,6 +192,17 @@ class BaselineInsightsMetricsTest {
             assertThrows(IllegalArgumentException::class.java) { BaselineInsightsMetrics.grade(ai) }
         }
     }
+
+    private fun factorResult(timestamp: Long, concentration: Float) = TestResult(
+        id = "result-$timestamp-$concentration",
+        sessionId = "session",
+        draftId = null,
+        factor = InflammationFactor.TNF_ALPHA,
+        concentration = concentration,
+        rangeStatus = RangeStatus.IN_RANGE,
+        features = RgbFeatures(1f, 1f, 1f, 1f, 1f, 1f),
+        timestamp = timestamp,
+    )
 
     private companion object {
         const val NOW = 2_000_000_000_000L

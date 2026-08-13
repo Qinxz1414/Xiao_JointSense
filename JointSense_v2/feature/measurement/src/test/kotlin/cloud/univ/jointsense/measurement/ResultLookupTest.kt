@@ -16,31 +16,48 @@ class ResultLookupTest {
         val stale = session("stale", result("wrong", "stale"))
         val requested = session("requested", result("target", "requested"))
 
-        val located = locateResultById(
+        val resolution = resolveResultById(
             resultId = "target",
             currentSession = stale,
             sessions = listOf(stale, requested),
+            hasReceivedSessionsSnapshot = true,
         )
+        val located = resolution as ResultResolution.Found
 
-        assertEquals("requested", located?.session?.id)
-        assertEquals("target", located?.result?.id)
+        assertEquals("requested", located.session.id)
+        assertEquals("target", located.result.id)
     }
 
     @Test
     fun currentSessionIsUsedOnlyWhenItContainsRequestedResult() {
         val current = session("current", result("target", "current"))
 
-        val located = locateResultById("target", current, emptyList())
+        val located = resolveResultById("target", current, emptyList(), false) as ResultResolution.Found
 
-        assertEquals("current", located?.session?.id)
-        assertEquals("target", located?.result?.id)
+        assertEquals("current", located.session.id)
+        assertEquals("target", located.result.id)
     }
 
     @Test
     fun missingResultReturnsNoSyntheticUnknownResult() {
         val current = session("current", result("other", "current"))
 
-        assertNull(locateResultById("missing", current, listOf(current)))
+        assertEquals(
+            ResultResolution.NotFound,
+            resolveResultById("missing", current, listOf(current), true),
+        )
+    }
+
+    @Test
+    fun absentResultIsLoadingUntilTheInitialRepositorySnapshotArrives() {
+        assertEquals(
+            ResultResolution.Loading,
+            resolveResultById("missing", null, emptyList(), false),
+        )
+        assertEquals(
+            ResultResolution.NotFound,
+            resolveResultById("missing", null, emptyList(), true),
+        )
     }
 
     private fun session(id: String, result: TestResult) = TestSession(

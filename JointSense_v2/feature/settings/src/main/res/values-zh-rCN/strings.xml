@@ -26,7 +26,8 @@
     <string name="settings_cancel">取消</string>
     <string name="settings_ok">确定</string>
     <string name="settings_restore_samples_title">恢复内置样例？</string>
-    <string name="settings_restore_samples_message">内置样例检测会话将重新添加到本设备。恢复内置样例不会更改或恢复用户校准曲线。</string>
+    <string name="settings_restore_samples_message">内置样例检测会话将重新添加到本设备。</string>
+    <string name="settings_restore_samples_calibration_note">恢复内置样例不会更改或恢复用户校准曲线。</string>
     <string name="settings_restore_samples_confirm">恢复样例</string>
     <string name="settings_restore_samples_success_title">样例已恢复</string>
     <string name="settings_restore_samples_success_message">内置样例检测会话已恢复，用户校准曲线未被更改。</string>

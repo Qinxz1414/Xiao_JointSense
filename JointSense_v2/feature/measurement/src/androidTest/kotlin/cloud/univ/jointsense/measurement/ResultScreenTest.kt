@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
@@ -17,6 +18,7 @@ import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.feature.measurement.R
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -49,9 +51,7 @@ class ResultScreenTest {
         composeRule.setContent {
             JointSenseTheme {
                 ResultScreen(
-                    session = session,
-                    lastResult = result,
-                    canAddMore = true,
+                    resolution = ResultResolution.Found(session, result),
                     onContinueMeasurement = {},
                     onReturnToOrigin = {},
                     onGoHome = {},
@@ -83,9 +83,7 @@ class ResultScreenTest {
         composeRule.setContent {
             JointSenseTheme {
                 ResultScreen(
-                    session = null,
-                    lastResult = null,
-                    canAddMore = false,
+                    resolution = ResultResolution.NotFound,
                     onContinueMeasurement = {},
                     onReturnToOrigin = { backs += 1 },
                     onGoHome = { homes += 1 },
@@ -101,5 +99,75 @@ class ResultScreenTest {
             assertEquals(1, homes)
         }
         composeRule.onAllNodesWithTag(RESULT_RANGE_STATUS_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun unresolvedRepositorySnapshotShowsLoadingWithoutContinueOrNotFound() {
+        var backs = 0
+        var continues = 0
+        var homes = 0
+        val backDescription = composeRule.activity.getString(R.string.measurement_action_back)
+        composeRule.setContent {
+            JointSenseTheme {
+                ResultScreen(
+                    resolution = ResultResolution.Loading,
+                    onContinueMeasurement = { continues += 1 },
+                    onReturnToOrigin = { backs += 1 },
+                    onGoHome = { homes += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(RESULT_LOADING_TAG).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(RESULT_NOT_FOUND_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(CONTINUE_MEASUREMENT_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(RESULT_HOME_ACTION_TAG).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription(backDescription).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, backs)
+            assertEquals(0, continues)
+            assertEquals(0, homes)
+        }
+    }
+
+    @Test
+    fun overflowingDerivedTealnessCannotReachEitherFeatureSummary() {
+        val result = TestResult(
+            id = "overflow",
+            sessionId = "session",
+            draftId = null,
+            factor = InflammationFactor.TNF_ALPHA,
+            concentration = 42f,
+            rangeStatus = RangeStatus.IN_RANGE,
+            features = RgbFeatures(
+                rMean = -Float.MAX_VALUE,
+                gMean = 0f,
+                bMean = Float.MAX_VALUE,
+                rStd = Float.MAX_VALUE,
+                gStd = Float.MAX_VALUE,
+                bStd = Float.MAX_VALUE,
+            ),
+            timestamp = 2L,
+        )
+        val session = TestSession(
+            id = "session",
+            name = "session",
+            createdAt = 1L,
+            source = DataSource.USER,
+            results = listOf(result),
+        )
+        composeRule.setContent {
+            JointSenseTheme {
+                ResultScreen(
+                    resolution = ResultResolution.Found(session, result),
+                    onContinueMeasurement = {},
+                    onReturnToOrigin = {},
+                    onGoHome = {},
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithTag(RESULT_FEATURES_SUMMARY_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithText("Infinity", substring = true).assertCountEquals(0)
     }
 }

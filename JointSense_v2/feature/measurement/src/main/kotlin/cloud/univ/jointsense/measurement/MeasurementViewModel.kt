@@ -90,7 +90,9 @@ class MeasurementViewModel(
 
     init {
         viewModelScope.launch {
-            repository.observeSessions().collectLatest(::applySessions)
+            repository.observeSessions().collectLatest { sessions ->
+                applySessions(sessions, receivedFromRepository = true)
+            }
         }
         state.value.imageUri?.takeIf { decoder != null }?.let {
             decodeImage(it, restoring = true, picked = false)
@@ -1100,12 +1102,14 @@ class MeasurementViewModel(
         retryPersistence = null
         cropConfirmed = false
         val sessions = state.value.sessions
+        val hasReceivedSessionsSnapshot = state.value.hasReceivedSessionsSnapshot
         val origin = state.value.originDestination
         val permissionHistory = state.value.hasRequestedCameraPermission
         val draft = draftIdFactory()
         mutableState.value = MeasurementUiState(
             draftId = draft,
             sessions = sessions,
+            hasReceivedSessionsSnapshot = hasReceivedSessionsSnapshot,
             originDestination = origin,
             hasRequestedCameraPermission = permissionHistory,
         )
@@ -1140,10 +1144,15 @@ class MeasurementViewModel(
         }
     }
 
-    private fun applySessions(sessions: List<TestSession>) {
+    private fun applySessions(
+        sessions: List<TestSession>,
+        receivedFromRepository: Boolean = false,
+    ) {
         mutableState.update { current ->
             current.copy(
                 sessions = sessions,
+                hasReceivedSessionsSnapshot =
+                    current.hasReceivedSessionsSnapshot || receivedFromRepository,
                 currentSession = sessions.firstOrNull { it.id == currentSessionId },
                 lastResult = current.resultId?.let { findResult(sessions, it) },
             )

@@ -276,11 +276,14 @@ fun ResultRouteScreen(
     onGoHome: () -> Unit,
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
-    val located = locateResultById(resultId, state.currentSession, state.sessions)
+    val resolution = resolveResultById(
+        resultId = resultId,
+        currentSession = state.currentSession,
+        sessions = state.sessions,
+        hasReceivedSessionsSnapshot = state.hasReceivedSessionsSnapshot,
+    )
     ResultScreen(
-        session = located?.session,
-        lastResult = located?.result,
-        canAddMore = located?.session?.results?.size?.let { it < 5 } == true,
+        resolution = resolution,
         cleanupWarning = state.captureCleanupWarning,
         onContinueMeasurement = onContinueMeasurement,
         onReturnToOrigin = onReturnToOrigin,

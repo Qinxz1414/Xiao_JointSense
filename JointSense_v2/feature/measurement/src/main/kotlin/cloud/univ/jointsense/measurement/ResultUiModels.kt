@@ -53,3 +53,4 @@ private fun RgbFeatures.hasOnlyFiniteValues(): Boolean = listOf(
     gStd,
     bStd,
 ).all(Float::isFinite)
+    && tealness.isFinite()

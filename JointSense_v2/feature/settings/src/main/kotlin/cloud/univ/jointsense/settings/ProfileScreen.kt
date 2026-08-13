@@ -77,6 +77,7 @@ internal fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
+                .testTag(PROFILE_SCREEN_TAG)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
@@ -250,7 +251,13 @@ internal fun SettingsScreen(
             modifier = Modifier.testTag(RESTORE_SAMPLES_CONFIRMATION_TAG),
             onDismissRequest = onCancelRestoreSamples,
             title = { Text(stringResource(R.string.settings_restore_samples_title)) },
-            text = { Text(stringResource(R.string.settings_restore_samples_message)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.settings_restore_samples_message))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(stringResource(R.string.settings_restore_samples_calibration_note))
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = onConfirmRestoreSamples,
@@ -302,6 +309,7 @@ internal fun SettingsScreen(
 }
 
 const val RESTORE_SAMPLES_CONFIRMATION_TAG = "restore_samples_confirmation"
+const val PROFILE_SCREEN_TAG = "profile_screen"
 
 internal sealed interface CalibrationSubtitle {
     data class Review(val count: Int) : CalibrationSubtitle
