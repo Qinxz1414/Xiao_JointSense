@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -120,6 +119,22 @@ internal fun JointSenseNavHostForTest(
     screenSlot: JointSenseScreenSlot,
     modifier: Modifier = Modifier,
 ) {
+    JointSenseNavHost(
+        navController = navController,
+        measurementViewModel = measurementViewModel,
+        screenSlot = screenSlot,
+        modifier = modifier,
+    )
+}
+
+/** Production navigation graph with injected measurement state for isolated instrumentation hosts. */
+@Composable
+internal fun JointSenseNavHost(
+    navController: NavHostController,
+    measurementViewModel: MeasurementViewModel,
+    screenSlot: JointSenseScreenSlot,
+    modifier: Modifier = Modifier,
+) {
     JointSenseNavHostContent(
         modifier = modifier,
         navController = navController,
@@ -157,7 +172,7 @@ private fun JointSenseNavHostContent(
     val measurementState = measurementViewModel?.state
         ?.collectAsStateWithLifecycle()?.value
     val sessionCreationError = measurementState?.sessionCreationError
-    val sessionCreationDriver = featureViewModels?.measurement?.let { measurement ->
+    val sessionCreationDriver = measurementViewModel?.let { measurement ->
         remember(measurement, actions) {
             SessionCreationNavigationDriver(measurement, actions)
         }
@@ -547,7 +562,9 @@ private fun MainBottomBar(
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(MAIN_BOTTOM_BAR_TAG),
     ) {
         Column {
             Row(
@@ -574,7 +591,7 @@ private fun MainBottomBar(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxHeight(),
+                        .heightIn(min = 64.dp),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     Text(
@@ -647,6 +664,7 @@ private fun RowScope.BarTab(
 }
 
 const val MAIN_NEW_TEST_TAG = "main_new_test"
+const val MAIN_BOTTOM_BAR_TAG = "main_bottom_bar"
 const val NAV_HOME_TAG = "nav_home"
 const val NAV_TRENDS_TAG = "nav_trends"
 const val NAV_REPORT_TAG = "nav_report"

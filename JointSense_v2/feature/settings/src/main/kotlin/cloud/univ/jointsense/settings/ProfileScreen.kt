@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,10 +44,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.unit.dp
 import cloud.univ.jointsense.core.designsystem.R as DesignSystemR
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
@@ -74,10 +82,13 @@ internal fun SettingsScreen(
     var languageDialogSelection by remember { mutableStateOf<LanguageOption?>(null) }
 
     Scaffold(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag(SCREEN_PROFILE_TAG),
         topBar = { JointSenseTopBar(title = stringResource(R.string.settings_title)) },
     ) { paddingValues ->
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
@@ -194,14 +205,39 @@ internal fun SettingsScreen(
 @Composable
 private fun IdentityCard(state: SettingsUiState) {
     ClinicalCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(PROFILE_IDENTITY_TAG),
         shape = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val stack = maxWidth < 400.dp && LocalDensity.current.fontScale >= 1.5f
+            if (stack) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    IdentityLogo()
+                    Spacer(Modifier.height(12.dp))
+                    IdentityDetails(state)
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IdentityLogo()
+                    Spacer(Modifier.width(16.dp))
+                    IdentityDetails(state)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IdentityLogo() {
             Box(
                 modifier = Modifier.size(64.dp).clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
@@ -211,11 +247,14 @@ private fun IdentityCard(state: SettingsUiState) {
                     painter = painterResource(DesignSystemR.drawable.jointsense_logo),
                     contentDescription = stringResource(R.string.settings_logo_description),
                     modifier = Modifier.size(48.dp),
-                    contentScale = ContentScale.Fit,
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            Column {
+                contentScale = ContentScale.Fit,
+            )
+    }
+}
+
+@Composable
+private fun IdentityDetails(state: SettingsUiState) {
+    Column {
                 Text(
                     text = stringResource(R.string.settings_app_name),
                     style = MaterialTheme.typography.titleMedium,
@@ -240,8 +279,6 @@ private fun IdentityCard(state: SettingsUiState) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-        }
     }
 }
 
@@ -278,9 +315,28 @@ private data class ProfileEntryModel(
 
 @Composable
 private fun ProfileEntry(entry: ProfileEntryModel) {
+    val announcement = stringResource(
+        R.string.settings_entry_accessibility_name,
+        entry.title,
+        entry.subtitle,
+    )
     Row(
-        modifier = Modifier.fillMaxWidth().testTag(entry.testTag)
-            .clickable(onClick = entry.onClick).padding(16.dp),
+        modifier = Modifier.fillMaxWidth()
+            .clickable(
+                role = Role.Button,
+                onClickLabel = announcement,
+                onClick = entry.onClick,
+            )
+            .clearAndSetSemantics {
+                contentDescription = announcement
+                role = Role.Button
+                this[SemanticsProperties.TestTag] = entry.testTag
+                onClick(label = announcement) {
+                    entry.onClick()
+                    true
+                }
+            }
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -360,6 +416,8 @@ internal fun calibrationSubtitle(state: SettingsUiState): CalibrationSubtitle = 
 }
 
 const val PROFILE_SCREEN_TAG = "profile_screen"
+const val SCREEN_PROFILE_TAG = "screen_profile"
+const val PROFILE_IDENTITY_TAG = "profile_identity"
 const val SETTINGS_LANGUAGE_TAG = "settings_language"
 const val SETTINGS_CALIBRATION_TAG = "settings_calibration"
 const val SETTINGS_HISTORY_TAG = "settings_history"

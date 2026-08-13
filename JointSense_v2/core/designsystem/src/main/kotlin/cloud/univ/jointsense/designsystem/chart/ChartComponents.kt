@@ -26,11 +26,12 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.designsystem.theme.GradeColors
@@ -50,6 +51,43 @@ data class ChartSeries(
     val points: List<TimePoint>
 )
 
+enum class ChartMarkerShape { CIRCLE, SQUARE, TRIANGLE }
+
+enum class ChartLinePattern { SOLID, DASHED, DOTTED }
+
+data class ChartSeriesStyle(
+    val markerShape: ChartMarkerShape,
+    val linePattern: ChartLinePattern,
+)
+
+/** Stable, color-independent visual identity shared by plots and legends. */
+fun chartSeriesStyle(seriesIndex: Int): ChartSeriesStyle {
+    require(seriesIndex >= 0) { "seriesIndex must not be negative" }
+    return SERIES_STYLES[seriesIndex % SERIES_STYLES.size]
+}
+
+@Composable
+fun SeriesLegendSymbol(
+    seriesIndex: Int,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    val style = chartSeriesStyle(seriesIndex)
+    val centerColor = MaterialTheme.colorScheme.surface
+    Canvas(modifier = modifier) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawLine(
+            color = color,
+            start = Offset(0f, center.y),
+            end = Offset(size.width, center.y),
+            strokeWidth = 3f,
+            cap = StrokeCap.Round,
+            pathEffect = style.linePattern.pathEffect(),
+        )
+        drawChartMarker(style.markerShape, color, centerColor, center)
+    }
+}
+
 /**
  * Tiny inline trend line used inside the home factor cards.
  */
@@ -57,8 +95,11 @@ data class ChartSeries(
 fun Sparkline(
     values: List<Float>,
     color: Color,
+    seriesIndex: Int = 0,
     modifier: Modifier = Modifier
 ) {
+    val style = chartSeriesStyle(seriesIndex)
+    val pointCenterColor = MaterialTheme.colorScheme.surface
     Canvas(modifier = modifier) {
         if (values.isEmpty()) return@Canvas
         val pad = 6f
@@ -75,7 +116,7 @@ fun Sparkline(
         }
 
         if (values.size == 1) {
-            drawCircle(color, radius = 5f, center = point(0))
+            drawChartMarker(style.markerShape, color, pointCenterColor, point(0), radius = 5f)
             return@Canvas
         }
 
@@ -86,9 +127,16 @@ fun Sparkline(
         drawPath(
             path,
             color,
-            style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            style = Stroke(
+                width = 3f,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round,
+                pathEffect = style.linePattern.pathEffect(),
+            )
         )
-        drawCircle(color, radius = 5f, center = point(values.size - 1))
+        values.indices.forEach { index ->
+            drawChartMarker(style.markerShape, color, pointCenterColor, point(index), radius = 5f)
+        }
     }
 }
 
@@ -110,15 +158,21 @@ fun MultiLineChart(
     val axisColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
     val pointCenterColor = MaterialTheme.colorScheme.surface
+    val localDensity = LocalDensity.current
+    val axisTitleTextSize = with(localDensity) { 10.sp.toPx() }
+    val tickTextSize = with(localDensity) { 10.sp.toPx() }
+    val yTickBaselineOffset = with(localDensity) { 4.sp.toPx() }
+    val xTickBaselineOffset = with(localDensity) { 14.sp.toPx() }
+    val leftPaddingPx = with(localDensity) { 48.dp.toPx() }
+    val rightPaddingPx = with(localDensity) { 12.dp.toPx() }
+    val topPaddingPx = with(localDensity) { 10.dp.toPx() }
+    val bottomPaddingPx = with(localDensity) { 22.dp.toPx() }
 
     Canvas(modifier = modifier) {
-        val density = this.density
-        fun textSize(sp: Float) = sp * density
-
-        val paddingLeft = 48f * density
-        val paddingRight = 12f * density
-        val paddingTop = 10f * density
-        val paddingBottom = 22f * density
+        val paddingLeft = maxOf(leftPaddingPx, tickTextSize * 4.5f)
+        val paddingRight = rightPaddingPx
+        val paddingTop = topPaddingPx
+        val paddingBottom = maxOf(bottomPaddingPx, tickTextSize * 2.2f)
 
         val chartWidth = size.width - paddingLeft - paddingRight
         val chartHeight = size.height - paddingTop - paddingBottom
@@ -143,10 +197,10 @@ fun MultiLineChart(
             drawText(
                 yAxisLabel,
                 -(paddingTop + chartHeight / 2f),
-                textSize(11f),
+                axisTitleTextSize * 1.1f,
                 android.graphics.Paint().apply {
                     color = labelColor
-                    textSize = textSize(10f)
+                    textSize = axisTitleTextSize
                     textAlign = android.graphics.Paint.Align.CENTER
                 },
             )
@@ -164,10 +218,10 @@ fun MultiLineChart(
             drawContext.canvas.nativeCanvas.drawText(
                 formatValue(gv),
                 paddingLeft - 8f,
-                gy + textSize(4f),
+                gy + yTickBaselineOffset,
                 android.graphics.Paint().apply {
                     color = labelColor
-                    textSize = textSize(10f)
+                    textSize = tickTextSize
                     textAlign = android.graphics.Paint.Align.RIGHT
                 }
             )
@@ -189,10 +243,10 @@ fun MultiLineChart(
             drawContext.canvas.nativeCanvas.drawText(
                 formatTime(t),
                 tx,
-                paddingTop + chartHeight + textSize(14f),
+                paddingTop + chartHeight + xTickBaselineOffset,
                 android.graphics.Paint().apply {
                     color = labelColor
-                    textSize = textSize(10f)
+                    textSize = tickTextSize
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
             )
@@ -202,56 +256,26 @@ fun MultiLineChart(
         for ((seriesIndex, s) in series.withIndex()) {
             if (s.points.isEmpty()) continue
             val pts = s.points.sortedBy { it.time }
-            if (pts.size == 1) {
-                drawCircle(s.color, radius = 6f, center = Offset(x(pts[0].time), y(pts[0].value)))
-                continue
-            }
-            val path = Path().apply {
-                moveTo(x(pts[0].time), y(pts[0].value))
-                for (i in 1 until pts.size) lineTo(x(pts[i].time), y(pts[i].value))
-            }
-            drawPath(
-                path,
-                s.color,
-                style = Stroke(
-                    width = 3f,
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round,
-                    pathEffect = when (seriesIndex % 3) {
-                        1 -> PathEffect.dashPathEffect(floatArrayOf(14f, 8f))
-                        2 -> PathEffect.dashPathEffect(floatArrayOf(3f, 7f))
-                        else -> null
-                    },
+            val style = chartSeriesStyle(seriesIndex)
+            if (pts.size > 1) {
+                val path = Path().apply {
+                    moveTo(x(pts[0].time), y(pts[0].value))
+                    for (i in 1 until pts.size) lineTo(x(pts[i].time), y(pts[i].value))
+                }
+                drawPath(
+                    path,
+                    s.color,
+                    style = Stroke(
+                        width = 3f,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round,
+                        pathEffect = style.linePattern.pathEffect(),
+                    ),
                 )
-            )
+            }
             for (p in pts) {
                 val center = Offset(x(p.time), y(p.value))
-                when (seriesIndex % 3) {
-                    1 -> {
-                        drawRect(pointCenterColor, center - Offset(6f, 6f), androidx.compose.ui.geometry.Size(12f, 12f))
-                        drawRect(s.color, center - Offset(4f, 4f), androidx.compose.ui.geometry.Size(8f, 8f))
-                    }
-                    2 -> {
-                        val outer = Path().apply {
-                            moveTo(center.x, center.y - 7f)
-                            lineTo(center.x - 7f, center.y + 6f)
-                            lineTo(center.x + 7f, center.y + 6f)
-                            close()
-                        }
-                        val inner = Path().apply {
-                            moveTo(center.x, center.y - 4f)
-                            lineTo(center.x - 4f, center.y + 3f)
-                            lineTo(center.x + 4f, center.y + 3f)
-                            close()
-                        }
-                        drawPath(outer, pointCenterColor)
-                        drawPath(inner, s.color)
-                    }
-                    else -> {
-                        drawCircle(pointCenterColor, radius = 6f, center = center)
-                        drawCircle(s.color, radius = 4f, center = center)
-                    }
-                }
+                drawChartMarker(style.markerShape, s.color, pointCenterColor, center)
             }
         }
     }
@@ -372,3 +396,47 @@ fun AiScaleBar(
 }
 
 private val AI_SCALE_TICKS = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)
+
+private val SERIES_STYLES = listOf(
+    ChartSeriesStyle(ChartMarkerShape.CIRCLE, ChartLinePattern.SOLID),
+    ChartSeriesStyle(ChartMarkerShape.SQUARE, ChartLinePattern.DASHED),
+    ChartSeriesStyle(ChartMarkerShape.TRIANGLE, ChartLinePattern.DOTTED),
+)
+
+internal fun ChartLinePattern.pathEffect(): PathEffect? = when (this) {
+    ChartLinePattern.SOLID -> null
+    ChartLinePattern.DASHED -> PathEffect.dashPathEffect(floatArrayOf(14f, 8f))
+    ChartLinePattern.DOTTED -> PathEffect.dashPathEffect(floatArrayOf(3f, 7f))
+}
+
+internal fun DrawScope.drawChartMarker(
+    shape: ChartMarkerShape,
+    color: Color,
+    centerColor: Color,
+    center: Offset,
+    radius: Float = 6f,
+) {
+    when (shape) {
+        ChartMarkerShape.CIRCLE -> {
+            drawCircle(centerColor, radius = radius, center = center)
+            drawCircle(color, radius = radius * 2f / 3f, center = center)
+        }
+        ChartMarkerShape.SQUARE -> {
+            val outer = androidx.compose.ui.geometry.Size(radius * 2f, radius * 2f)
+            val innerRadius = radius * 2f / 3f
+            val inner = androidx.compose.ui.geometry.Size(innerRadius * 2f, innerRadius * 2f)
+            drawRect(centerColor, center - Offset(radius, radius), outer)
+            drawRect(color, center - Offset(innerRadius, innerRadius), inner)
+        }
+        ChartMarkerShape.TRIANGLE -> {
+            fun triangle(triangleRadius: Float) = Path().apply {
+                moveTo(center.x, center.y - triangleRadius)
+                lineTo(center.x - triangleRadius, center.y + triangleRadius * 0.85f)
+                lineTo(center.x + triangleRadius, center.y + triangleRadius * 0.85f)
+                close()
+            }
+            drawPath(triangle(radius), centerColor)
+            drawPath(triangle(radius * 2f / 3f), color)
+        }
+    }
+}

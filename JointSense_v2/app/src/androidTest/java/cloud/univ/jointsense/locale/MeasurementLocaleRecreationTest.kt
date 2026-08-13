@@ -5,11 +5,23 @@ import android.os.SystemClock
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.core.os.LocaleListCompat
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -25,13 +37,19 @@ import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import cloud.univ.jointsense.measurement.BaselineAnalysisResult
 import cloud.univ.jointsense.measurement.BaselinePhotoAnalysisAdapter
 import cloud.univ.jointsense.measurement.CropBounds
-import cloud.univ.jointsense.measurement.FactorSelectRouteScreen
-import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
 import cloud.univ.jointsense.measurement.MeasurementAction
 import cloud.univ.jointsense.measurement.MeasurementImage
 import cloud.univ.jointsense.measurement.MeasurementImageDecoder
 import cloud.univ.jointsense.measurement.MeasurementViewModel
 import cloud.univ.jointsense.measurement.MeasurementViewModelFactory
+import cloud.univ.jointsense.navigation.CropRoute
+import cloud.univ.jointsense.navigation.FactorSelectRoute
+import cloud.univ.jointsense.navigation.HomeRoute
+import cloud.univ.jointsense.navigation.ImageSelectRoute
+import cloud.univ.jointsense.navigation.JointSenseNavHost
+import cloud.univ.jointsense.navigation.JointSenseRoute
+import cloud.univ.jointsense.navigation.MAIN_NEW_TEST_TAG
+import cloud.univ.jointsense.navigation.NavigationActions
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,73 +59,118 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MeasurementLocaleRecreationTest {
+    @get:Rule
+    val composeRule = createEmptyComposeRule()
+
     @Before
     fun resetBefore() {
         LocaleMeasurementHarness.reset()
-        applyLocales("")
+        applyLocales("en")
     }
 
     @After
     fun resetAfter() = applyLocales("")
 
     @Test
-    fun localeRecreationKeepsMeasurementRouteAndFormalStateAndUsesEventLocalePrefix() {
+    fun productionNavigationAndSessionDriverKeepRouteStateAndUseEventLocalePrefix() {
         ActivityScenario.launch(LocaleMeasurementHostActivity::class.java).use { scenario ->
-            val initial = currentActivity(scenario)
+            val initial = waitForStableActivity(scenario, language = "en")
+            assertLocalizedConfiguration(initial, "en", "Test")
+            composeRule.onNodeWithTag(LOCALE_ROUTE_HOME_TAG).assertIsDisplayed()
+
+            composeRule.onNodeWithTag(MAIN_NEW_TEST_TAG).performClick()
+            composeRule.onNodeWithTag(LOCALE_ROUTE_IMAGE_TAG).assertIsDisplayed()
+            waitUntil { LocaleMeasurementHarness.repository.names.singleOrNull()?.startsWith("Test #") == true }
+
             val viewModel = initial.measurementViewModel
-            viewModel.createNewSession("REPORT", "Test")
-            waitUntil { viewModel.state.value.sessionCreationRequest?.completedSessionId != null }
-            val request = requireNotNull(viewModel.state.value.sessionCreationRequest)
-            val sessionId = requireNotNull(viewModel.acceptSessionCreation(request.requestId))
+            waitUntil { viewModel.state.value.currentSession != null }
+            val sessionId = requireNotNull(viewModel.state.value.currentSession?.id)
             viewModel.onAction(MeasurementAction.ImageSelected("content://measurement/locale-photo"))
             waitUntil { viewModel.state.value.image != null }
             viewModel.onAction(MeasurementAction.CropChanged(CropBounds(11, 12, 111, 112)))
             viewModel.onAction(MeasurementAction.CropConfirmed)
             viewModel.onAction(MeasurementAction.FactorSelected(InflammationFactor.IL1_BETA))
-            InstrumentationRegistry.getInstrumentation().runOnMainSync(initial::showFactorRoute)
-            assertEquals("factor", initial.routeIdentity)
+            composeRule.onNodeWithTag(LOCALE_OPEN_CROP_TAG).performClick()
+            composeRule.onNodeWithTag(LOCALE_OPEN_FACTOR_TAG).performClick()
+            composeRule.onNodeWithTag(LOCALE_ROUTE_FACTOR_TAG).assertIsDisplayed()
             val draftId = viewModel.state.value.draftId
 
             applyLocales("zh-CN")
-            val recreated = waitForRecreated(scenario, initial)
-            waitUntil {
-                recreated.routeIdentity == "factor" &&
-                    recreated.measurementViewModel.state.value.currentSession?.id == sessionId
-            }
-            assertNotSame(initial, recreated)
-            assertEquals("factor", recreated.routeIdentity)
-            with(recreated.measurementViewModel.state.value) {
+            val chinese = waitForRecreated(scenario, initial, "zh")
+            assertNotSame(initial, chinese)
+            composeRule.onNodeWithTag(LOCALE_ROUTE_FACTOR_TAG).assertIsDisplayed()
+            assertLocalizedConfiguration(chinese, "zh", "检测")
+            with(chinese.measurementViewModel.state.value) {
                 assertEquals("content://measurement/locale-photo", imageUri)
                 assertEquals(CropBounds(11, 12, 111, 112), cropRect)
                 assertEquals(InflammationFactor.IL1_BETA, factor)
                 assertEquals(draftId, this.draftId)
                 assertEquals(sessionId, currentSession?.id)
-                assertEquals("REPORT", originDestination)
+                assertEquals("HOME", originDestination)
             }
 
-            val prefix = recreated.getString(R.string.session_name_prefix)
-            assertEquals("检测", prefix)
-            recreated.measurementViewModel.createNewSession("REPORT", prefix)
-            waitUntil { recreated.measurementViewModel.state.value.sessionCreationRequest?.completedSessionId != null }
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                NavigationActions(chinese.navController).exitMeasurement()
+            }
+            composeRule.onNodeWithTag(LOCALE_ROUTE_HOME_TAG).assertIsDisplayed()
+            composeRule.onNodeWithTag(MAIN_NEW_TEST_TAG).performClick()
+            composeRule.onNodeWithTag(LOCALE_ROUTE_IMAGE_TAG).assertIsDisplayed()
+            waitUntil { LocaleMeasurementHarness.repository.names.size == 2 }
             assertTrue(LocaleMeasurementHarness.repository.names.last().startsWith("检测 #"))
+
+            applyLocales("en")
+            val english = waitForRecreated(scenario, chinese, "en")
+            composeRule.onNodeWithTag(LOCALE_ROUTE_IMAGE_TAG).assertIsDisplayed()
+            assertLocalizedConfiguration(english, "en", "Test")
         }
+    }
+
+    private fun assertLocalizedConfiguration(
+        activity: LocaleMeasurementHostActivity,
+        language: String,
+        expectedPrefix: String,
+    ) {
+        assertEquals(language, activity.resources.configuration.locales[0].language)
+        assertEquals(expectedPrefix, activity.getString(R.string.session_name_prefix))
+        composeRule.onNodeWithTag(LOCALE_PREFIX_TAG).assertTextEquals(expectedPrefix)
+    }
+
+    private fun waitForStableActivity(
+        scenario: ActivityScenario<LocaleMeasurementHostActivity>,
+        language: String,
+    ): LocaleMeasurementHostActivity {
+        var current = currentActivity(scenario)
+        var consecutive = 0
+        waitUntil {
+            val observed = runCatching { currentActivity(scenario) }.getOrNull()
+            if (observed === current && observed?.resources?.configuration?.locales?.get(0)?.language == language) {
+                consecutive += 1
+            } else {
+                if (observed != null) current = observed
+                consecutive = 0
+            }
+            consecutive >= 3
+        }
+        return current
     }
 
     private fun waitForRecreated(
         scenario: ActivityScenario<LocaleMeasurementHostActivity>,
         old: LocaleMeasurementHostActivity,
+        language: String,
     ): LocaleMeasurementHostActivity {
         var current = old
         waitUntil {
             runCatching { currentActivity(scenario) }.getOrNull()?.let { current = it }
-            current !== old
+            current !== old && current.resources.configuration.locales[0].language == language
         }
-        return current
+        return waitForStableActivity(scenario, language)
     }
 
     private fun currentActivity(
@@ -136,7 +199,7 @@ class MeasurementLocaleRecreationTest {
 }
 
 class LocaleMeasurementHostActivity : AppCompatActivity() {
-    var routeIdentity by androidx.compose.runtime.mutableStateOf("image")
+    lateinit var navController: NavHostController
         private set
     val measurementViewModel: MeasurementViewModel by viewModels {
         MeasurementViewModelFactory(
@@ -151,40 +214,54 @@ class LocaleMeasurementHostActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        routeIdentity = savedInstanceState?.getString(KEY_ROUTE) ?: "image"
         enableEdgeToEdge()
         setContent {
+            val controller = rememberNavController()
+            SideEffect { navController = controller }
             JointSenseTheme {
-                if (routeIdentity == "factor") {
-                    FactorSelectRouteScreen(
-                        viewModel = measurementViewModel,
-                        onResultReady = {},
-                        onBack = {},
-                    )
-                } else {
-                    ImageSelectRouteScreen(
-                        viewModel = measurementViewModel,
-                        onImageReady = {},
-                        onBack = {},
-                    )
-                }
+                JointSenseNavHost(
+                    navController = controller,
+                    measurementViewModel = measurementViewModel,
+                    screenSlot = { route, actions ->
+                        Column(Modifier.testTag(localeRouteTag(route))) {
+                            Text(
+                                text = stringResource(R.string.session_name_prefix),
+                                modifier = Modifier.testTag(LOCALE_PREFIX_TAG),
+                            )
+                            when (route) {
+                                ImageSelectRoute -> Button(
+                                    onClick = actions::openCrop,
+                                    modifier = Modifier.testTag(LOCALE_OPEN_CROP_TAG),
+                                ) { Text("Crop") }
+                                CropRoute -> Button(
+                                    onClick = actions::openFactorSelect,
+                                    modifier = Modifier.testTag(LOCALE_OPEN_FACTOR_TAG),
+                                ) { Text("Factor") }
+                                else -> Unit
+                            }
+                        }
+                    },
+                )
             }
         }
     }
-
-    fun showFactorRoute() {
-        routeIdentity = "factor"
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        outState.putString(KEY_ROUTE, routeIdentity)
-        super.onSaveInstanceState(outState)
-    }
-
-    private companion object {
-        const val KEY_ROUTE = "locale.test.measurement.route"
-    }
 }
+
+private fun localeRouteTag(route: JointSenseRoute): String = when (route) {
+    HomeRoute -> LOCALE_ROUTE_HOME_TAG
+    ImageSelectRoute -> LOCALE_ROUTE_IMAGE_TAG
+    CropRoute -> LOCALE_ROUTE_CROP_TAG
+    FactorSelectRoute -> LOCALE_ROUTE_FACTOR_TAG
+    else -> "locale-route:${route::class.simpleName}"
+}
+
+private const val LOCALE_ROUTE_HOME_TAG = "locale-route:home"
+private const val LOCALE_ROUTE_IMAGE_TAG = "locale-route:image"
+private const val LOCALE_ROUTE_CROP_TAG = "locale-route:crop"
+private const val LOCALE_ROUTE_FACTOR_TAG = "locale-route:factor"
+private const val LOCALE_OPEN_CROP_TAG = "locale-action:crop"
+private const val LOCALE_OPEN_FACTOR_TAG = "locale-action:factor"
+private const val LOCALE_PREFIX_TAG = "locale-prefix"
 
 private object LocaleMeasurementHarness {
     var repository = LocaleMeasurementRepository()
@@ -195,10 +272,10 @@ private object LocaleMeasurementHarness {
             cropBounds: CropBounds,
             factor: InflammationFactor,
         ) = BaselineAnalysisResult(
-                concentration = 1f,
-                rangeStatus = RangeStatus.IN_RANGE,
-                features = RgbFeatures(1f, 2f, 3f, 0f, 0f, 0f),
-            )
+            concentration = 1f,
+            rangeStatus = RangeStatus.IN_RANGE,
+            features = RgbFeatures(1f, 2f, 3f, 0f, 0f, 0f),
+        )
     }
 
     fun reset() {

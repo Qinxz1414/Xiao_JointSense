@@ -78,6 +78,16 @@ const val CALIBRATION_SAVE_TAG = "calibration:save"
 const val CALIBRATION_CAPTURE_TAG = "calibration:capture"
 const val CALIBRATION_GALLERY_TAG = "calibration:gallery"
 const val CALIBRATION_REVIEW_TAG = "calibration:review-curve"
+const val CALIBRATION_SELECT_LEGACY_TAG = "calibration:select"
+const val CALIBRATION_CROP_LEGACY_TAG = "calibration:crop"
+const val CALIBRATION_ASSIGN_LEGACY_TAG = "calibration:assign"
+const val CALIBRATION_REVIEW_LEGACY_TAG = "calibration:review"
+const val CALIBRATION_DONE_LEGACY_TAG = "calibration:done"
+const val SCREEN_CALIBRATION_SELECT_TAG = "screen_calibration_select"
+const val SCREEN_CALIBRATION_CROP_TAG = "screen_calibration_crop"
+const val SCREEN_CALIBRATION_ASSIGN_TAG = "screen_calibration_assign"
+const val SCREEN_CALIBRATION_REVIEW_TAG = "screen_calibration_review"
+const val SCREEN_CALIBRATION_DONE_TAG = "screen_calibration_done"
 
 fun calibrationFactorTag(factor: InflammationFactor): String =
     "calibration:factor-${factor.name.lowercase()}"
@@ -111,7 +121,7 @@ internal fun CalibrationSelectScreen(
     CalibrationScaffold(
         title = stringResource(R.string.calibration_title),
         step = stringResource(R.string.calibration_step_select),
-        tag = "calibration:select",
+        tag = CALIBRATION_SELECT_LEGACY_TAG,
         onBack = onBack,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -168,7 +178,7 @@ internal fun CalibrationCropScreen(
     CalibrationScaffold(
         title = stringResource(R.string.calibration_title),
         step = stringResource(R.string.calibration_step_crop),
-        tag = "calibration:crop",
+        tag = CALIBRATION_CROP_LEGACY_TAG,
         onBack = onBack,
     ) {
         Row(
@@ -220,7 +230,7 @@ internal fun CalibrationAssignScreen(
     CalibrationScaffold(
         title = stringResource(R.string.calibration_title),
         step = stringResource(R.string.calibration_step_assign),
-        tag = "calibration:assign",
+        tag = CALIBRATION_ASSIGN_LEGACY_TAG,
         onBack = onBack,
     ) {
         Text(stringResource(R.string.calibration_factor_label), fontWeight = FontWeight.SemiBold)
@@ -297,7 +307,7 @@ internal fun CalibrationReviewScreen(
     CalibrationScaffold(
         title = stringResource(R.string.calibration_title),
         step = stringResource(R.string.calibration_step_review),
-        tag = "calibration:review",
+        tag = CALIBRATION_REVIEW_LEGACY_TAG,
         onBack = onBack,
         backEnabled = !state.isPersistenceBusy,
     ) {
@@ -347,7 +357,7 @@ internal fun CalibrationDoneScreen(
     CalibrationScaffold(
         title = stringResource(R.string.calibration_title),
         step = stringResource(R.string.calibration_step_done),
-        tag = "calibration:done",
+        tag = CALIBRATION_DONE_LEGACY_TAG,
         onBack = onBack,
         backEnabled = !state.isPersistenceBusy,
     ) {
@@ -421,8 +431,15 @@ private fun CalibrationScaffold(
     backEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(calibrationScreenTag(tag)),
+    ) {
     Scaffold(
-        modifier = Modifier.testTag(tag),
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(tag),
         topBar = {
             JointSenseTopBar(
                 title = title,
@@ -447,6 +464,16 @@ private fun CalibrationScaffold(
             content()
         }
     }
+    }
+}
+
+private fun calibrationScreenTag(legacyTag: String): String = when (legacyTag) {
+    CALIBRATION_SELECT_LEGACY_TAG -> SCREEN_CALIBRATION_SELECT_TAG
+    CALIBRATION_CROP_LEGACY_TAG -> SCREEN_CALIBRATION_CROP_TAG
+    CALIBRATION_ASSIGN_LEGACY_TAG -> SCREEN_CALIBRATION_ASSIGN_TAG
+    CALIBRATION_REVIEW_LEGACY_TAG -> SCREEN_CALIBRATION_REVIEW_TAG
+    CALIBRATION_DONE_LEGACY_TAG -> SCREEN_CALIBRATION_DONE_TAG
+    else -> error("Unknown calibration page tag: $legacyTag")
 }
 
 @Composable

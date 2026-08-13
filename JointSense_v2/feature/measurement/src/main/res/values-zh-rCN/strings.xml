@@ -58,6 +58,8 @@
     <string name="measurement_history_result_count">%1$d/5 项测量</string>
     <string name="measurement_history_delete_session">删除%1$s</string>
     <string name="measurement_history_open_session">打开%1$s</string>
+    <string name="measurement_history_open_session_summary">打开%1$s。%2$s。%3$s。因子：%4$s。</string>
+    <string name="measurement_history_no_factors">暂无因子记录</string>
     <string name="measurement_builtin_test_plate">检测板 %1$d</string>
     <string name="measurement_builtin_clipboard_plate">剪贴板样例 %1$d</string>
     <string name="measurement_factor_separator">、</string>

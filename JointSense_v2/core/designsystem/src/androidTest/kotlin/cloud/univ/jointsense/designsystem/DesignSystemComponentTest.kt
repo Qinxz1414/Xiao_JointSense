@@ -16,6 +16,7 @@ import cloud.univ.jointsense.designsystem.component.GRADE_BADGE_CONTAINER_TAG
 import cloud.univ.jointsense.designsystem.component.GRADE_BADGE_SWATCH_TAG
 import cloud.univ.jointsense.designsystem.component.LoadingErrorState
 import cloud.univ.jointsense.designsystem.component.FactorValue
+import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import androidx.compose.ui.semantics.LiveRegionMode
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
@@ -127,5 +128,27 @@ class DesignSystemComponentTest {
         composeRule.onNodeWithText("Interleukin-6")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
         composeRule.onNodeWithText("12 pg/mL", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun clickableClinicalCardPublishesOneNamedButtonAndHidesDuplicateReadableChildren() {
+        var clicks = 0
+        composeRule.setContent {
+            JointSenseTheme {
+                ClinicalCard(
+                    onClick = { clicks += 1 },
+                    accessibilityLabel = "Open study visit, 2 results",
+                ) {
+                    androidx.compose.material3.Text("Study visit")
+                    androidx.compose.material3.Text("2 results")
+                }
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Open study visit, 2 results")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Button))
+            .performClick()
+        composeRule.onNodeWithText("Study visit").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, clicks) }
     }
 }

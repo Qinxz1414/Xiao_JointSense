@@ -18,6 +18,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsSelectable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
@@ -36,6 +38,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.text.DateFormat
+import java.util.Date
 
 @RunWith(AndroidJUnit4::class)
 class MeasurementAccessibilityTest {
@@ -89,6 +93,35 @@ class MeasurementAccessibilityTest {
             .assertHeightIsAtLeast(48.dp)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription))
+    }
+
+    @Test
+    fun historyOpenCardHasOneCompleteAnnouncementAndDeleteStaysSeparate() {
+        val session = TestSession(
+            id = "history-summary",
+            name = "Study visit",
+            createdAt = 1_000L,
+            source = DataSource.USER,
+            results = listOf(
+                historyResult("a", InflammationFactor.TNF_ALPHA),
+                historyResult("b", InflammationFactor.IL6),
+            ),
+        )
+        composeRule.setContent {
+            JointSenseTheme { HistoryScreen(listOf(session), {}, {}, {}) }
+        }
+
+        val announcement = composeRule.onNodeWithTag(historySessionTag(session.id))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
+        val locale = composeRule.activity.resources.configuration.locales[0]
+        val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
+            .format(Date(session.createdAt))
+        listOf("Study visit", date, "2", InflammationFactor.TNF_ALPHA.shortName, InflammationFactor.IL6.shortName)
+            .forEach { expected -> assertTrue(announcement.contains(expected)) }
+        composeRule.onAllNodesWithText("Study visit").assertCountEquals(0)
+        composeRule.onNodeWithTag(historyDeleteTag(session.id))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
     }
 
     @Test
@@ -215,4 +248,39 @@ class MeasurementAccessibilityTest {
         composeRule.onNodeWithTag(CONTINUE_MEASUREMENT_TAG).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(RESULT_HOME_ACTION_TAG).performScrollTo().assertIsDisplayed()
     }
+
+    @Test
+    fun twoHundredPercentTextKeepsHistoryOpenAndDeleteActionsReachableInCompactViewport() {
+        val session = TestSession(
+            id = "history-compact",
+            name = "Long research study visit name",
+            createdAt = 1_000L,
+            source = DataSource.USER,
+            results = listOf(historyResult("compact", InflammationFactor.IL1_BETA)),
+        )
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                JointSenseTheme {
+                    Box(Modifier.requiredSize(360.dp, 640.dp)) {
+                        HistoryScreen(listOf(session), {}, {}, {})
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(historySessionTag(session.id)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(historyDeleteTag(session.id)).performScrollTo().assertIsDisplayed()
+    }
+
+    private fun historyResult(id: String, factor: InflammationFactor) = TestResult(
+        id = id,
+        sessionId = "history-summary",
+        draftId = null,
+        factor = factor,
+        concentration = 1f,
+        rangeStatus = RangeStatus.IN_RANGE,
+        features = RgbFeatures(1f, 2f, 3f, 0f, 0f, 0f),
+        timestamp = 1_000L,
+    )
 }

@@ -58,6 +58,8 @@
     <string name="measurement_history_result_count">%1$d/5 measurements</string>
     <string name="measurement_history_delete_session">Delete %1$s</string>
     <string name="measurement_history_open_session">Open %1$s</string>
+    <string name="measurement_history_open_session_summary">Open %1$s. %2$s. %3$s. Factors: %4$s.</string>
+    <string name="measurement_history_no_factors">No factors recorded</string>
     <string name="measurement_builtin_test_plate">Test plate %1$d</string>
     <string name="measurement_builtin_clipboard_plate">Clipboard sample %1$d</string>
     <string name="measurement_factor_separator">, </string>

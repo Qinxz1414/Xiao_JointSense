@@ -4,6 +4,8 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -17,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.feature.settings.R
@@ -70,8 +74,13 @@ class SettingsScreenTest {
             SETTINGS_CLEAR_ALL_TAG,
             SETTINGS_ABOUT_TAG,
         ).forEach {
-            composeRule.onNodeWithTag(it).performScrollTo().assertIsDisplayed()
+            composeRule.onNodeWithTag(it)
+                .performScrollTo()
+                .assertIsDisplayed()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         }
+        composeRule.onNodeWithTag(SCREEN_PROFILE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(PROFILE_SCREEN_TAG).assertIsDisplayed()
 
         composeRule.onNodeWithTag(SETTINGS_LANGUAGE_TAG).performClick()
         composeRule.onNodeWithTag(LANGUAGE_EN_TAG).assertIsSelected()
@@ -214,7 +223,51 @@ class SettingsScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(PROFILE_IDENTITY_TAG).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_CLEAR_ALL_TAG).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(SETTINGS_ABOUT_TAG).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun aboutContentRemainsReachableAtCompactWidthAndTwoHundredPercentText() {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(LocalDensity.current.density, fontScale = 2f),
+            ) {
+                JointSenseTheme {
+                    Box(Modifier.requiredSize(360.dp, 640.dp)) {
+                        AboutRouteScreen(appVersionName = "9.8.7", onBack = {})
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.research_disclaimer), substring = true)
+            .performScrollTo()
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun confirmationActionsRemainReachableAtCompactWidthAndTwoHundredPercentText() {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(LocalDensity.current.density, fontScale = 2f),
+            ) {
+                JointSenseTheme {
+                    Box(Modifier.requiredSize(360.dp, 640.dp)) {
+                        DataManagementDialogs(
+                            action = DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+                            onDismiss = {},
+                            onConfirm = {},
+                            onRetry = {},
+                            onConsumeResult = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(DATA_DIALOG_CONFIRM_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(DATA_DIALOG_DISMISS_TAG).assertIsDisplayed()
     }
 }

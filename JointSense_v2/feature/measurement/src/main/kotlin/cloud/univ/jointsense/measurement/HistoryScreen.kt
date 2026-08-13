@@ -1,9 +1,9 @@
 package cloud.univ.jointsense.measurement
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,13 +36,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -137,104 +138,48 @@ fun HistoryScreen(
             ) {
                 items(sessions.reversed()) { session ->
                     val displayName = session.localizedDisplayName()
-                    val openDescription = stringResource(R.string.measurement_history_open_session, displayName)
+                    val dateLabel = dateFormat.format(Date(session.createdAt))
+                    val resultCount = session.results.size
+                    val resultCountLabel = pluralStringResource(
+                        R.plurals.measurement_history_result_count_plural,
+                        resultCount,
+                        resultCount,
+                    )
+                    val factorsSummary = session.results
+                        .map { it.factor.shortName }
+                        .distinct()
+                        .joinToString(stringResource(R.string.measurement_factor_separator))
+                        .ifBlank { stringResource(R.string.measurement_history_no_factors) }
+                    val openDescription = stringResource(
+                        R.string.measurement_history_open_session_summary,
+                        displayName,
+                        dateLabel,
+                        resultCountLabel,
+                        factorsSummary,
+                    )
                     val deleteDescription = stringResource(R.string.measurement_history_delete_session, displayName)
-                    ClinicalCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .testTag(historySessionTag(session.id))
-                            .semantics {
-                                contentDescription = openDescription
-                                role = Role.Button
-                            }
-                            .clickable(
-                                role = Role.Button,
-                                onClickLabel = openDescription,
-                            ) { onSessionClick(session) },
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ClinicalCard(
+                            onClick = { onSessionClick(session) },
+                            accessibilityLabel = openDescription,
+                            accessibilityTestTag = historySessionTag(session.id),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .heightIn(min = 48.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         ) {
-                            // Session icon
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Science,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            // Session info
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = displayName,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Text(
-                                    text = dateFormat.format(Date(session.createdAt)),
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                // Results summary
-                                val resultCount = session.results.size
-                                val factorsSummary = session.results
-                                    .map { it.factor.shortName }
-                                    .distinct()
-                                    .joinToString(stringResource(R.string.measurement_factor_separator))
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(MaterialTheme.colorScheme.primaryContainer)
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = pluralStringResource(
-                                                R.plurals.measurement_history_result_count_plural,
-                                                resultCount,
-                                                resultCount,
-                                            ),
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-
-                                    if (factorsSummary.isNotEmpty()) {
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = factorsSummary,
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Delete button
+                            HistoryOpenCardContent(
+                                displayName = displayName,
+                                dateLabel = dateLabel,
+                                resultCountLabel = resultCountLabel,
+                                factorsSummary = factorsSummary,
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
                             IconButton(
                                 onClick = { onDeleteSession(session) },
                                 modifier = Modifier
@@ -252,18 +197,99 @@ fun HistoryScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
-
-                            // Arrow
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HistoryOpenCardContent(
+    displayName: String,
+    dateLabel: String,
+    resultCountLabel: String,
+    factorsSummary: String,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compactLargeText = maxWidth < 400.dp && LocalDensity.current.fontScale >= 1.5f
+        if (compactLargeText) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                HistorySessionIcon()
+                Spacer(Modifier.height(12.dp))
+                HistorySessionDetails(displayName, dateLabel, resultCountLabel, factorsSummary)
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HistorySessionIcon()
+                Spacer(Modifier.width(12.dp))
+                HistorySessionDetails(
+                    displayName,
+                    dateLabel,
+                    resultCountLabel,
+                    factorsSummary,
+                    Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistorySessionIcon() {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Science,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun HistorySessionDetails(
+    displayName: String,
+    dateLabel: String,
+    resultCountLabel: String,
+    factorsSummary: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(displayName, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(4.dp))
+        Text(dateLabel, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        ) {
+            Text(
+                resultCountLabel,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(factorsSummary, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

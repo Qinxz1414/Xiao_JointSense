@@ -60,7 +60,8 @@ class BuiltInSampleDisplayNameTest {
         ).readText()
 
         assertTrue(source.contains("val displayName = session.localizedDisplayName()"))
-        assertTrue(Regex("text\\s*=\\s*displayName").containsMatchIn(source))
+        assertTrue(Regex("(?:Text\\(|text\\s*=\\s*)displayName").containsMatchIn(source))
+        assertTrue(Regex("measurement_history_open_session_summary,\\s*displayName", RegexOption.DOT_MATCHES_ALL).containsMatchIn(source))
         assertTrue(Regex("measurement_history_delete_session,\\s*displayName", RegexOption.DOT_MATCHES_ALL).containsMatchIn(source))
         assertFalse(source.contains("text = session.name"))
         assertFalse(Regex("measurement_history_delete_session,\\s*session\\.name", RegexOption.DOT_MATCHES_ALL).containsMatchIn(source))

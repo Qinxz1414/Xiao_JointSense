@@ -60,6 +60,8 @@ class CalibrationAccessibilityTest {
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
         }
         composeRule.onNodeWithTag(calibrationFactorTag(InflammationFactor.TNF_ALPHA)).assertIsSelected()
+        composeRule.onNodeWithTag(SCREEN_CALIBRATION_ASSIGN_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(CALIBRATION_ASSIGN_LEGACY_TAG).assertIsDisplayed()
     }
 
     @Test

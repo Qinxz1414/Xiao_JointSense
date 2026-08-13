@@ -79,4 +79,18 @@ class ComponentContractTest {
         assertFalse(source.contains("listOf(\"0\", \"0.25\", \"0.50\", \"0.75\", \"1.00\")"))
         assertFalse(source.contains("text = \"▼\""))
     }
+
+    @Test
+    fun canvasChartLabelsUseTextUnitsAndFontScaleAwareDensityConversion() {
+        listOf("ChartComponents.kt", "LineChart.kt").forEach { fileName ->
+            val source = File(
+                "src/main/kotlin/cloud/univ/jointsense/designsystem/chart/$fileName",
+            ).readText()
+
+            assertTrue("$fileName must observe LocalDensity", source.contains("LocalDensity.current"))
+            assertTrue("$fileName must convert TextUnit with Density", source.contains(".sp.toPx()"))
+            assertFalse("$fileName must not treat raw pixels as text size", source.contains("textSize = 24f"))
+            assertFalse("$fileName must not ignore fontScale", source.contains("sp * density"))
+        }
+    }
 }

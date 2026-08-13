@@ -3,6 +3,7 @@ package cloud.univ.jointsense.settings
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -76,7 +77,12 @@ private fun ConfirmationDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag(DATA_DIALOG_CONFIRM_TAG),
+            ) {
                 Text(
                     text = stringResource(
                         if (clear) R.string.settings_delete
@@ -87,7 +93,12 @@ private fun ConfirmationDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag(DATA_DIALOG_DISMISS_TAG),
+            ) {
                 Text(stringResource(R.string.settings_cancel))
             }
         },
@@ -158,6 +169,8 @@ private fun ResultDialog(
 
 const val CONFIRM_RESTORE_SAMPLES_TAG = "confirm_restore_samples"
 const val CONFIRM_CLEAR_ALL_TAG = "confirm_clear_all"
+const val DATA_DIALOG_CONFIRM_TAG = "data_dialog_confirm"
+const val DATA_DIALOG_DISMISS_TAG = "data_dialog_dismiss"
 
 // Preserved for the Task 4 production navigation integration assertion.
 const val RESTORE_SAMPLES_CONFIRMATION_TAG = CONFIRM_RESTORE_SAMPLES_TAG

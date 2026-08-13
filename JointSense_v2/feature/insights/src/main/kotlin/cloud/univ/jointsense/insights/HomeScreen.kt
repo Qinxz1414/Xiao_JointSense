@@ -50,6 +50,7 @@ import cloud.univ.jointsense.core.designsystem.R as DesignSystemR
 import cloud.univ.jointsense.designsystem.chart.ChartDataPoint
 import cloud.univ.jointsense.designsystem.chart.LineChart
 import cloud.univ.jointsense.designsystem.chart.Sparkline
+import cloud.univ.jointsense.designsystem.chart.chartSeriesStyle
 import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.GradeBadge
 import cloud.univ.jointsense.designsystem.component.GradeScale
@@ -181,6 +182,13 @@ private fun DashboardContent(
             maximumFractionDigits = 2
         }
     }
+    val dayFormat = remember(locale) { DateFormat.getDateInstance(DateFormat.SHORT, locale) }
+    val currentAiText = presentation.oaIndex?.let(numberFormat::format)
+        ?: stringResource(R.string.value_unavailable)
+    val currentGradeText = presentation.grade?.toString()
+        ?: stringResource(R.string.value_unavailable)
+    val currentGradeLabel = presentation.grade?.let { stringResource(gradeResource(it)) }
+        ?: stringResource(R.string.insights_grade_unavailable)
 
     ClinicalCard(
         modifier = Modifier.fillMaxWidth(),
@@ -200,29 +208,27 @@ private fun DashboardContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = presentation.oaIndex?.let(numberFormat::format)
-                            ?: stringResource(R.string.value_unavailable),
-                        modifier = Modifier.testTag(OA_INDEX_VALUE_TAG),
-                        style = MaterialTheme.typography.displaySmall,
-                        fontWeight = FontWeight.Bold,
+                Text(
+                    text = presentation.oaIndex?.let(numberFormat::format)
+                        ?: stringResource(R.string.value_unavailable),
+                    modifier = Modifier.testTag(OA_INDEX_VALUE_TAG),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                presentation.grade?.let { grade ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val gradeLabel = stringResource(gradeResource(grade))
+                    GradeBadge(
+                        grade = grade,
+                        label = gradeLabel,
+                        contentDescription = stringResource(R.string.insights_oa_grade),
+                        stateDescription = stringResource(
+                            R.string.insights_grade_description,
+                            grade,
+                            gradeLabel,
+                        ),
+                        modifier = Modifier.testTag(OA_GRADE_TAG),
                     )
-                    presentation.grade?.let { grade ->
-                        Spacer(modifier = Modifier.width(12.dp))
-                        val gradeLabel = stringResource(gradeResource(grade))
-                        GradeBadge(
-                            grade = grade,
-                            label = gradeLabel,
-                            contentDescription = stringResource(R.string.insights_oa_grade),
-                            stateDescription = stringResource(
-                                R.string.insights_grade_description,
-                                grade,
-                                gradeLabel,
-                            ),
-                            modifier = Modifier.testTag(OA_GRADE_TAG),
-                        )
-                    }
                 }
                 presentation.latestTimestamp?.let { timestamp ->
                     Spacer(modifier = Modifier.height(6.dp))
@@ -236,7 +242,10 @@ private fun DashboardContent(
                     )
                 }
             }
-            IconButton(onClick = onOpenReport) {
+            IconButton(
+                onClick = onOpenReport,
+                modifier = Modifier.testTag(HOME_OPEN_REPORT_TAG),
+            ) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = stringResource(R.string.insights_open_report),
@@ -277,13 +286,30 @@ private fun DashboardContent(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        presentation.factorValues.forEach { factorValue ->
+        presentation.factorValues.forEachIndexed { seriesIndex, factorValue ->
             val factor = factorValue.factor
-            val spark = state.factorSeries[factor].orEmpty()
+            val sparkPoints = state.factorSeries[factor].orEmpty()
                 .filter { it.value.isFinite() && it.value >= 0f }
                 .sortedBy(InsightPoint::time)
                 .takeLast(7)
-                .map(InsightPoint::value)
+            val style = chartSeriesStyle(seriesIndex)
+            val sparkSummary = if (sparkPoints.isEmpty()) {
+                stringResource(R.string.insights_trends_empty)
+            } else {
+                stringResource(
+                    R.string.insights_factor_sparkline_summary,
+                    factor.shortName,
+                    dayFormat.format(Date(sparkPoints.first().time)),
+                    dayFormat.format(Date(sparkPoints.last().time)),
+                    numberFormat.format(sparkPoints.last().value),
+                    chartTrendDirection(sparkPoints.map(InsightPoint::value)).localizedLabel(),
+                    currentAiText,
+                    currentGradeText,
+                    currentGradeLabel,
+                    chartLineStyleLabel(style.linePattern),
+                    chartMarkerStyleLabel(style.markerShape),
+                )
+            }
             ClinicalCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -311,11 +337,14 @@ private fun DashboardContent(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Sparkline(
-                        values = spark,
+                        values = sparkPoints.map(InsightPoint::value),
                         color = factorColor(factor),
+                        seriesIndex = seriesIndex,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(26.dp),
+                            .height(26.dp)
+                            .testTag(factorSparklineTag(factor))
+                            .semantics { contentDescription = sparkSummary },
                     )
                 }
             }
@@ -324,10 +353,26 @@ private fun DashboardContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
+    val recent = presentation.recentObservations
+    val recentSummary = if (recent.isEmpty()) {
+        stringResource(R.string.insights_trends_empty)
+    } else {
+        stringResource(
+            R.string.insights_recent_chart_summary,
+            dayFormat.format(Date(recent.first().time)),
+            dayFormat.format(Date(recent.last().time)),
+            numberFormat.format(recent.last().value),
+            chartTrendDirection(recent.map(InsightPoint::value)).localizedLabel(),
+            currentAiText,
+            currentGradeText,
+            currentGradeLabel,
+        )
+    }
     ClinicalCard(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(RECENT_TREND_TAG),
+            .testTag(RECENT_TREND_TAG)
+            .semantics { contentDescription = recentSummary },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
@@ -338,18 +383,6 @@ private fun DashboardContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            val dayFormat = remember(locale) { DateFormat.getDateInstance(DateFormat.SHORT, locale) }
-            val recent = presentation.recentObservations
-            val recentSummary = if (recent.isEmpty()) {
-                stringResource(R.string.insights_trends_empty)
-            } else {
-                stringResource(
-                    R.string.insights_recent_chart_summary,
-                    dayFormat.format(Date(recent.first().time)),
-                    dayFormat.format(Date(recent.last().time)),
-                    numberFormat.format(recent.last().value),
-                )
-            }
             LineChart(
                 dataPoints = recent.map {
                     ChartDataPoint(dayFormat.format(Date(it.time)), it.value)
@@ -395,6 +428,12 @@ private fun factorValueTag(factor: cloud.univ.jointsense.domain.model.Inflammati
     cloud.univ.jointsense.domain.model.InflammationFactor.IL1_BETA -> FACTOR_VALUE_IL1_BETA_TAG
 }
 
+private fun factorSparklineTag(factor: cloud.univ.jointsense.domain.model.InflammationFactor): String = when (factor) {
+    cloud.univ.jointsense.domain.model.InflammationFactor.TNF_ALPHA -> FACTOR_SPARKLINE_TNF_ALPHA_TAG
+    cloud.univ.jointsense.domain.model.InflammationFactor.IL6 -> FACTOR_SPARKLINE_IL6_TAG
+    cloud.univ.jointsense.domain.model.InflammationFactor.IL1_BETA -> FACTOR_SPARKLINE_IL1_BETA_TAG
+}
+
 const val OA_INDEX_VALUE_TAG = "oa_index_value"
 const val OA_GRADE_TAG = "oa_grade"
 const val FACTOR_VALUE_TNF_ALPHA_TAG = "factor_value_tnf_alpha"
@@ -404,3 +443,7 @@ const val RECENT_TREND_TAG = "recent_trend"
 const val START_MEASUREMENT_TAG = "start_measurement"
 const val RESTORE_SAMPLES_TAG = "restore_samples"
 const val HOME_SCREEN_TAG = "screen_home"
+const val HOME_OPEN_REPORT_TAG = "home_open_report"
+const val FACTOR_SPARKLINE_TNF_ALPHA_TAG = "factor_sparkline_tnf_alpha"
+const val FACTOR_SPARKLINE_IL6_TAG = "factor_sparkline_il6"
+const val FACTOR_SPARKLINE_IL1_BETA_TAG = "factor_sparkline_il1_beta"

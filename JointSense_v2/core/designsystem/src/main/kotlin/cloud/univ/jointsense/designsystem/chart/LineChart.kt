@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -48,16 +49,27 @@ fun LineChart(
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
     val pointCenterColor = MaterialTheme.colorScheme.surface
+    val localDensity = LocalDensity.current
+    val tickTextSize = with(localDensity) { 10.sp.toPx() }
+    val axisTitleTextSize = with(localDensity) { 10.sp.toPx() }
+    val valueTextSize = with(localDensity) { 10.sp.toPx() }
+    val labelBaselineOffset = with(localDensity) { 14.sp.toPx() }
+    val valueLabelOffset = with(localDensity) { 7.sp.toPx() }
+    val baseLeftPadding = with(localDensity) { 60.dp.toPx() }
+    val baseRightPadding = with(localDensity) { 20.dp.toPx() }
+    val baseTopPadding = with(localDensity) { 20.dp.toPx() }
+    val baseBottomPadding = with(localDensity) { 50.dp.toPx() }
+    val seriesStyle = chartSeriesStyle(0)
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        val paddingLeft = 60f
-        val paddingRight = 20f
-        val paddingTop = 20f
-        val paddingBottom = 50f
+        val paddingLeft = maxOf(baseLeftPadding, tickTextSize * 4.5f)
+        val paddingRight = baseRightPadding
+        val paddingTop = baseTopPadding
+        val paddingBottom = maxOf(baseBottomPadding, tickTextSize * 2.5f)
 
         val chartWidth = size.width - paddingLeft - paddingRight
         val chartHeight = size.height - paddingTop - paddingBottom
@@ -109,10 +121,10 @@ fun LineChart(
             drawContext.canvas.nativeCanvas.drawText(
                 formatValue(value),
                 paddingLeft - 8f,
-                y + 4f,
+                y + tickTextSize * 0.4f,
                 android.graphics.Paint().apply {
                     color = labelColor
-                    textSize = 24f
+                    textSize = tickTextSize
                     textAlign = android.graphics.Paint.Align.RIGHT
                 }
             )
@@ -128,7 +140,7 @@ fun LineChart(
                 paddingTop + chartHeight / 2,
                 android.graphics.Paint().apply {
                     color = labelColor
-                    textSize = 22f
+                    textSize = axisTitleTextSize
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
             )
@@ -140,20 +152,22 @@ fun LineChart(
             val x = paddingLeft + chartWidth / 2
             val y = paddingTop + chartHeight - ((dataPoints[0].value - yMin) / (yMax - yMin) * chartHeight)
 
-            drawCircle(
+            drawChartMarker(
+                shape = seriesStyle.markerShape,
                 color = lineColor,
-                radius = 8f,
-                center = Offset(x, y)
+                centerColor = pointCenterColor,
+                center = Offset(x, y),
+                radius = 7f,
             )
 
             // Label
             drawContext.canvas.nativeCanvas.drawText(
                 dataPoints[0].label,
                 x,
-                paddingTop + chartHeight + 35f,
+                paddingTop + chartHeight + labelBaselineOffset,
                 android.graphics.Paint().apply {
                     color = labelColor
-                    textSize = 22f
+                    textSize = tickTextSize
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
             )
@@ -162,10 +176,10 @@ fun LineChart(
             drawContext.canvas.nativeCanvas.drawText(
                 formatValue(dataPoints[0].value),
                 x,
-                y - 14f,
+                y - valueLabelOffset,
                 android.graphics.Paint().apply {
                     color = lineColor.toArgb()
-                    textSize = 22f
+                    textSize = valueTextSize
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
             )
@@ -191,7 +205,8 @@ fun LineChart(
                 style = Stroke(
                     width = 3f,
                     cap = StrokeCap.Round,
-                    join = StrokeJoin.Round
+                    join = StrokeJoin.Round,
+                    pathEffect = seriesStyle.linePattern.pathEffect(),
                 )
             )
 
@@ -213,25 +228,22 @@ fun LineChart(
             // Draw data points and labels
             for (i in points.indices) {
                 // Data point
-                drawCircle(
-                    color = pointCenterColor,
-                    radius = 7f,
-                    center = points[i]
-                )
-                drawCircle(
+                drawChartMarker(
+                    shape = seriesStyle.markerShape,
                     color = lineColor,
-                    radius = 5f,
-                    center = points[i]
+                    centerColor = pointCenterColor,
+                    center = points[i],
+                    radius = 7f,
                 )
 
                 // X-axis label
                 drawContext.canvas.nativeCanvas.drawText(
                     dataPoints[i].label,
                     points[i].x,
-                    paddingTop + chartHeight + 35f,
+                    paddingTop + chartHeight + labelBaselineOffset,
                     android.graphics.Paint().apply {
                         color = labelColor
-                        textSize = 22f
+                        textSize = tickTextSize
                         textAlign = android.graphics.Paint.Align.CENTER
                     }
                 )
@@ -240,10 +252,10 @@ fun LineChart(
                 drawContext.canvas.nativeCanvas.drawText(
                     formatValue(dataPoints[i].value),
                     points[i].x,
-                    points[i].y - 14f,
+                    points[i].y - valueLabelOffset,
                     android.graphics.Paint().apply {
                         color = lineColor.toArgb()
-                        textSize = 20f
+                        textSize = valueTextSize
                         textAlign = android.graphics.Paint.Align.CENTER
                         isFakeBoldText = true
                     }

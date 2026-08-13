@@ -242,26 +242,27 @@ fun ReportScreen(
                                 .first { it.factor == factor }
                             val delta = factorPresentation.weekChangePercent
                             val absolute = factorPresentation.value
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(vertical = 8.dp),
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(factorColor(factor))
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = factor.shortName,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(factorColor(factor))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = factor.shortName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = absolute?.let {
                                         stringResource(
@@ -269,37 +270,43 @@ fun ReportScreen(
                                             numberFormat.format(it),
                                         )
                                     } ?: stringResource(R.string.value_unavailable),
-                                    fontSize = 14.sp,
+                                    style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 if (delta != null) {
-                                    Icon(
-                                        imageVector = if (delta >= 0) {
-                                            Icons.Default.ArrowUpward
-                                        } else {
-                                            Icons.Default.ArrowDownward
-                                        },
-                                        contentDescription = null,
-                                        tint = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = stringResource(
-                                            if (delta >= 0) R.string.insights_change_up else R.string.insights_change_down,
-                                            kotlin.math.abs(delta),
-                                        ),
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.testTag(reportFactorComparisonTag(factor)),
+                                    ) {
+                                        Icon(
+                                            imageVector = if (delta >= 0) {
+                                                Icons.Default.ArrowUpward
+                                            } else {
+                                                Icons.Default.ArrowDownward
+                                            },
+                                            contentDescription = null,
+                                            tint = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = stringResource(
+                                                if (delta >= 0) R.string.insights_change_up else R.string.insights_change_down,
+                                                kotlin.math.abs(delta),
+                                            ),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (delta >= 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
                                 } else {
                                     Text(
                                         text = stringResource(R.string.insights_no_comparison),
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.testTag(reportFactorComparisonTag(factor)),
                                     )
                                 }
                             }
@@ -516,9 +523,18 @@ private fun trendInterpretationResource(trend: TrendInterpretation): Int = when 
 }
 
 const val REPORT_FACTOR_SUMMARY_TAG = "report_factor_summary"
+const val REPORT_FACTOR_TNF_ALPHA_COMPARISON_TAG = "report_factor_tnf_alpha_comparison"
+const val REPORT_FACTOR_IL6_COMPARISON_TAG = "report_factor_il6_comparison"
+const val REPORT_FACTOR_IL1_BETA_COMPARISON_TAG = "report_factor_il1_beta_comparison"
 const val REPORT_TREND_INTERPRETATION_TAG = "report_trend_interpretation"
 const val REPORT_SUGGESTIONS_TAG = "report_suggestions"
 const val REPORT_EXPORT_PDF_TAG = "report_export_pdf"
 const val REPORT_EXPORT_SHARE_TAG = "report_export_share"
 const val REPORT_SCREEN_TAG = "screen_report"
+
+private fun reportFactorComparisonTag(factor: InflammationFactor): String = when (factor) {
+    InflammationFactor.TNF_ALPHA -> REPORT_FACTOR_TNF_ALPHA_COMPARISON_TAG
+    InflammationFactor.IL6 -> REPORT_FACTOR_IL6_COMPARISON_TAG
+    InflammationFactor.IL1_BETA -> REPORT_FACTOR_IL1_BETA_COMPARISON_TAG
+}
 private const val STABLE_TREND_THRESHOLD_PERCENT = 10
