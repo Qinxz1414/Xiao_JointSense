@@ -147,6 +147,9 @@ class DesignSystemComponentTest {
 
         composeRule.onNodeWithContentDescription("Open study visit, 2 results")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, androidx.compose.ui.semantics.Role.Button))
+            .assert(SemanticsMatcher("full announcement is not repeated as the action label") { node ->
+                node.config[SemanticsActions.OnClick].label != "Open study visit, 2 results"
+            })
             .performClick()
         composeRule.onNodeWithText("Study visit").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(1, clicks) }

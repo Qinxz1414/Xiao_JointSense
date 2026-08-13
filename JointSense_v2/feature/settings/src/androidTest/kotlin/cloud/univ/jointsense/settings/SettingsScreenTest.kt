@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
@@ -78,6 +79,10 @@ class SettingsScreenTest {
                 .performScrollTo()
                 .assertIsDisplayed()
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+                .assert(SemanticsMatcher("profile announcement is not repeated as the action label") { node ->
+                    val announcement = node.config[SemanticsProperties.ContentDescription].single()
+                    node.config[SemanticsActions.OnClick].label != announcement
+                })
         }
         composeRule.onNodeWithTag(SCREEN_PROFILE_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(PROFILE_SCREEN_TAG).assertIsDisplayed()

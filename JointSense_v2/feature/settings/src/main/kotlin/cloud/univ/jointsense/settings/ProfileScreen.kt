@@ -324,14 +324,13 @@ private fun ProfileEntry(entry: ProfileEntryModel) {
         modifier = Modifier.fillMaxWidth()
             .clickable(
                 role = Role.Button,
-                onClickLabel = announcement,
                 onClick = entry.onClick,
             )
             .clearAndSetSemantics {
                 contentDescription = announcement
                 role = Role.Button
                 this[SemanticsProperties.TestTag] = entry.testTag
-                onClick(label = announcement) {
+                onClick {
                     entry.onClick()
                     true
                 }

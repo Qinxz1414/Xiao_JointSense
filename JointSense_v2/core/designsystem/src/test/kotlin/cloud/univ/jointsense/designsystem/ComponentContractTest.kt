@@ -93,4 +93,14 @@ class ComponentContractTest {
             assertFalse("$fileName must not ignore fontScale", source.contains("sp * density"))
         }
     }
+
+    @Test
+    fun clickableClinicalCardDoesNotRepeatItsAnnouncementAsAnActionLabel() {
+        val source = File(
+            "src/main/kotlin/cloud/univ/jointsense/designsystem/component/ClinicalCard.kt",
+        ).readText()
+
+        assertFalse(source.contains("onClickLabel = accessibilityLabel"))
+        assertFalse(Regex("onClick\\(label\\s*=\\s*accessibilityLabel").containsMatchIn(source))
+    }
 }

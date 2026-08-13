@@ -1,6 +1,11 @@
 package cloud.univ.jointsense.insights
 
 import androidx.activity.ComponentActivity
+import android.content.Context
+import android.content.res.Configuration
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -33,6 +38,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.Locale
 
 @RunWith(AndroidJUnit4::class)
 class InsightsScreenTest {
@@ -90,7 +96,7 @@ class InsightsScreenTest {
     @Test
     fun trendsExposeChartsAndDirectAxisAndSeriesLabels() {
         val now = 2_000_000_000_000L
-        composeRule.setContent {
+        setLocalizedContent("en") {
             JointSenseTheme { TrendsScreen(completeTrendsState(now), nowMillis = { now }) }
         }
 
@@ -117,6 +123,9 @@ class InsightsScreenTest {
             .assertContentDescriptionEquals("IL-6: dashed line, square markers")
         composeRule.onNodeWithTag(TREND_SERIES_IL1_BETA_LEGEND_TAG)
             .assertContentDescriptionEquals("IL-1β: dotted line, triangle markers")
+        listOf("TNF-α", "IL-6", "IL-1β").forEach { seriesName ->
+            composeRule.onAllNodesWithText(seriesName, useUnmergedTree = true).assertCountEquals(0)
+        }
 
         composeRule.onNodeWithTag(FACTOR_TREND_CHART_TAG).assert(
             contentDescriptionContainsAll(
@@ -134,7 +143,7 @@ class InsightsScreenTest {
 
     @Test
     fun homeFactorSparklinesPublishConcreteSeriesSummariesForSinglePoints() {
-        composeRule.setContent {
+        setLocalizedContent("en") {
             JointSenseTheme {
                 HomeScreen(
                     state = completeHomeState(),
@@ -167,6 +176,35 @@ class InsightsScreenTest {
                 "OA inflammation index (AI)", "from", "Latest value 0.4", "rising", "grade 1",
             ),
         )
+        val recentSummary = composeRule.onNodeWithTag(RECENT_TREND_TAG)
+            .fetchSemanticsNode().config[SemanticsProperties.ContentDescription]
+        composeRule.onAllNodes(
+            SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, recentSummary),
+            useUnmergedTree = true,
+        ).assertCountEquals(1)
+    }
+
+    @Test
+    fun chartSummariesExposeMeaningfulSimplifiedChineseContent() {
+        val now = 2_000_000_000_000L
+        setLocalizedContent("zh-CN") {
+            JointSenseTheme { TrendsScreen(completeTrendsState(now), nowMillis = { now }) }
+        }
+
+        composeRule.onNodeWithTag(FACTOR_TREND_CHART_TAG).performScrollTo().assert(
+            contentDescriptionContainsAll(
+                "序列 TNF-α, IL-6, IL-1β", "时间范围", "最新值和趋势方向", "上升",
+                "当前 OA 炎症综合指数（AI）0.3", "1 级",
+            ),
+        )
+        composeRule.onNodeWithTag(OA_TREND_CHART_TAG).performScrollTo().assert(
+            contentDescriptionContainsAll(
+                "OA 炎症综合指数（AI）序列", "时间范围", "最新值 0.3",
+                "趋势方向：上升", "当前等级 1 级",
+            ),
+        )
+        composeRule.onNodeWithTag(TREND_SERIES_TNF_ALPHA_LEGEND_TAG)
+            .assert(contentDescriptionContainsAll("TNF-α", "实线", "圆形标记"))
     }
 
     @Test
@@ -354,4 +392,24 @@ class InsightsScreenTest {
                 .joinToString(" ")
             fragments.all(description::contains)
         }
+
+    private fun setLocalizedContent(
+        languageTag: String,
+        content: @Composable () -> Unit,
+    ): Context {
+        val locale = Locale.forLanguageTag(languageTag)
+        val configuration = Configuration(composeRule.activity.resources.configuration).apply {
+            setLocale(locale)
+        }
+        val localizedContext = composeRule.activity.createConfigurationContext(configuration)
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalContext provides localizedContext,
+                LocalConfiguration provides localizedContext.resources.configuration,
+            ) {
+                content()
+            }
+        }
+        return localizedContext
+    }
 }

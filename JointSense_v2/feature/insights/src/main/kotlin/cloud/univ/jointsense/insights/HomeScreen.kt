@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -372,7 +373,7 @@ private fun DashboardContent(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(RECENT_TREND_TAG)
-            .semantics { contentDescription = recentSummary },
+            .clearAndSetSemantics { contentDescription = recentSummary },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
@@ -390,8 +391,7 @@ private fun DashboardContent(
                 lineColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp)
-                    .semantics { contentDescription = recentSummary },
+                    .height(180.dp),
                 yAxisLabel = stringResource(R.string.insights_ai_axis),
                 formatValue = numberFormat::format,
             )

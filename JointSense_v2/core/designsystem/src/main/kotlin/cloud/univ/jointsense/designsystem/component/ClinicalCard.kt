@@ -65,14 +65,13 @@ fun ClinicalCard(
         modifier = modifier
             .clickable(
                 role = Role.Button,
-                onClickLabel = accessibilityLabel,
                 onClick = onClick,
             )
             .clearAndSetSemantics {
                 contentDescription = accessibilityLabel
                 role = Role.Button
                 accessibilityTestTag?.let { this[SemanticsProperties.TestTag] = it }
-                onClick(label = accessibilityLabel) {
+                onClick {
                     onClick()
                     true
                 }
