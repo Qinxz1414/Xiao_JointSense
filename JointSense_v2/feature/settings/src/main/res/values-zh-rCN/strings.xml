@@ -71,7 +71,7 @@
     <string name="settings_about_rgb_features">对选定的反应腔裁剪区域提取 6 项特征：红、绿、蓝三通道均值及各通道标准差。</string>
     <string name="settings_about_tealness">青色信号（tealness）定义为 BMean − RMean。</string>
     <string name="settings_about_curve_heading">标准曲线定量</string>
-    <string name="settings_about_curve_behavior">对应因子存在启用中的用户校准曲线时优先使用该曲线，否则使用工厂标准曲线；通过分段线性反演得到浓度，并标注低于范围、范围内或高于范围。</string>
+    <string name="settings_about_curve_behavior">对应因子存在启用中的用户校准曲线时，先从测量的原始青色信号中减去该校准的空白孔原始青色信号，再应用用户曲线；否则使用工厂标准曲线。通过分段线性反演得到浓度，并标注低于范围、范围内或高于范围。</string>
     <string name="settings_about_factory_ranges">工厂曲线浓度范围：TNF-α 0–200 pg/mL、IL-6 0–500 pg/mL、IL-1β 0–200 pg/mL。</string>
     <string name="settings_about_index_heading">OA 炎症综合指数（AI）</string>
     <string name="settings_about_oa_weights">权重为 TNF-α %1$d%%、IL-6 %2$d%%、IL-1β %3$d%%；缺少某项因子时，对已有因子的权重重新归一化。</string>

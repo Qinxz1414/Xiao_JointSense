@@ -6,11 +6,14 @@ import cloud.univ.jointsense.analysis.CurveKnot
 import cloud.univ.jointsense.analysis.FactoryCurves
 import cloud.univ.jointsense.analysis.QuantificationResult
 import cloud.univ.jointsense.analysis.StandardCurve
+import cloud.univ.jointsense.domain.model.Calibration
+import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
+import kotlin.math.abs
 import kotlin.math.sqrt
 import kotlinx.coroutines.flow.first
 
@@ -68,15 +71,11 @@ class AndroidBaselinePhotoAnalysisAdapter(
         val bitmap = (image as? BitmapMeasurementImage)?.bitmap
             ?: error("Android photo analysis requires a BitmapMeasurementImage")
         val calibration = calibrations.observeCalibration(factor).first()
-            ?.takeIf { it.status == CalibrationStatus.ACTIVE }
         val features = extractFeatures(bitmap, cropBounds)
         val quantification = quantifyMeasurementSignal(
             factor = factor,
-            signal = features.tealness,
-            calibratedKnots = calibration?.knots
-                ?.sortedBy { it.concentration }
-                ?.map { it.concentration to it.fittedSignal }
-                .orEmpty(),
+            rawSignal = features.tealness,
+            userCalibration = calibration,
         )
         return BaselineAnalysisResult(
             concentration = quantification.concentration,
@@ -126,17 +125,77 @@ private fun extractFeatures(bitmap: Bitmap, bounds: CropBounds): RgbFeatures {
 
 internal fun quantifyMeasurementSignal(
     factor: InflammationFactor,
-    signal: Float,
-    calibratedKnots: List<Pair<Float, Float>>,
+    rawSignal: Float,
+    userCalibration: Calibration?,
 ): QuantificationResult {
-    val curve = if (calibratedKnots.isEmpty()) {
-        FactoryCurves.forFactor(factor)
-    } else {
+    quantifyWithUserCalibration(
+        factor = factor,
+        rawSignal = rawSignal,
+        calibration = userCalibration,
+    )?.let { return it }
+
+    // Keep the factory path in the raw-tealness domain.
+    return FactoryCurves.forFactor(factor).quantify(rawSignal)
+}
+
+private fun quantifyWithUserCalibration(
+    factor: InflammationFactor,
+    rawSignal: Float,
+    calibration: Calibration?,
+): QuantificationResult? {
+    calibration ?: return null
+    if (calibration.status != CalibrationStatus.ACTIVE || calibration.factor != factor) return null
+    val knots = calibration.knots
+    val blank = knots.singleOrNull(CalibrationKnot::isBlank) ?: return null
+    if (!knots.areStructurallyValid(blank)) return null
+
+    val blankSubtractedSignal = (rawSignal.toDouble() - blank.rawSignal.toDouble())
+        .toRepresentableFloatOrNull()
+        ?: return null
+    val curve = try {
         StandardCurve(
-            calibratedKnots.map { (concentration, fittedSignal) ->
-                CurveKnot(concentration = concentration, signal = fittedSignal)
+            knots.sortedBy(CalibrationKnot::concentration).map { knot ->
+                CurveKnot(concentration = knot.concentration, signal = knot.fittedSignal)
             },
         )
+    } catch (_: IllegalArgumentException) {
+        return null
     }
-    return curve.quantify(signal)
+    return curve.quantify(blankSubtractedSignal)
 }
+
+private fun List<CalibrationKnot>.areStructurallyValid(blank: CalibrationKnot): Boolean =
+    size >= 2 &&
+        blank.concentration == 0f &&
+        blank.netSignal == 0f &&
+        map(CalibrationKnot::position).distinct().size == size &&
+        map(CalibrationKnot::concentration).distinct().size == size &&
+        all { knot ->
+            knot.concentration.isFinite() &&
+                knot.concentration >= 0f &&
+                knot.rawSignal.isFinite() &&
+                knot.netSignal.isFinite() &&
+                knot.fittedSignal.isFinite() &&
+                (knot.isBlank || knot.concentration > 0f) &&
+                knot.hasConsistentNetSignal(blank)
+        }
+
+private fun CalibrationKnot.hasConsistentNetSignal(blank: CalibrationKnot): Boolean {
+    val expected = rawSignal.toDouble() - blank.rawSignal.toDouble()
+    expected.toRepresentableFloatOrNull() ?: return false
+    val actual = netSignal.toDouble()
+    val tolerance = maxOf(
+        NET_SIGNAL_ABSOLUTE_TOLERANCE,
+        maxOf(abs(expected), abs(actual)) * NET_SIGNAL_RELATIVE_TOLERANCE,
+    )
+    return abs(expected - actual) <= tolerance
+}
+
+private fun Double.toRepresentableFloatOrNull(): Float? {
+    if (!isFinite()) return null
+    val converted = toFloat()
+    return converted.takeIf { it.isFinite() && (this == 0.0 || it != 0f) }
+}
+
+private const val NET_SIGNAL_ABSOLUTE_TOLERANCE = 1e-4
+private const val NET_SIGNAL_RELATIVE_TOLERANCE = 1e-5

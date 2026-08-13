@@ -8,10 +8,13 @@ import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import cloud.univ.jointsense.domain.repository.DataManagementRepository
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -53,23 +56,29 @@ class SettingsViewModel(
     private val dataAction = MutableStateFlow<DataAction>(DataAction.Idle)
 
     val state: StateFlow<SettingsUiState> = combine(
-        sessions.observeSessions(),
-        calibrations.observeCalibrations(),
+        sessions.observeSessions().withLoadingState(),
+        calibrations.observeCalibrations().withLoadingState(),
         dataAction,
-    ) { observedSessions, observedCalibrations, action ->
-        SettingsUiState(
-            countsLoaded = true,
-            sessionCount = observedSessions.size,
-            measurementCount = observedSessions.sumOf { it.results.size },
-            builtInSampleCount = observedSessions.count { it.source == DataSource.BUILT_IN },
-            calibrationCount = observedCalibrations.count {
-                it.status == CalibrationStatus.ACTIVE
-            },
-            calibrationReviewCount = observedCalibrations.count {
-                it.status == CalibrationStatus.NEEDS_REVIEW
-            },
-            dataAction = action,
-        )
+    ) { sessionsState, calibrationsState, action ->
+        if (sessionsState is LoadingState.Loaded && calibrationsState is LoadingState.Loaded) {
+            val observedSessions = sessionsState.value
+            val observedCalibrations = calibrationsState.value
+            SettingsUiState(
+                countsLoaded = true,
+                sessionCount = observedSessions.size,
+                measurementCount = observedSessions.sumOf { it.results.size },
+                builtInSampleCount = observedSessions.count { it.source == DataSource.BUILT_IN },
+                calibrationCount = observedCalibrations.count {
+                    it.status == CalibrationStatus.ACTIVE
+                },
+                calibrationReviewCount = observedCalibrations.count {
+                    it.status == CalibrationStatus.NEEDS_REVIEW
+                },
+                dataAction = action,
+            )
+        } else {
+            SettingsUiState(dataAction = action)
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
@@ -157,3 +166,12 @@ class SettingsViewModel(
         }
     }
 }
+
+private sealed interface LoadingState<out T> {
+    data object Loading : LoadingState<Nothing>
+    data class Loaded<T>(val value: T) : LoadingState<T>
+}
+
+private fun <T> Flow<T>.withLoadingState(): Flow<LoadingState<T>> =
+    map<T, LoadingState<T>> { value -> LoadingState.Loaded(value) }
+        .onStart { emit(LoadingState.Loading) }

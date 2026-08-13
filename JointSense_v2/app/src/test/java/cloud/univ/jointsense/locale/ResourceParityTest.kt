@@ -140,6 +140,14 @@ class ResourceParityTest {
         assertEquals(CHINESE_OA_TERM, settingsZh.text("settings_about_index_heading"))
         assertEquals("Tealness is defined as BMean − RMean.", settingsEn.text("settings_about_tealness"))
         assertEquals("青色信号（tealness）定义为 BMean − RMean。", settingsZh.text("settings_about_tealness"))
+        assertEquals(
+            "An active user calibration curve is applied after subtracting that calibration’s blank raw tealness from the measurement’s raw tealness; otherwise the factory standard curve is used. Concentration is obtained by piecewise-linear inversion and labeled below range, in range, or above range.",
+            settingsEn.text("settings_about_curve_behavior"),
+        )
+        assertEquals(
+            "对应因子存在启用中的用户校准曲线时，先从测量的原始青色信号中减去该校准的空白孔原始青色信号，再应用用户曲线；否则使用工厂标准曲线。通过分段线性反演得到浓度，并标注低于范围、范围内或高于范围。",
+            settingsZh.text("settings_about_curve_behavior"),
+        )
         localizedModules.forEach { module ->
             listOf("values", "values-zh-rCN").forEach { directory ->
                 resources(module, directory).forEach { (key, entry) ->

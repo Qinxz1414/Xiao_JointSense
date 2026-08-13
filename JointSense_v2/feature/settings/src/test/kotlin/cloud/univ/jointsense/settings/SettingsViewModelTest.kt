@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -99,6 +100,72 @@ class SettingsViewModelTest {
         assertEquals(1, viewModel.state.value.builtInSampleCount)
         assertEquals(1, viewModel.state.value.calibrationCount)
         assertEquals(1, viewModel.state.value.calibrationReviewCount)
+    }
+
+    @Test
+    fun restorePendingIsVisibleBeforeEitherRepositoryEmitsAndSurvivesBothSnapshots() = runTest(dispatcher) {
+        val sessions = DelayedSettingsSessionRepository()
+        val calibrations = DelayedSettingsCalibrationRepository()
+        val viewModel = SettingsViewModel(sessions, calibrations, FakeDataManagementRepository())
+
+        viewModel.requestRestoreBuiltInSamplesConfirmation()
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.countsLoaded)
+        assertEquals(
+            DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+            viewModel.state.value.dataAction,
+        )
+
+        sessions.snapshots.emit(listOf(sessionWithTwoResults()))
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.state.value.countsLoaded)
+        assertEquals(
+            DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+            viewModel.state.value.dataAction,
+        )
+
+        calibrations.snapshots.emit(listOf(calibration(InflammationFactor.IL6)))
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.state.value.countsLoaded)
+        assertEquals(1, viewModel.state.value.sessionCount)
+        assertEquals(2, viewModel.state.value.measurementCount)
+        assertEquals(1, viewModel.state.value.calibrationCount)
+        assertEquals(
+            DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+            viewModel.state.value.dataAction,
+        )
+    }
+
+    @Test
+    fun clearPendingIsVisibleWhileCalibrationFirstSnapshotIsStillDelayed() = runTest(dispatcher) {
+        val sessions = DelayedSettingsSessionRepository()
+        val calibrations = DelayedSettingsCalibrationRepository()
+        val viewModel = SettingsViewModel(sessions, calibrations, FakeDataManagementRepository())
+        testScheduler.advanceUntilIdle()
+
+        sessions.snapshots.emit(
+            listOf(sessionWithTwoResults().copy(source = DataSource.BUILT_IN)),
+        )
+        testScheduler.advanceUntilIdle()
+        viewModel.requestClearAllConfirmation()
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.countsLoaded)
+        assertEquals(
+            DataAction.Pending(DataActionType.CLEAR_ALL),
+            viewModel.state.value.dataAction,
+        )
+
+        calibrations.snapshots.emit(emptyList())
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.state.value.countsLoaded)
+        assertEquals(1, viewModel.state.value.sessionCount)
+        assertEquals(1, viewModel.state.value.builtInSampleCount)
+        assertEquals(
+            DataAction.Pending(DataActionType.CLEAR_ALL),
+            viewModel.state.value.dataAction,
+        )
     }
 
     @Test
@@ -307,6 +374,21 @@ private class FakeSettingsSessionRepository(initial: List<TestSession>) : TestSe
     override suspend fun deleteSession(id: String) = error("unused")
 }
 
+private class DelayedSettingsSessionRepository : TestSessionRepository {
+    val snapshots = MutableSharedFlow<List<TestSession>>(replay = 1)
+
+    override fun observeSessions(): Flow<List<TestSession>> = snapshots
+    override fun observeSession(id: String): Flow<TestSession?> = error("unused")
+    override suspend fun createSession(name: String, source: DataSource): String = error("unused")
+    override suspend fun commitResult(
+        sessionId: String,
+        draftId: String,
+        result: NewTestResult,
+    ): String = error("unused")
+
+    override suspend fun deleteSession(id: String) = error("unused")
+}
+
 private class FakeSettingsCalibrationRepository(initial: List<Calibration>) : CalibrationRepository {
     val calibrations = MutableStateFlow(initial)
 
@@ -314,6 +396,15 @@ private class FakeSettingsCalibrationRepository(initial: List<Calibration>) : Ca
     override fun observeCalibration(factor: InflammationFactor): Flow<Calibration?> =
         MutableStateFlow(calibrations.value.firstOrNull { it.factor == factor })
 
+    override suspend fun save(calibration: Calibration) = error("unused")
+    override suspend fun clearAll() = error("unused")
+}
+
+private class DelayedSettingsCalibrationRepository : CalibrationRepository {
+    val snapshots = MutableSharedFlow<List<Calibration>>(replay = 1)
+
+    override fun observeCalibrations(): Flow<List<Calibration>> = snapshots
+    override fun observeCalibration(factor: InflammationFactor): Flow<Calibration?> = error("unused")
     override suspend fun save(calibration: Calibration) = error("unused")
     override suspend fun clearAll() = error("unused")
 }

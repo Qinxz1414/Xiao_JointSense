@@ -76,7 +76,7 @@
     <string name="settings_about_rgb_features">The selected reaction-chamber crop is summarized by six features: red, green, and blue channel means plus their channel standard deviations.</string>
     <string name="settings_about_tealness">Tealness is defined as BMean − RMean.</string>
     <string name="settings_about_curve_heading">Standard-curve quantification</string>
-    <string name="settings_about_curve_behavior">An active user calibration curve is used for its factor; otherwise the factory standard curve is used. Concentration is obtained by piecewise-linear inversion and labeled below range, in range, or above range.</string>
+    <string name="settings_about_curve_behavior">An active user calibration curve is applied after subtracting that calibration’s blank raw tealness from the measurement’s raw tealness; otherwise the factory standard curve is used. Concentration is obtained by piecewise-linear inversion and labeled below range, in range, or above range.</string>
     <string name="settings_about_factory_ranges">Factory concentration ranges: TNF-α 0–200 pg/mL, IL-6 0–500 pg/mL, and IL-1β 0–200 pg/mL.</string>
     <string name="settings_about_index_heading">OA inflammation index (AI)</string>
     <string name="settings_about_oa_weights">Weights are TNF-α %1$d%%, IL-6 %2$d%%, and IL-1β %3$d%%. When a factor is missing, the available weights are re-normalized.</string>
