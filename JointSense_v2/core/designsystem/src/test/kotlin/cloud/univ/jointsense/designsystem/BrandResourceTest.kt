@@ -14,9 +14,61 @@ class BrandResourceTest {
 
     @Test
     fun semanticVectorsHaveExactRootPathStructureGeometryAndColors() {
-        val full = parseSemanticVector(resource("jointsense_logo.xml"))
-        val mono = parseSemanticVector(resource("jointsense_logo_monochrome.xml"))
-        val foreground = parseSemanticVector(appResource("drawable/ic_launcher_joint_signal_foreground.xml"))
+        validateSemanticVectorMatrix(
+            resource("jointsense_logo.xml"),
+            resource("jointsense_logo_monochrome.xml"),
+            appResource("drawable/ic_launcher_joint_signal_foreground.xml"),
+        )
+    }
+
+    @Test
+    fun coherentSameBoundsAndColorsSemanticGeometryDriftIsRejected() {
+        val approvedRing = "M20,31 C20,27.686 22.686,25 26,25 C29.314,25 32,27.686 32,31 C32,34.314 29.314,37 26,37 C22.686,37 20,34.314 20,31 Z"
+        val fakeSameBoundsRing = "M20,31 C20,25 20,25 26,25 C32,25 32,25 32,31 C32,37 32,37 26,37 C20,37 20,37 20,31 Z"
+        val fakeFull = resource("jointsense_logo.xml").readText().replace(approvedRing, fakeSameBoundsRing)
+        val fakeMono = resource("jointsense_logo_monochrome.xml").readText().replace(approvedRing, fakeSameBoundsRing)
+        val fakeForeground = appResource("drawable/ic_launcher_joint_signal_foreground.xml")
+            .readText().replace(approvedRing, fakeSameBoundsRing)
+
+        assertThrows(AssertionError::class.java) {
+            validateSemanticVectorMatrix(tempXml(fakeFull), tempXml(fakeMono), tempXml(fakeForeground))
+        }
+    }
+
+    @Test
+    fun semanticAndBackgroundPathNodesRejectNestedRenderingElements() {
+        listOf(
+            resource("jointsense_logo.xml"),
+            resource("jointsense_logo_monochrome.xml"),
+            appResource("drawable/ic_launcher_joint_signal_foreground.xml"),
+        ).forEach { semantic ->
+            nestedRenderingElements().forEach { nested ->
+                assertThrows(AssertionError::class.java) {
+                    parseSemanticVector(tempXml(nestInsideFirstPath(semantic.readText(), nested)))
+                }
+            }
+        }
+
+        listOf(
+            appResource("drawable/ic_launcher_background.xml"),
+            appResource("drawable/ic_launcher_round_background.xml"),
+        ).forEach { background ->
+            nestedRenderingElements().forEach { nested ->
+                assertThrows(AssertionError::class.java) {
+                    parseExactBackground(tempXml(nestInsideFirstPath(background.readText(), nested)))
+                }
+            }
+        }
+
+        val fakeSquare = appResource("drawable/ic_launcher_background.xml").readText()
+            .replace(NORMAL_BACKGROUND_PATH, "M0,0 H108 V54 H54 V108 H0 Z")
+        assertThrows(AssertionError::class.java) { validateNormalBackground(tempXml(fakeSquare)) }
+    }
+
+    private fun validateSemanticVectorMatrix(fullFile: File, monoFile: File, foregroundFile: File) {
+        val full = parseSemanticVector(fullFile)
+        val mono = parseSemanticVector(monoFile)
+        val foreground = parseSemanticVector(foregroundFile)
 
         assertEquals(full.paths.map { it.pathData }, mono.paths.map { it.pathData })
         assertEquals(full.paths.map { it.pathData }, foreground.paths.map { it.pathData })
@@ -97,7 +149,7 @@ class BrandResourceTest {
         val adaptiveRound = parseAdaptiveIcon(appResource("mipmap-anydpi-v26/ic_launcher_round.xml"))
         val themed = parseAdaptiveIcon(appResource("mipmap-anydpi-v33/ic_launcher.xml"))
         val themedRound = parseAdaptiveIcon(appResource("mipmap-anydpi-v33/ic_launcher_round.xml"))
-        val manifest = File("../../app/src/main/AndroidManifest.xml").readText()
+        val manifestFile = File("../../app/src/main/AndroidManifest.xml")
 
         val expectedAdaptive = AdaptiveIcon(BACKGROUND, FOREGROUND, null)
         assertEquals(expectedAdaptive, adaptive)
@@ -105,8 +157,24 @@ class BrandResourceTest {
         val expectedThemed = AdaptiveIcon(BACKGROUND, FOREGROUND, MONOCHROME_DRAWABLE)
         assertEquals(expectedThemed, themed)
         assertEquals(expectedThemed, themedRound)
-        assertTrue(manifest.contains("android:icon=\"@mipmap/ic_launcher\""))
-        assertTrue(manifest.contains("android:roundIcon=\"@mipmap/ic_launcher_round\""))
+        assertEquals(
+            ManifestLaunchers("@mipmap/ic_launcher", "@mipmap/ic_launcher_round"),
+            parseManifestLaunchers(manifestFile),
+        )
+    }
+
+    @Test
+    fun manifestTextDecoysCannotSatisfyLauncherContract() {
+        val fakeManifest = File("../../app/src/main/AndroidManifest.xml").readText()
+            .replace("android:icon=\"@mipmap/ic_launcher\"", "android:icon=\"@drawable/not_launcher\"")
+            .replace(
+                "<application",
+                "<!-- android:icon=\"@mipmap/ic_launcher\" android:roundIcon=\"@mipmap/ic_launcher_round\" -->\n    <application",
+            )
+        assertFalse(
+            parseManifestLaunchers(tempXml(fakeManifest)) ==
+                ManifestLaunchers("@mipmap/ic_launcher", "@mipmap/ic_launcher_round"),
+        )
     }
 
     @Test
@@ -213,8 +281,14 @@ class BrandResourceTest {
         children.forEach { child ->
             assertEquals("path", child.tagName)
             assertExactAndroidAttributes(child, SEMANTIC_PATH_ATTRIBUTES)
+            assertTrue("semantic paths must not contain element descendants", child.directElementChildren().isEmpty())
             assertTrue("Path must use absolute M/C/Z grammar", STRICT_PATH.matches(child.androidAttribute("pathData")))
         }
+        assertEquals(
+            "semantic paths must preserve the approved geometry and order",
+            APPROVED_SEMANTIC_PATHS,
+            children.map { it.androidAttribute("pathData") },
+        )
         return root.toVectorFixture(children)
     }
 
@@ -241,6 +315,7 @@ class BrandResourceTest {
         val path = children.single()
         assertEquals("path", path.tagName)
         assertExactAndroidAttributes(path, BACKGROUND_PATH_ATTRIBUTES)
+        assertTrue("background path must not contain element descendants", path.directElementChildren().isEmpty())
         assertEquals(INK, path.androidAttribute("fillColor"))
         return root.toVectorFixture(children)
     }
@@ -287,6 +362,27 @@ class BrandResourceTest {
             monochrome = drawable("monochrome"),
         )
     }
+
+    private fun parseManifestLaunchers(file: File): ManifestLaunchers {
+        val root = parseRoot(file)
+        assertEquals("manifest", root.tagName)
+        val applications = root.directElementChildren().filter { it.tagName == "application" }
+        assertEquals("manifest must have exactly one direct application", 1, applications.size)
+        val application = applications.single()
+        return ManifestLaunchers(
+            icon = application.androidAttribute("icon"),
+            roundIcon = application.androidAttribute("roundIcon"),
+        )
+    }
+
+    private fun nestedRenderingElements(): List<String> = listOf(
+        "<group />",
+        "<clip-path android:pathData=\"M20,20 C20,20 80,80 80,80 Z\" />",
+        "<path android:fillColor=\"#FFFFFF\" android:pathData=\"M20,20 C20,20 80,80 80,80 Z\" />",
+    )
+
+    private fun nestInsideFirstPath(xml: String, nested: String): String =
+        xml.replaceFirst(" />", ">\n        $nested\n    </path>")
 
     private fun Element.toVectorFixture(pathElements: List<Element>): VectorFixture = VectorFixture(
         viewportWidth = androidAttribute("viewportWidth").toFloat(),
@@ -391,6 +487,8 @@ class BrandResourceTest {
 
     private data class AdaptiveIcon(val background: String, val foreground: String, val monochrome: String?)
 
+    private data class ManifestLaunchers(val icon: String, val roundIcon: String)
+
     private companion object {
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
         const val XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/"
@@ -410,6 +508,13 @@ class BrandResourceTest {
         const val MONOCHROME_DRAWABLE = "@drawable/jointsense_logo_monochrome"
         const val NORMAL_BACKGROUND_PATH = "M0,0 H108 V108 H0 Z"
         const val ROUND_BACKGROUND_PATH = "M54,2 C82.719,2 106,25.281 106,54 C106,82.719 82.719,106 54,106 C25.281,106 2,82.719 2,54 C2,25.281 25.281,2 54,2 Z"
+        val APPROVED_SEMANTIC_PATHS = listOf(
+            "M20,31 C20,27.686 22.686,25 26,25 C29.314,25 32,27.686 32,31 C32,34.314 29.314,37 26,37 C22.686,37 20,34.314 20,31 Z",
+            "M68,69 C68,65.686 70.686,63 74,63 C77.314,63 80,65.686 80,69 C80,72.314 77.314,75 74,75 C70.686,75 68,72.314 68,69 Z",
+            "M32,30 C40,23 53,22 64,29 C67,31 69,33 70,35",
+            "M68,70 C60,77 47,78 36,71 C33,69 31,67 30,65",
+            "M43,50 C43,46.134 46.134,43 50,43 C53.866,43 57,46.134 57,50 C57,53.866 53.866,57 50,57 C46.134,57 43,53.866 43,50 Z",
+        )
         const val NUMBER_TOKEN = "-?(?:0|[1-9]\\d*)(?:\\.\\d+)?"
         const val PAIR_TOKEN = "$NUMBER_TOKEN,$NUMBER_TOKEN"
         val STRICT_PATH = Regex("^M$PAIR_TOKEN(?: C$PAIR_TOKEN $PAIR_TOKEN $PAIR_TOKEN)+(?: Z)?$")
