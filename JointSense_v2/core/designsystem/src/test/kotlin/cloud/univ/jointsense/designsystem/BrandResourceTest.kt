@@ -8,26 +8,16 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
+import org.w3c.dom.Node
 
 class BrandResourceTest {
 
     @Test
-    fun vectorsShareStrictFivePartGeometryWithApprovedPerPathAttributes() {
-        val full = parseVector(resource("jointsense_logo.xml"))
-        val mono = parseVector(resource("jointsense_logo_monochrome.xml"))
-        val foreground = parseVector(appResource("drawable/ic_launcher_joint_signal_foreground.xml"))
+    fun semanticVectorsHaveExactRootPathStructureGeometryAndColors() {
+        val full = parseSemanticVector(resource("jointsense_logo.xml"))
+        val mono = parseSemanticVector(resource("jointsense_logo_monochrome.xml"))
+        val foreground = parseSemanticVector(appResource("drawable/ic_launcher_joint_signal_foreground.xml"))
 
-        listOf(full, mono, foreground).forEach { vector ->
-            assertEquals(100f, vector.viewportWidth)
-            assertEquals(100f, vector.viewportHeight)
-            assertEquals("exactly five semantic paths", 5, vector.paths.size)
-            vector.paths.forEach { path ->
-                assertTrue("Path must use only absolute M/C/Z grammar: ${path.pathData}", STRICT_PATH.matches(path.pathData))
-                assertTrue("Every semantic path must be stroked", path.strokeWidth > 0f)
-                assertEquals("round", path.strokeLineCap)
-                assertEquals("round", path.strokeLineJoin)
-            }
-        }
         assertEquals(full.paths.map { it.pathData }, mono.paths.map { it.pathData })
         assertEquals(full.paths.map { it.pathData }, foreground.paths.map { it.pathData })
 
@@ -54,7 +44,7 @@ class BrandResourceTest {
     }
 
     @Test
-    fun strictPathGrammarRejectsRelativeCommandsAndMalformedCoordinates() {
+    fun strictPathGrammarRejectsEveryNonAbsoluteOrMalformedAlternative() {
         val invalid = listOf(
             "m20,31 C20,28 23,25 26,25 Z",
             "M20,31 c20,28 23,25 26,25 Z",
@@ -64,27 +54,20 @@ class BrandResourceTest {
             "M20,31 C20,28 23,25 Z",
             "M20,31 C20,28 23,25 26,25 z",
         )
-
         invalid.forEach { path -> assertFalse("Invalid grammar was accepted: $path", STRICT_PATH.matches(path)) }
     }
 
     @Test
     fun visibleStrokeAndRoundCapExtentsStayInsideLauncherSafeMask() {
-        val vectors = listOf(
+        listOf(
             resource("jointsense_logo.xml"),
             resource("jointsense_logo_monochrome.xml"),
             appResource("drawable/ic_launcher_joint_signal_foreground.xml"),
-        )
-
-        vectors.forEach { file ->
-            parseVector(file).paths.forEachIndexed { index, path ->
-                val coordinates = path.coordinates
-                val x = coordinates.filterIndexed { coordinateIndex, _ -> coordinateIndex % 2 == 0 }
-                val y = coordinates.filterIndexed { coordinateIndex, _ -> coordinateIndex % 2 == 1 }
+        ).forEach { file ->
+            parseSemanticVector(file).paths.forEachIndexed { index, path ->
+                val x = path.coordinates.filterIndexed { coordinateIndex, _ -> coordinateIndex % 2 == 0 }
+                val y = path.coordinates.filterIndexed { coordinateIndex, _ -> coordinateIndex % 2 == 1 }
                 val radius = path.strokeWidth / 2f
-
-                // Cubic Beziers stay inside the convex hull of their control points. Expanding that
-                // hull by half the stroke width also conservatively contains round joins and caps.
                 assertTrue("${file.name} path ${index + 1} visible left edge", x.min() - radius >= SAFE_MIN)
                 assertTrue("${file.name} path ${index + 1} visible top edge", y.min() - radius >= SAFE_MIN)
                 assertTrue("${file.name} path ${index + 1} visible right edge", x.max() + radius <= SAFE_MAX)
@@ -94,36 +77,27 @@ class BrandResourceTest {
     }
 
     @Test
-    fun legacyRoundHasTransparentCornersAndLauncherMatrixUsesJointSignal() {
-        val normalLayer = parseLayerList(appResource("mipmap-anydpi/ic_launcher.xml"))
-        val roundLayer = parseLayerList(appResource("mipmap-anydpi/ic_launcher_round.xml"))
+    fun legacyLayerListsHaveExactBackgroundAndCentered88DpForeground() {
+        validateNormalBackground(appResource("drawable/ic_launcher_background.xml"))
+        validateRoundBackground(appResource("drawable/ic_launcher_round_background.xml"))
+
+        val normal = parseLegacyLayer(appResource("mipmap-anydpi/ic_launcher.xml"), BACKGROUND)
+        val round = parseLegacyLayer(appResource("mipmap-anydpi/ic_launcher_round.xml"), ROUND_BACKGROUND)
+        listOf(normal, round).forEach { layer ->
+            assertEquals(LEGACY_FOREGROUND_SIZE_DP, layer.foregroundWidthDp)
+            assertEquals(LEGACY_FOREGROUND_SIZE_DP, layer.foregroundHeightDp)
+            assertEquals("center", layer.foregroundGravity)
+            assertEquals(FOREGROUND, layer.foregroundDrawable)
+        }
+    }
+
+    @Test
+    fun adaptiveMatrixAndManifestUseOnlyApprovedLauncherResources() {
         val adaptive = parseAdaptiveIcon(appResource("mipmap-anydpi-v26/ic_launcher.xml"))
         val adaptiveRound = parseAdaptiveIcon(appResource("mipmap-anydpi-v26/ic_launcher_round.xml"))
         val themed = parseAdaptiveIcon(appResource("mipmap-anydpi-v33/ic_launcher.xml"))
         val themedRound = parseAdaptiveIcon(appResource("mipmap-anydpi-v33/ic_launcher_round.xml"))
         val manifest = File("../../app/src/main/AndroidManifest.xml").readText()
-
-        assertEquals(listOf(BACKGROUND, FOREGROUND), normalLayer.drawables)
-        assertEquals(listOf(ROUND_BACKGROUND, FOREGROUND), roundLayer.drawables)
-        assertEquals(72, normalLayer.foregroundWidthDp)
-        assertEquals(72, normalLayer.foregroundHeightDp)
-        assertEquals(72, roundLayer.foregroundWidthDp)
-        assertEquals(72, roundLayer.foregroundHeightDp)
-
-        val normalBackground = parseVector(appResource("drawable/ic_launcher_background.xml"))
-        assertEquals(setOf(INK), normalBackground.pathColors)
-        val roundBackground = parseVector(appResource("drawable/ic_launcher_round_background.xml"))
-        assertEquals(108f, roundBackground.viewportWidth)
-        assertEquals(108f, roundBackground.viewportHeight)
-        assertEquals(setOf(INK), roundBackground.pathColors)
-        assertEquals("one closed circular fill leaves corners transparent", 1, roundBackground.paths.size)
-        val roundPath = roundBackground.paths.single()
-        assertEquals(INK, roundPath.fillColor)
-        assertEquals("", roundPath.strokeColor)
-        assertTrue(roundPath.pathData.endsWith(" Z"))
-        assertEquals("circle uses four cubic quadrants", 4, roundPath.pathData.count { it == 'C' })
-        assertEquals(2f, roundPath.coordinates.min())
-        assertEquals(106f, roundPath.coordinates.max())
 
         val expectedAdaptive = AdaptiveIcon(BACKGROUND, FOREGROUND, null)
         assertEquals(expectedAdaptive, adaptive)
@@ -136,9 +110,76 @@ class BrandResourceTest {
     }
 
     @Test
+    fun transformedClippedTintedOrTrimmedSemanticVectorsAreRejected() {
+        val valid = resource("jointsense_logo.xml").readText()
+        val transformed = valid
+            .replaceFirst("<path", "<group android:scaleX=\"0.5\">\n    <path")
+            .replace("</vector>", "</group>\n</vector>")
+        val clipped = valid.replaceFirst(
+            "<path",
+            "<clip-path android:pathData=\"M20,20 C20,20 80,80 80,80 Z\" />\n    <path",
+        )
+        val tinted = valid.replaceFirst(
+            "android:width=\"100dp\"",
+            "android:tint=\"#FFFFFF\"\n    android:width=\"100dp\"",
+        )
+        val hidden = valid.replaceFirst(
+            "android:height=\"100dp\"",
+            "android:alpha=\"0\"\n    android:height=\"100dp\"",
+        )
+        val mirrored = valid.replaceFirst(
+            "android:height=\"100dp\"",
+            "android:autoMirrored=\"true\"\n    android:height=\"100dp\"",
+        )
+        val changedViewport = valid.replace("android:viewportWidth=\"100\"", "android:viewportWidth=\"101\"")
+        val trimmed = valid.replaceFirst(
+            "android:strokeWidth=\"4\"",
+            "android:strokeWidth=\"4\"\n        android:trimPathStart=\"0.5\"",
+        )
+        val translucentFill = valid.replaceFirst(
+            "android:strokeWidth=\"4\"",
+            "android:strokeWidth=\"4\"\n        android:fillAlpha=\"0\"",
+        )
+        val faded = valid.replaceFirst(
+            "android:strokeWidth=\"4\"",
+            "android:strokeWidth=\"4\"\n        android:strokeAlpha=\"0\"",
+        )
+        listOf(
+            transformed,
+            clipped,
+            tinted,
+            hidden,
+            mirrored,
+            changedViewport,
+            trimmed,
+            translucentFill,
+            faded,
+        ).forEach { xml ->
+            assertThrows(AssertionError::class.java) { parseSemanticVector(tempXml(xml)) }
+        }
+    }
+
+    @Test
+    fun shiftedLegacyLayerAndFakeRoundBackgroundAreRejected() {
+        val validLayer = appResource("mipmap-anydpi/ic_launcher_round.xml").readText()
+        val shiftedGravity = validLayer.replace("android:gravity=\"center\"", "android:gravity=\"top\"")
+        val offset = validLayer.replace(
+            "android:gravity=\"center\"",
+            "android:gravity=\"center\"\n        android:left=\"1dp\"",
+        )
+        val wrongSize = validLayer.replace(Regex("android:width=\"\\d+dp\""), "android:width=\"87dp\"")
+        listOf(shiftedGravity, offset, wrongSize).forEach { xml ->
+            assertThrows(AssertionError::class.java) { parseLegacyLayer(tempXml(xml), ROUND_BACKGROUND) }
+        }
+
+        val fakeCircle = appResource("drawable/ic_launcher_round_background.xml").readText()
+            .replace("C82.719,2", "C80,2")
+        assertThrows(AssertionError::class.java) { validateRoundBackground(tempXml(fakeCircle)) }
+    }
+
+    @Test
     fun obsoleteLogoAndEveryLegacyRasterLauncherExtensionAreAbsent() {
         val appResources = File("../../app/src/main/res")
-
         assertFalse(File(appResources, "drawable/ic_launcher_foreground.xml").exists())
         assertFalse(File(appResources, "drawable/logo.png").exists())
         assertFalse(File("src/main/res/drawable/logo.png").exists())
@@ -151,18 +192,116 @@ class BrandResourceTest {
 
     @Test
     fun vectorParserRejectsDoctypeAndExternalEntityDeclarations() {
-        val malicious = File.createTempFile("jointsense-vector-doctype", ".xml").apply {
-            writeText(
-                """<!DOCTYPE vector [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-                    |<vector xmlns:android="$ANDROID_NAMESPACE"
-                    | android:viewportWidth="100" android:viewportHeight="100">&xxe;</vector>
-                """.trimMargin(),
-            )
-            deleteOnExit()
-        }
-
-        assertThrows(Exception::class.java) { parseVector(malicious) }
+        val malicious = """<!DOCTYPE vector [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+            |<vector xmlns:android="$ANDROID_NAMESPACE"
+            | android:width="100dp" android:height="100dp"
+            | android:viewportWidth="100" android:viewportHeight="100">&xxe;</vector>
+        """.trimMargin()
+        assertThrows(Exception::class.java) { parseSemanticVector(tempXml(malicious)) }
     }
+
+    private fun parseSemanticVector(file: File): VectorFixture {
+        val root = parseRoot(file)
+        assertEquals("vector", root.tagName)
+        assertExactAndroidAttributes(root, VECTOR_ROOT_ATTRIBUTES, allowAndroidNamespace = true)
+        assertEquals("100dp", root.androidAttribute("width"))
+        assertEquals("100dp", root.androidAttribute("height"))
+        assertEquals("100", root.androidAttribute("viewportWidth"))
+        assertEquals("100", root.androidAttribute("viewportHeight"))
+        val children = root.directElementChildren()
+        assertEquals("semantic vector must have five direct paths", 5, children.size)
+        children.forEach { child ->
+            assertEquals("path", child.tagName)
+            assertExactAndroidAttributes(child, SEMANTIC_PATH_ATTRIBUTES)
+            assertTrue("Path must use absolute M/C/Z grammar", STRICT_PATH.matches(child.androidAttribute("pathData")))
+        }
+        return root.toVectorFixture(children)
+    }
+
+    private fun validateNormalBackground(file: File) {
+        val vector = parseExactBackground(file)
+        assertEquals(NORMAL_BACKGROUND_PATH, vector.paths.single().pathData)
+    }
+
+    private fun validateRoundBackground(file: File) {
+        val vector = parseExactBackground(file)
+        assertEquals(ROUND_BACKGROUND_PATH, vector.paths.single().pathData)
+    }
+
+    private fun parseExactBackground(file: File): VectorFixture {
+        val root = parseRoot(file)
+        assertEquals("vector", root.tagName)
+        assertExactAndroidAttributes(root, VECTOR_ROOT_ATTRIBUTES, allowAndroidNamespace = true)
+        assertEquals("108dp", root.androidAttribute("width"))
+        assertEquals("108dp", root.androidAttribute("height"))
+        assertEquals("108", root.androidAttribute("viewportWidth"))
+        assertEquals("108", root.androidAttribute("viewportHeight"))
+        val children = root.directElementChildren()
+        assertEquals("background vector must have one direct path", 1, children.size)
+        val path = children.single()
+        assertEquals("path", path.tagName)
+        assertExactAndroidAttributes(path, BACKGROUND_PATH_ATTRIBUTES)
+        assertEquals(INK, path.androidAttribute("fillColor"))
+        return root.toVectorFixture(children)
+    }
+
+    private fun parseLegacyLayer(file: File, expectedBackground: String): LegacyLayerList {
+        val root = parseRoot(file)
+        assertEquals("layer-list", root.tagName)
+        assertExactAndroidAttributes(root, emptySet(), allowAndroidNamespace = true)
+        val items = root.directElementChildren()
+        assertEquals("legacy icon must have two direct items", 2, items.size)
+        items.forEach { item ->
+            assertEquals("item", item.tagName)
+            assertTrue("layer item must not contain nested elements", item.directElementChildren().isEmpty())
+        }
+        val background = items[0]
+        assertExactAndroidAttributes(background, setOf("drawable"))
+        assertEquals(expectedBackground, background.androidAttribute("drawable"))
+        val foreground = items[1]
+        assertExactAndroidAttributes(foreground, LEGACY_FOREGROUND_ATTRIBUTES)
+        val width = foreground.androidAttribute("width").removeSuffix("dp").toInt()
+        val height = foreground.androidAttribute("height").removeSuffix("dp").toInt()
+        assertEquals(LEGACY_FOREGROUND_SIZE_DP, width)
+        assertEquals(LEGACY_FOREGROUND_SIZE_DP, height)
+        assertEquals("center", foreground.androidAttribute("gravity"))
+        assertEquals(FOREGROUND, foreground.androidAttribute("drawable"))
+        return LegacyLayerList(width, height, foreground.androidAttribute("gravity"), foreground.androidAttribute("drawable"))
+    }
+
+    private fun parseAdaptiveIcon(file: File): AdaptiveIcon {
+        val root = parseRoot(file)
+        assertEquals("adaptive-icon", root.tagName)
+        assertExactAndroidAttributes(root, emptySet(), allowAndroidNamespace = true)
+        val children = root.directElementChildren()
+        val tags = children.map { it.tagName }
+        assertTrue(tags == listOf("background", "foreground") || tags == listOf("background", "foreground", "monochrome"))
+        children.forEach { child ->
+            assertExactAndroidAttributes(child, setOf("drawable"))
+            assertTrue(child.directElementChildren().isEmpty())
+        }
+        fun drawable(tag: String): String? = children.singleOrNull { it.tagName == tag }?.androidAttribute("drawable")
+        return AdaptiveIcon(
+            background = requireNotNull(drawable("background")),
+            foreground = requireNotNull(drawable("foreground")),
+            monochrome = drawable("monochrome"),
+        )
+    }
+
+    private fun Element.toVectorFixture(pathElements: List<Element>): VectorFixture = VectorFixture(
+        viewportWidth = androidAttribute("viewportWidth").toFloat(),
+        viewportHeight = androidAttribute("viewportHeight").toFloat(),
+        paths = pathElements.map { element ->
+            VectorPath(
+                pathData = element.androidAttribute("pathData"),
+                fillColor = element.androidAttribute("fillColor"),
+                strokeColor = element.androidAttribute("strokeColor"),
+                strokeWidth = element.androidAttribute("strokeWidth").toFloatOrNull() ?: 0f,
+                strokeLineCap = element.androidAttribute("strokeLineCap"),
+                strokeLineJoin = element.androidAttribute("strokeLineJoin"),
+            )
+        },
+    )
 
     private fun assertSemanticPath(path: VectorPath, fill: String, stroke: String, width: Float) {
         assertEquals(fill, path.fillColor)
@@ -172,57 +311,37 @@ class BrandResourceTest {
         assertEquals("round", path.strokeLineJoin)
     }
 
-    private fun resource(name: String): File = File("src/main/res/drawable/$name").requireFile()
-
-    private fun appResource(path: String): File = File("../../app/src/main/res/$path").requireFile()
-
-    private fun File.requireFile(): File = also { file ->
-        assertTrue("Missing brand resource: ${file.path}", file.isFile)
-    }
-
-    private fun parseVector(file: File): VectorFixture {
-        val root = secureXmlFactory().newDocumentBuilder().parse(file).documentElement
-        val nodes = root.getElementsByTagName("path")
-        val paths = (0 until nodes.length).map { index ->
-            val element = nodes.item(index) as Element
-            VectorPath(
-                pathData = element.androidAttribute("pathData"),
-                fillColor = element.androidAttribute("fillColor"),
-                strokeColor = element.androidAttribute("strokeColor"),
-                strokeWidth = element.androidAttribute("strokeWidth").toFloatOrNull() ?: 0f,
-                strokeLineCap = element.androidAttribute("strokeLineCap"),
-                strokeLineJoin = element.androidAttribute("strokeLineJoin"),
-            )
+    private fun assertExactAndroidAttributes(
+        element: Element,
+        expected: Set<String>,
+        allowAndroidNamespace: Boolean = false,
+    ) {
+        val android = mutableMapOf<String, String>()
+        val unexpected = mutableListOf<String>()
+        val attributes = element.attributes
+        for (index in 0 until attributes.length) {
+            val attribute = attributes.item(index)
+            when (attribute.namespaceURI) {
+                ANDROID_NAMESPACE -> android[attribute.localName] = attribute.nodeValue
+                XMLNS_NAMESPACE -> {
+                    val approved = allowAndroidNamespace &&
+                        attribute.localName == "android" && attribute.nodeValue == ANDROID_NAMESPACE
+                    if (!approved) unexpected += attribute.nodeName
+                }
+                else -> unexpected += attribute.nodeName
+            }
         }
-        return VectorFixture(
-            viewportWidth = root.androidAttribute("viewportWidth").toFloat(),
-            viewportHeight = root.androidAttribute("viewportHeight").toFloat(),
-            paths = paths,
-        )
+        assertTrue("${element.tagName} has undeclared attributes: $unexpected", unexpected.isEmpty())
+        assertEquals("${element.tagName} Android attribute whitelist", expected, android.keys)
     }
 
-    private fun parseLayerList(file: File): LegacyLayerList {
-        val root = secureXmlFactory().newDocumentBuilder().parse(file).documentElement
-        val nodes = root.getElementsByTagName("item")
-        val items = (0 until nodes.length).map { nodes.item(it) as Element }
-        val foreground = items.last()
-        return LegacyLayerList(
-            drawables = items.map { it.androidAttribute("drawable") },
-            foregroundWidthDp = foreground.androidAttribute("width").removeSuffix("dp").toInt(),
-            foregroundHeightDp = foreground.androidAttribute("height").removeSuffix("dp").toInt(),
-        )
-    }
+    private fun Element.directElementChildren(): List<Element> =
+        (0 until childNodes.length)
+            .map { childNodes.item(it) }
+            .filter { it.nodeType == Node.ELEMENT_NODE }
+            .map { it as Element }
 
-    private fun parseAdaptiveIcon(file: File): AdaptiveIcon {
-        val root = secureXmlFactory().newDocumentBuilder().parse(file).documentElement
-        fun drawable(tag: String): String? =
-            (root.getElementsByTagName(tag).item(0) as? Element)?.androidAttribute("drawable")
-        return AdaptiveIcon(
-            background = requireNotNull(drawable("background")),
-            foreground = requireNotNull(drawable("foreground")),
-            monochrome = drawable("monochrome"),
-        )
-    }
+    private fun parseRoot(file: File): Element = secureXmlFactory().newDocumentBuilder().parse(file).documentElement
 
     private fun secureXmlFactory(): DocumentBuilderFactory = DocumentBuilderFactory.newInstance().apply {
         isNamespaceAware = true
@@ -234,6 +353,13 @@ class BrandResourceTest {
         isExpandEntityReferences = false
     }
 
+    private fun resource(name: String): File = File("src/main/res/drawable/$name").requireFile()
+    private fun appResource(path: String): File = File("../../app/src/main/res/$path").requireFile()
+    private fun File.requireFile(): File = also { assertTrue("Missing brand resource: ${it.path}", it.isFile) }
+    private fun tempXml(xml: String): File = File.createTempFile("jointsense-brand-contract", ".xml").apply {
+        writeText(xml)
+        deleteOnExit()
+    }
     private fun Element.androidAttribute(name: String): String = getAttributeNS(ANDROID_NAMESPACE, name)
 
     private data class VectorFixture(
@@ -241,11 +367,8 @@ class BrandResourceTest {
         val viewportHeight: Float,
         val paths: List<VectorPath>,
     ) {
-        val pathColors: Set<String> = paths
-            .flatMap { listOf(it.fillColor, it.strokeColor) }
-            .filter { HEX_COLOR.matches(it) }
-            .map { it.uppercase() }
-            .toSet()
+        val pathColors: Set<String> = paths.flatMap { listOf(it.fillColor, it.strokeColor) }
+            .filter { HEX_COLOR.matches(it) }.map { it.uppercase() }.toSet()
     }
 
     private data class VectorPath(
@@ -260,19 +383,17 @@ class BrandResourceTest {
     }
 
     private data class LegacyLayerList(
-        val drawables: List<String>,
         val foregroundWidthDp: Int,
         val foregroundHeightDp: Int,
+        val foregroundGravity: String,
+        val foregroundDrawable: String,
     )
 
-    private data class AdaptiveIcon(
-        val background: String,
-        val foreground: String,
-        val monochrome: String?,
-    )
+    private data class AdaptiveIcon(val background: String, val foreground: String, val monochrome: String?)
 
     private companion object {
         const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
+        const val XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/"
         const val TRANSPARENT = "@android:color/transparent"
         const val MONOCHROME = "?android:attr/colorControlNormal"
         const val INK = "#0E2841"
@@ -282,13 +403,22 @@ class BrandResourceTest {
         const val WHITE = "#FFFFFF"
         const val SAFE_MIN = 18f
         const val SAFE_MAX = 82f
+        const val LEGACY_FOREGROUND_SIZE_DP = 88
         const val BACKGROUND = "@drawable/ic_launcher_background"
         const val ROUND_BACKGROUND = "@drawable/ic_launcher_round_background"
         const val FOREGROUND = "@drawable/ic_launcher_joint_signal_foreground"
         const val MONOCHROME_DRAWABLE = "@drawable/jointsense_logo_monochrome"
+        const val NORMAL_BACKGROUND_PATH = "M0,0 H108 V108 H0 Z"
+        const val ROUND_BACKGROUND_PATH = "M54,2 C82.719,2 106,25.281 106,54 C106,82.719 82.719,106 54,106 C25.281,106 2,82.719 2,54 C2,25.281 25.281,2 54,2 Z"
         const val NUMBER_TOKEN = "-?(?:0|[1-9]\\d*)(?:\\.\\d+)?"
         const val PAIR_TOKEN = "$NUMBER_TOKEN,$NUMBER_TOKEN"
         val STRICT_PATH = Regex("^M$PAIR_TOKEN(?: C$PAIR_TOKEN $PAIR_TOKEN $PAIR_TOKEN)+(?: Z)?$")
+        val VECTOR_ROOT_ATTRIBUTES = setOf("width", "height", "viewportWidth", "viewportHeight")
+        val SEMANTIC_PATH_ATTRIBUTES = setOf(
+            "fillColor", "pathData", "strokeColor", "strokeLineCap", "strokeLineJoin", "strokeWidth",
+        )
+        val BACKGROUND_PATH_ATTRIBUTES = setOf("fillColor", "pathData")
+        val LEGACY_FOREGROUND_ATTRIBUTES = setOf("width", "height", "drawable", "gravity")
         val APPROVED_BRAND_COLORS = setOf(INK, PRIMARY, CYAN, BIO_GREEN)
         val APPROVED_LAUNCHER_FOREGROUND_COLORS = setOf(WHITE, PRIMARY, CYAN, BIO_GREEN)
         val HEX_COLOR = Regex("#[0-9A-Fa-f]{6,8}")
