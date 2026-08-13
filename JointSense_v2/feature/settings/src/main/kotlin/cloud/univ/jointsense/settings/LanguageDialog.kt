@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -29,7 +32,11 @@ internal fun LanguageDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings_language_dialog_title)) },
         text = {
-            Column {
+            Column(
+                modifier = Modifier
+                    .selectableGroup()
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 LanguageRow(
                     option = LanguageOption.SYSTEM,
                     label = stringResource(R.string.settings_language_system),

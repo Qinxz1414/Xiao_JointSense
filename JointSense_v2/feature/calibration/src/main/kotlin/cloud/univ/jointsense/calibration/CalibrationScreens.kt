@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +14,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +53,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +70,17 @@ import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.feature.calibration.R
 import java.io.File
+
+const val CALIBRATION_FACTOR_GROUP_TAG = "calibration:factor-group"
+const val CALIBRATION_CROP_VIEW_TAG = "calibration:crop-view"
+const val CALIBRATION_DETECT_TAG = "calibration:detect"
+const val CALIBRATION_SAVE_TAG = "calibration:save"
+const val CALIBRATION_CAPTURE_TAG = "calibration:capture"
+const val CALIBRATION_GALLERY_TAG = "calibration:gallery"
+const val CALIBRATION_REVIEW_TAG = "calibration:review-curve"
+
+fun calibrationFactorTag(factor: InflammationFactor): String =
+    "calibration:factor-${factor.name.lowercase()}"
 
 @Composable
 internal fun CalibrationSelectScreen(
@@ -112,7 +128,7 @@ internal fun CalibrationSelectScreen(
             Button(
                 onClick = { cameraPermission.launch(android.Manifest.permission.CAMERA) },
                 enabled = !state.isDecoding,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(CALIBRATION_CAPTURE_TAG),
             ) {
                 Icon(Icons.Default.CameraAlt, null)
                 Spacer(Modifier.width(8.dp))
@@ -122,7 +138,7 @@ internal fun CalibrationSelectScreen(
             Button(
                 onClick = { galleryLauncher.launch("image/*") },
                 enabled = !state.isDecoding,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(CALIBRATION_GALLERY_TAG),
             ) {
                 Icon(Icons.Default.PhotoLibrary, null)
                 Spacer(Modifier.width(8.dp))
@@ -185,7 +201,7 @@ internal fun CalibrationCropScreen(
         Button(
             onClick = onDetect,
             enabled = bitmap != null && crop != null && !state.isDetecting,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(CALIBRATION_DETECT_TAG),
         ) {
             Text(stringResource(if (state.isDetecting) R.string.calibration_detecting else R.string.calibration_detect_wells))
         }
@@ -209,13 +225,27 @@ internal fun CalibrationAssignScreen(
     ) {
         Text(stringResource(R.string.calibration_factor_label), fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().selectableGroup().testTag(CALIBRATION_FACTOR_GROUP_TAG),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             InflammationFactor.entries.forEach { factor ->
                 val selected = factor == state.factor
+                val factorLabel = stringResource(R.string.calibration_factor_option, factor.shortName)
                 ClinicalCard(
-                    modifier = Modifier.weight(1f).clickable { onFactorChanged(factor) }.then(
-                        if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier,
-                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag(calibrationFactorTag(factor))
+                        .selectable(
+                            selected = selected,
+                            role = Role.RadioButton,
+                            onClick = { onFactorChanged(factor) },
+                        )
+                        .semantics(mergeDescendants = true) { contentDescription = factorLabel }
+                        .then(
+                            if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier,
+                        ),
                     colors = CardDefaults.cardColors(
                         containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                     ),
@@ -245,7 +275,13 @@ internal fun CalibrationAssignScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Button(onClick = onReview, Modifier.fillMaxWidth().height(52.dp)) {
+        Button(
+            onClick = onReview,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .testTag(CALIBRATION_REVIEW_TAG),
+        ) {
             Text(stringResource(R.string.calibration_review_curve))
         }
         validationErrorResource(state.validation)?.let { message -> ErrorText(stringResource(message)) }
@@ -289,7 +325,7 @@ internal fun CalibrationReviewScreen(
         Button(
             onClick = onSave,
             enabled = state.canSave,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(CALIBRATION_SAVE_TAG),
         ) {
             Icon(Icons.Default.Check, null)
             Spacer(Modifier.width(6.dp))
@@ -336,7 +372,7 @@ internal fun CalibrationDoneScreen(
             Button(
                 onClick = onAnother,
                 enabled = !state.isPersistenceBusy,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) {
                 Text(stringResource(R.string.calibration_another_factor))
             }
@@ -350,7 +386,7 @@ internal fun CalibrationDoneScreen(
             Button(
                 onClick = onDone,
                 enabled = !state.isPersistenceBusy,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) { Text(stringResource(R.string.calibration_done)) }
             state.errorMessage?.let { ErrorText(localizedStateMessage(it)) }
         }

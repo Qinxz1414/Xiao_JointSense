@@ -2,12 +2,25 @@ package cloud.univ.jointsense.insights
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.domain.model.DataSource
@@ -90,6 +103,14 @@ class InsightsScreenTest {
         ).forEach { tag ->
             composeRule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
+        composeRule.onNodeWithTag(TRENDS_PERIOD_7_TAG)
+            .assertIsSelected()
+            .assertHeightIsAtLeast(48.dp)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+        composeRule.onNodeWithTag(FACTOR_TREND_CHART_TAG)
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription))
+        composeRule.onNodeWithTag(OA_TREND_CHART_TAG)
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription))
     }
 
     @Test
@@ -122,6 +143,34 @@ class InsightsScreenTest {
         composeRule.onAllNodesWithText(
             "本报告结果基于手机照片色度代理估算，仅供科研与纵向趋势观察，不作为临床诊断、治疗决策或替代经验证实验室检测的依据。",
         ).assertCountEquals(0)
+    }
+
+    @Test
+    fun criticalActionsRemainReachableAtCompactWidthAndTwoHundredPercentText() {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(
+                    density = LocalDensity.current.density,
+                    fontScale = 2f,
+                ),
+            ) {
+                JointSenseTheme {
+                    Box(Modifier.requiredSize(360.dp, 640.dp)) {
+                        ReportScreen(
+                            ReportUiState(
+                                latestValues = InflammationFactor.entries.associateWith { 10f },
+                                currentAi = 0.4f,
+                                currentGrade = 1,
+                                aiWeekDeltaPct = 2f,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(REPORT_EXPORT_PDF_TAG).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(REPORT_EXPORT_SHARE_TAG).performScrollTo().assertIsDisplayed()
     }
 
     private fun completeHomeState(): HomeUiState {

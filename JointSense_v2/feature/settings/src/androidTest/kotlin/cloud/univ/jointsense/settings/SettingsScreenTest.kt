@@ -10,6 +10,13 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.feature.settings.R
@@ -183,5 +190,31 @@ class SettingsScreenTest {
         ).forEach {
             composeRule.onNodeWithText(it, substring = true).performScrollTo().assertIsDisplayed()
         }
+    }
+
+    @Test
+    fun profileActionsRemainReachableAtCompactWidthAndTwoHundredPercentText() {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(LocalDensity.current.density, fontScale = 2f),
+            ) {
+                JointSenseTheme {
+                    Box(Modifier.requiredSize(360.dp, 640.dp)) {
+                        SettingsScreen(
+                            state = SettingsUiState(countsLoaded = true),
+                            selectedLanguage = LanguageOption.SYSTEM,
+                            readCurrentLanguage = { LanguageOption.SYSTEM },
+                            onApplyLanguage = {}, onOpenHistory = {}, onCalibrate = {},
+                            onOpenAbout = {}, onRequestClearAll = {}, onRequestRestoreSamples = {},
+                            onConfirmDataAction = {}, onDismissDataAction = {},
+                            onRetryDataAction = {}, onConsumeDataActionResult = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(SETTINGS_CLEAR_ALL_TAG).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_ABOUT_TAG).performScrollTo().assertIsDisplayed()
     }
 }

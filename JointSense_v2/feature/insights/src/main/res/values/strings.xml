@@ -53,6 +53,7 @@
     <string name="insights_grade_scale_description">OA inflammation grade scale</string>
     <string name="insights_open_report">Open AI report</string>
     <string name="insights_recent_trend">Seven most recent observations</string>
+    <string name="insights_recent_chart_summary">Seven most recent OA inflammation index (AI) observations from %1$s to %2$s. Latest value %3$s.</string>
     <string name="insights_latest_observation_time">Latest observation: %1$s</string>
     <string name="insights_report_screen_title">AI report</string>
     <string name="insights_share_summary">Share summary</string>
@@ -83,6 +84,9 @@
     <string name="insights_concentration_axis">Concentration (pg/mL)</string>
     <string name="insights_date_axis">Date</string>
     <string name="insights_ai_trend">OA inflammation index (AI) trend</string>
+    <string name="insights_factor_chart_summary">Inflammatory biomarker chart from %1$s to %2$s. Latest values: %3$s.</string>
+    <string name="insights_factor_chart_latest">%1$s %2$s pg/mL</string>
+    <string name="insights_ai_chart_summary">OA inflammation index (AI) chart from %1$s to %2$s. Latest value %3$s.</string>
     <string name="insights_key_events">Key events</string>
     <string name="insights_no_events">No events in this period.</string>
     <plurals name="insights_event_test">

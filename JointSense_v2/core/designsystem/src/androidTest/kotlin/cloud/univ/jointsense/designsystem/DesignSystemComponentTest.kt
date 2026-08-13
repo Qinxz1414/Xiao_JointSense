@@ -15,6 +15,9 @@ import cloud.univ.jointsense.designsystem.component.GradeBadge
 import cloud.univ.jointsense.designsystem.component.GRADE_BADGE_CONTAINER_TAG
 import cloud.univ.jointsense.designsystem.component.GRADE_BADGE_SWATCH_TAG
 import cloud.univ.jointsense.designsystem.component.LoadingErrorState
+import cloud.univ.jointsense.designsystem.component.FactorValue
+import cloud.univ.jointsense.domain.model.InflammationFactor
+import androidx.compose.ui.semantics.LiveRegionMode
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -99,10 +102,30 @@ class DesignSystemComponentTest {
         }
 
         composeRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Migration failed")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         composeRule.onNodeWithText("Start empty").assertIsDisplayed().performClick()
         composeRule.runOnIdle {
             assertEquals(1, primaryCalls)
             assertEquals(1, secondaryCalls)
         }
+    }
+
+    @Test
+    fun factorValueMergesLabelSupportAndValueIntoOneReadableNode() {
+        composeRule.setContent {
+            JointSenseTheme {
+                FactorValue(
+                    factor = InflammationFactor.IL6,
+                    label = "Interleukin-6",
+                    supportingText = "Latest observation",
+                    value = "12 pg/mL",
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Interleukin-6")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text))
+        composeRule.onNodeWithText("12 pg/mL", useUnmergedTree = true).assertIsDisplayed()
     }
 }

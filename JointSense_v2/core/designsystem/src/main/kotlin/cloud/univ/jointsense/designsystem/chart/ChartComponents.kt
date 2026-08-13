@@ -22,6 +22,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -198,7 +199,7 @@ fun MultiLineChart(
         }
 
         // Series
-        for (s in series) {
+        for ((seriesIndex, s) in series.withIndex()) {
             if (s.points.isEmpty()) continue
             val pts = s.points.sortedBy { it.time }
             if (pts.size == 1) {
@@ -212,11 +213,45 @@ fun MultiLineChart(
             drawPath(
                 path,
                 s.color,
-                style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                style = Stroke(
+                    width = 3f,
+                    cap = StrokeCap.Round,
+                    join = StrokeJoin.Round,
+                    pathEffect = when (seriesIndex % 3) {
+                        1 -> PathEffect.dashPathEffect(floatArrayOf(14f, 8f))
+                        2 -> PathEffect.dashPathEffect(floatArrayOf(3f, 7f))
+                        else -> null
+                    },
+                )
             )
             for (p in pts) {
-                drawCircle(pointCenterColor, radius = 6f, center = Offset(x(p.time), y(p.value)))
-                drawCircle(s.color, radius = 4f, center = Offset(x(p.time), y(p.value)))
+                val center = Offset(x(p.time), y(p.value))
+                when (seriesIndex % 3) {
+                    1 -> {
+                        drawRect(pointCenterColor, center - Offset(6f, 6f), androidx.compose.ui.geometry.Size(12f, 12f))
+                        drawRect(s.color, center - Offset(4f, 4f), androidx.compose.ui.geometry.Size(8f, 8f))
+                    }
+                    2 -> {
+                        val outer = Path().apply {
+                            moveTo(center.x, center.y - 7f)
+                            lineTo(center.x - 7f, center.y + 6f)
+                            lineTo(center.x + 7f, center.y + 6f)
+                            close()
+                        }
+                        val inner = Path().apply {
+                            moveTo(center.x, center.y - 4f)
+                            lineTo(center.x - 4f, center.y + 3f)
+                            lineTo(center.x + 4f, center.y + 3f)
+                            close()
+                        }
+                        drawPath(outer, pointCenterColor)
+                        drawPath(inner, s.color)
+                    }
+                    else -> {
+                        drawCircle(pointCenterColor, radius = 6f, center = center)
+                        drawCircle(s.color, radius = 4f, center = center)
+                    }
+                }
             }
         }
     }

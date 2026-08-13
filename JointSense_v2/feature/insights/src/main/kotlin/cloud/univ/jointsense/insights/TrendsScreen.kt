@@ -2,6 +2,8 @@ package cloud.univ.jointsense.insights
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +42,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -92,11 +97,12 @@ fun TrendsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
+                .testTag(TRENDS_SCREEN_TAG)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
             // Period chips
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().selectableGroup()) {
                 periods.forEach { days ->
                     val selected = periodDays == days
                     Box(
@@ -105,7 +111,12 @@ fun TrendsScreen(
                             .padding(horizontal = 4.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
-                            .clickable { periodDays = days }
+                            .testTag(periodTag(days))
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { periodDays = days },
+                            )
                             .heightIn(min = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -146,6 +157,36 @@ fun TrendsScreen(
             }
             val events = state.keyEvents.filter { it.time in since..now && it.isPresentable() }
             val hasData = factorSeries.any { it.points.isNotEmpty() }
+            val factorPoints = factorSeries.flatMap(ChartSeries::points)
+            val factorSummary = if (factorPoints.isEmpty()) {
+                stringResource(R.string.insights_trends_empty)
+            } else {
+                val latest = factorSeries.mapNotNull { series ->
+                    series.points.maxByOrNull(TimePoint::time)?.let { point ->
+                        stringResource(
+                            R.string.insights_factor_chart_latest,
+                            series.name,
+                            numberFormat.format(point.value),
+                        )
+                    }
+                }.joinToString(", ")
+                stringResource(
+                    R.string.insights_factor_chart_summary,
+                    chartDateFormat.format(Date(factorPoints.minOf(TimePoint::time))),
+                    chartDateFormat.format(Date(factorPoints.maxOf(TimePoint::time))),
+                    latest,
+                )
+            }
+            val aiSummary = if (aiSeries.isEmpty()) {
+                stringResource(R.string.insights_trends_empty)
+            } else {
+                stringResource(
+                    R.string.insights_ai_chart_summary,
+                    chartDateFormat.format(Date(aiSeries.minOf(InsightPoint::time))),
+                    chartDateFormat.format(Date(aiSeries.maxOf(InsightPoint::time))),
+                    numberFormat.format(aiSeries.maxBy(InsightPoint::time).value),
+                )
+            }
 
             if (!hasData) {
                 ClinicalCard(
@@ -220,6 +261,7 @@ fun TrendsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
+                                .semantics { contentDescription = factorSummary }
                                 .testTag(FACTOR_TREND_CHART_TAG)
                         ) {
                             MultiLineChart(
@@ -268,6 +310,7 @@ fun TrendsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(160.dp)
+                                .semantics { contentDescription = aiSummary }
                                 .testTag(OA_TREND_CHART_TAG)
                         ) {
                             LineChart(
@@ -383,6 +426,18 @@ const val OA_TREND_CHART_TAG = "oa_trend_chart"
 const val TREND_DATE_AXIS_LABEL_TAG = "trend_date_axis_label"
 const val TREND_UNIT_AXIS_LABEL_TAG = "trend_unit_axis_label"
 const val TREND_SERIES_LABELS_TAG = "trend_series_labels"
+const val TRENDS_PERIOD_7_TAG = "trends_period_7"
+const val TRENDS_PERIOD_30_TAG = "trends_period_30"
+const val TRENDS_PERIOD_90_TAG = "trends_period_90"
+const val TRENDS_PERIOD_ALL_TAG = "trends_period_all"
+const val TRENDS_SCREEN_TAG = "screen_trends"
+
+private fun periodTag(days: Int): String = when (days) {
+    7 -> TRENDS_PERIOD_7_TAG
+    30 -> TRENDS_PERIOD_30_TAG
+    90 -> TRENDS_PERIOD_90_TAG
+    else -> TRENDS_PERIOD_ALL_TAG
+}
 
 @Composable
 private fun KeyEventItem.localizedText(): String = when (kind) {

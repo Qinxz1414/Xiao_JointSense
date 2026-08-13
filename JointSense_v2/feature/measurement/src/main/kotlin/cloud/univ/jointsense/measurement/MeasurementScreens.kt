@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +13,13 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,6 +45,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -59,6 +64,17 @@ const val MEASUREMENT_ERROR_TAG = "measurement_error"
 const val RETRY_BUTTON_TAG = "retry_button"
 const val ANALYZE_BUTTON_TAG = "analyze_button"
 const val CONTINUE_MEASUREMENT_TAG = "continue_measurement"
+const val SCREEN_MEASUREMENT_SELECT_TAG = "screen_measurement_select"
+const val SCREEN_MEASUREMENT_CROP_TAG = "screen_measurement_crop"
+const val SCREEN_MEASUREMENT_FACTOR_TAG = "screen_measurement_factor"
+const val MEASUREMENT_TAKE_PHOTO_TAG = "measurement_take_photo"
+const val MEASUREMENT_GALLERY_TAG = "measurement_gallery"
+const val MEASUREMENT_CROP_CONFIRM_TAG = "measurement_crop_confirm"
+const val MEASUREMENT_CROP_VIEW_TAG = "crop_view"
+const val MEASUREMENT_FACTOR_GROUP_TAG = "measurement_factor_group"
+
+fun measurementFactorTag(factor: InflammationFactor): String =
+    "measurement_factor_${factor.name.lowercase()}"
 
 /**
  * Image Selection Screen - Step 1 of the test flow.
@@ -73,6 +89,7 @@ fun ImageSelectScreen(
     modifier: Modifier = Modifier
 ) {
     Scaffold(
+        modifier = modifier.testTag(SCREEN_MEASUREMENT_SELECT_TAG),
         topBar = {
             JointSenseTopBar(
                 title = sessionName,
@@ -83,12 +100,13 @@ fun ImageSelectScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Icon(
                 imageVector = Icons.Default.CameraAlt,
@@ -122,7 +140,8 @@ fun ImageSelectScreen(
                 onClick = onTakePhoto,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp),
+                    .heightIn(min = 60.dp)
+                    .testTag(MEASUREMENT_TAKE_PHOTO_TAG),
                 shape = RoundedCornerShape(16.dp),
             ) {
                 Icon(
@@ -141,7 +160,8 @@ fun ImageSelectScreen(
                 onClick = onPickImage,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp),
+                    .heightIn(min = 60.dp)
+                    .testTag(MEASUREMENT_GALLERY_TAG),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -174,6 +194,7 @@ fun ImageCropScreen(
     modifier: Modifier = Modifier
 ) {
     Scaffold(
+        modifier = modifier.testTag(SCREEN_MEASUREMENT_CROP_TAG),
         topBar = {
             JointSenseTopBar(
                 title = stringResource(R.string.measurement_title_crop),
@@ -184,7 +205,7 @@ fun ImageCropScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
@@ -235,7 +256,8 @@ fun ImageCropScreen(
                     onClick = onConfirm,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .heightIn(min = 52.dp)
+                        .testTag(MEASUREMENT_CROP_CONFIRM_TAG),
                     shape = RoundedCornerShape(16.dp),
                 ) {
                     Icon(Icons.Default.Check, contentDescription = null)
@@ -266,6 +288,7 @@ fun FactorSelectScreen(
     modifier: Modifier = Modifier
 ) {
     Scaffold(
+        modifier = modifier.testTag(SCREEN_MEASUREMENT_FACTOR_TAG),
         topBar = {
             JointSenseTopBar(
                 title = stringResource(R.string.measurement_title_factor),
@@ -281,9 +304,10 @@ fun FactorSelectScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -308,75 +332,92 @@ fun FactorSelectScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Factor selection cards
-            InflammationFactor.entries.forEach { factor ->
-                val isSelected = factor == selectedFactor
-                ClinicalCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                        .clickable { onFactorSelected(factor) }
-                        .then(
-                            if (isSelected) {
-                                Modifier.border(
-                                    2.dp,
-                                    MaterialTheme.colorScheme.primary,
-                                    RoundedCornerShape(16.dp)
-                                )
-                            } else {
-                                Modifier
-                            }
-                        ),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        }
-                    ),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = if (isSelected) 4.dp else 1.dp
+            Column(Modifier.fillMaxWidth().selectableGroup().testTag(MEASUREMENT_FACTOR_GROUP_TAG)) {
+                InflammationFactor.entries.forEach { factor ->
+                    val isSelected = factor == selectedFactor
+                    val factorName = stringResource(factor.displayNameResource())
+                    val factorAccessibilityName = stringResource(
+                        R.string.measurement_factor_accessibility_name,
+                        factor.shortName,
+                        factorName,
                     )
-                ) {
-                    Row(
+                    ClinicalCard(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 6.dp)
+                            .heightIn(min = 48.dp)
+                            .testTag(measurementFactorTag(factor))
+                            .selectable(
+                                selected = isSelected,
+                                role = Role.RadioButton,
+                                onClick = { onFactorSelected(factor) },
+                            )
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = factorAccessibilityName
+                            }
+                            .then(
+                                if (isSelected) {
+                                    Modifier.border(
+                                        2.dp,
+                                        MaterialTheme.colorScheme.primary,
+                                        RoundedCornerShape(16.dp)
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            }
+                        ),
+                        elevation = CardDefaults.cardElevation(
+                            defaultElevation = if (isSelected) 4.dp else 1.dp
+                        )
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = factor.shortName,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = stringResource(factor.displayNameResource()),
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = stringResource(R.string.measurement_selected),
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
-                            )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = factor.shortName,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = factorName,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Analyze button
             Button(
                 onClick = onAnalyze,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .heightIn(min = 56.dp)
                     .testTag(ANALYZE_BUTTON_TAG),
                 shape = RoundedCornerShape(16.dp),
                 enabled = !isAnalyzing

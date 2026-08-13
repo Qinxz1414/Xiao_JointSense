@@ -2,12 +2,14 @@ package cloud.univ.jointsense.insights
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -137,6 +139,7 @@ fun ReportScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
+                .testTag(REPORT_SCREEN_TAG)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
@@ -418,7 +421,10 @@ fun ReportScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(10.dp))
-                        Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
                             Button(
                                 onClick = {
                                     if (isExporting) return@Button
@@ -451,8 +457,8 @@ fun ReportScreen(
                                 },
                                 enabled = !isExporting,
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
                                     .testTag(REPORT_EXPORT_PDF_TAG),
                                 shape = RoundedCornerShape(12.dp),
                             ) {
@@ -462,14 +468,13 @@ fun ReportScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(stringResource(R.string.insights_pdf_report), fontSize = 14.sp, maxLines = 1)
+                                Text(stringResource(R.string.insights_pdf_report), fontSize = 14.sp)
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
                             OutlinedButton(
                                 onClick = ::shareTextReport,
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
                                     .testTag(REPORT_EXPORT_SHARE_TAG),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
@@ -483,7 +488,6 @@ fun ReportScreen(
                                 Text(
                                     stringResource(R.string.insights_share_chooser),
                                     fontSize = 14.sp,
-                                    maxLines = 1,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -516,4 +520,5 @@ const val REPORT_TREND_INTERPRETATION_TAG = "report_trend_interpretation"
 const val REPORT_SUGGESTIONS_TAG = "report_suggestions"
 const val REPORT_EXPORT_PDF_TAG = "report_export_pdf"
 const val REPORT_EXPORT_SHARE_TAG = "report_export_share"
+const val REPORT_SCREEN_TAG = "screen_report"
 private const val STABLE_TREND_THRESHOLD_PERCENT = 10

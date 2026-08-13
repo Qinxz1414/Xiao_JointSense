@@ -27,9 +27,17 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import cloud.univ.jointsense.feature.measurement.R
+import cloud.univ.jointsense.measurement.MEASUREMENT_CROP_VIEW_TAG
 import kotlin.math.roundToInt
 
 /**
@@ -51,11 +59,53 @@ fun ImageCropView(
     val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
     val cornerRadius = 12.dp
     val handleColor = MaterialTheme.colorScheme.primary
+    val cropLabel = stringResource(R.string.measurement_crop_accessibility_label)
+    val cropState = stringResource(
+        R.string.measurement_crop_state,
+        cropRect.left,
+        cropRect.top,
+        cropRect.right,
+        cropRect.bottom,
+    )
+    val actionStep = maxOf(1, minOf(bitmap.width, bitmap.height) / 20)
+    val updateCrop: (Rect) -> Boolean = { updated ->
+        if (updated != cropRect) {
+            onCropRectChanged(updated)
+            true
+        } else {
+            false
+        }
+    }
+    val alternatives = listOf(
+        CustomAccessibilityAction(stringResource(R.string.measurement_crop_move_up)) {
+            updateCrop(cropRect.movedBy(0, -actionStep, bitmap.width, bitmap.height))
+        },
+        CustomAccessibilityAction(stringResource(R.string.measurement_crop_move_down)) {
+            updateCrop(cropRect.movedBy(0, actionStep, bitmap.width, bitmap.height))
+        },
+        CustomAccessibilityAction(stringResource(R.string.measurement_crop_move_left)) {
+            updateCrop(cropRect.movedBy(-actionStep, 0, bitmap.width, bitmap.height))
+        },
+        CustomAccessibilityAction(stringResource(R.string.measurement_crop_move_right)) {
+            updateCrop(cropRect.movedBy(actionStep, 0, bitmap.width, bitmap.height))
+        },
+        CustomAccessibilityAction(stringResource(R.string.measurement_crop_increase)) {
+            updateCrop(cropRect.resizedBy(actionStep, bitmap.width, bitmap.height))
+        },
+        CustomAccessibilityAction(stringResource(R.string.measurement_crop_decrease)) {
+            updateCrop(cropRect.resizedBy(-actionStep, bitmap.width, bitmap.height))
+        },
+    )
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .testTag("crop_view")
+            .testTag(MEASUREMENT_CROP_VIEW_TAG)
+            .semantics {
+                contentDescription = cropLabel
+                stateDescription = cropState
+                customActions = alternatives
+            }
     ) {
         val maxWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val maxHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
@@ -282,6 +332,51 @@ fun ImageCropView(
             }
         }
     }
+}
+
+private fun Rect.movedBy(dx: Int, dy: Int, imageWidth: Int, imageHeight: Int): Rect {
+    val normalized = normalizedTo(imageWidth, imageHeight)
+    val newLeft = (normalized.left + dx).coerceIn(0, imageWidth - normalized.width())
+    val newTop = (normalized.top + dy).coerceIn(0, imageHeight - normalized.height())
+    return Rect(
+        newLeft,
+        newTop,
+        newLeft + normalized.width(),
+        newTop + normalized.height(),
+    )
+}
+
+private fun Rect.resizedBy(delta: Int, imageWidth: Int, imageHeight: Int): Rect {
+    val normalized = normalizedTo(imageWidth, imageHeight)
+    if (delta < 0) {
+        val shrink = -delta
+        val minWidth = minOf(50, imageWidth)
+        val minHeight = minOf(50, imageHeight)
+        if (
+            normalized.width() - shrink * 2 < minWidth ||
+            normalized.height() - shrink * 2 < minHeight
+        ) return normalized
+        return Rect(
+            normalized.left + shrink,
+            normalized.top + shrink,
+            normalized.right - shrink,
+            normalized.bottom - shrink,
+        )
+    }
+    return Rect(
+        (normalized.left - delta).coerceAtLeast(0),
+        (normalized.top - delta).coerceAtLeast(0),
+        (normalized.right + delta).coerceAtMost(imageWidth),
+        (normalized.bottom + delta).coerceAtMost(imageHeight),
+    )
+}
+
+private fun Rect.normalizedTo(imageWidth: Int, imageHeight: Int): Rect {
+    val safeWidth = width().coerceIn(1, imageWidth)
+    val safeHeight = height().coerceIn(1, imageHeight)
+    val safeLeft = left.coerceIn(0, imageWidth - safeWidth)
+    val safeTop = top.coerceIn(0, imageHeight - safeHeight)
+    return Rect(safeLeft, safeTop, safeLeft + safeWidth, safeTop + safeHeight)
 }
 
 private enum class DragMode {

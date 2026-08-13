@@ -53,6 +53,7 @@
     <string name="insights_grade_scale_description">OA 炎症等级刻度</string>
     <string name="insights_open_report">打开 AI 报告</string>
     <string name="insights_recent_trend">最近 7 个观测点</string>
+    <string name="insights_recent_chart_summary">最近 7 个 OA 炎症综合指数（AI）观测点，时间范围 %1$s 至 %2$s。最新值 %3$s。</string>
     <string name="insights_latest_observation_time">最近观测时间：%1$s</string>
     <string name="insights_report_screen_title">AI 报告</string>
     <string name="insights_share_summary">分享摘要</string>
@@ -83,6 +84,9 @@
     <string name="insights_concentration_axis">浓度（pg/mL）</string>
     <string name="insights_date_axis">日期</string>
     <string name="insights_ai_trend">OA 炎症综合指数（AI）趋势</string>
+    <string name="insights_factor_chart_summary">炎症生物标志物图表，时间范围 %1$s 至 %2$s。最新值：%3$s。</string>
+    <string name="insights_factor_chart_latest">%1$s %2$s pg/mL</string>
+    <string name="insights_ai_chart_summary">OA 炎症综合指数（AI）图表，时间范围 %1$s 至 %2$s。最新值 %3$s。</string>
     <string name="insights_key_events">关键事件</string>
     <string name="insights_no_events">该时间段暂无事件。</string>
     <plurals name="insights_event_test">

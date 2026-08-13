@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +40,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -74,6 +77,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
+                .testTag(HOME_SCREEN_TAG)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
@@ -141,7 +145,7 @@ private fun EmptyHome(
                 onClick = onRestoreSamples,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
+                    .heightIn(min = 52.dp)
                     .testTag(RESTORE_SAMPLES_TAG),
                 shape = RoundedCornerShape(16.dp),
             ) {
@@ -269,9 +273,9 @@ private fun DashboardContent(
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         presentation.factorValues.forEach { factorValue ->
             val factor = factorValue.factor
@@ -282,7 +286,7 @@ private fun DashboardContent(
                 .map(InsightPoint::value)
             ClinicalCard(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxWidth()
                     .testTag(factorValueTag(factor)),
                 shape = RoundedCornerShape(12.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -335,14 +339,26 @@ private fun DashboardContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
             val dayFormat = remember(locale) { DateFormat.getDateInstance(DateFormat.SHORT, locale) }
+            val recent = presentation.recentObservations
+            val recentSummary = if (recent.isEmpty()) {
+                stringResource(R.string.insights_trends_empty)
+            } else {
+                stringResource(
+                    R.string.insights_recent_chart_summary,
+                    dayFormat.format(Date(recent.first().time)),
+                    dayFormat.format(Date(recent.last().time)),
+                    numberFormat.format(recent.last().value),
+                )
+            }
             LineChart(
-                dataPoints = presentation.recentObservations.map {
+                dataPoints = recent.map {
                     ChartDataPoint(dayFormat.format(Date(it.time)), it.value)
                 },
                 lineColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(180.dp),
+                    .height(180.dp)
+                    .semantics { contentDescription = recentSummary },
                 yAxisLabel = stringResource(R.string.insights_ai_axis),
                 formatValue = numberFormat::format,
             )
@@ -360,7 +376,7 @@ private fun StartMeasurementButton(onTestNow: () -> Unit) {
         onClick = onTestNow,
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .heightIn(min = 52.dp)
             .testTag(START_MEASUREMENT_TAG),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -387,3 +403,4 @@ const val FACTOR_VALUE_IL1_BETA_TAG = "factor_value_il1_beta"
 const val RECENT_TREND_TAG = "recent_trend"
 const val START_MEASUREMENT_TAG = "start_measurement"
 const val RESTORE_SAMPLES_TAG = "restore_samples"
+const val HOME_SCREEN_TAG = "screen_home"

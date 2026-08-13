@@ -17,6 +17,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +49,7 @@ fun AboutRouteScreen(
         Column(
             modifier = modifier
                 .fillMaxSize()
+                .testTag(ABOUT_SCREEN_TAG)
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
@@ -92,6 +94,8 @@ fun AboutRouteScreen(
         }
     }
 }
+
+const val ABOUT_SCREEN_TAG = "screen_about"
 
 @Composable
 private fun AboutSection(title: String, paragraphs: List<String>) {

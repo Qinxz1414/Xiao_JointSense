@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -123,6 +124,7 @@ fun ResultScreen(
     val grade = presentation.grade
 
     Scaffold(
+        modifier = modifier.testTag(SCREEN_RESULT_TAG),
         topBar = {
             JointSenseTopBar(
                 title = stringResource(R.string.measurement_title_result),
@@ -137,7 +139,7 @@ fun ResultScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
@@ -463,7 +465,7 @@ fun ResultScreen(
                     onClick = onContinueMeasurement,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .heightIn(min = 50.dp)
                         .testTag(CONTINUE_MEASUREMENT_TAG),
                     shape = RoundedCornerShape(14.dp)
                 ) {
@@ -487,7 +489,7 @@ fun ResultScreen(
                 onClick = onGoHome,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
+                    .heightIn(min = 50.dp)
                     .testTag(RESULT_HOME_ACTION_TAG),
                 shape = RoundedCornerShape(14.dp),
             ) {
@@ -521,6 +523,7 @@ private fun ResultLoadingScreen(
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
+        modifier = modifier.testTag(SCREEN_RESULT_TAG),
         topBar = {
             JointSenseTopBar(
                 title = stringResource(R.string.measurement_title_result),
@@ -535,7 +538,7 @@ private fun ResultLoadingScreen(
         },
     ) { paddingValues ->
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
@@ -571,6 +574,7 @@ private fun ResultNotFoundScreen(
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
+        modifier = modifier.testTag(SCREEN_RESULT_TAG),
         topBar = {
             JointSenseTopBar(
                 title = stringResource(R.string.measurement_title_result),
@@ -585,7 +589,7 @@ private fun ResultNotFoundScreen(
         },
     ) { paddingValues ->
         Box(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(MaterialTheme.colorScheme.background)
@@ -641,6 +645,7 @@ const val RESULT_NOT_FOUND_TAG = "result_not_found"
 const val RESULT_NOT_FOUND_BACK_TAG = "result_not_found_back"
 const val RESULT_NOT_FOUND_HOME_TAG = "result_not_found_home"
 const val RESULT_LOADING_TAG = "result_loading"
+const val SCREEN_RESULT_TAG = "screen_result"
 
 private fun RangeStatus.labelResource(): Int = when (this) {
     RangeStatus.UNKNOWN -> R.string.measurement_range_unknown

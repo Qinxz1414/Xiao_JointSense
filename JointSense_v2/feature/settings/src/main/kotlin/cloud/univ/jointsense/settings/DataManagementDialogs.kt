@@ -3,6 +3,8 @@ package cloud.univ.jointsense.settings
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -63,10 +65,10 @@ private fun ConfirmationDialog(
             )
         },
         text = {
-            if (clear) {
-                Text(stringResource(R.string.settings_clear_scope))
-            } else {
-                Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (clear) {
+                    Text(stringResource(R.string.settings_clear_scope))
+                } else {
                     Text(stringResource(R.string.settings_restore_samples_message))
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(R.string.settings_restore_samples_calibration_note))

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,8 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +57,12 @@ import cloud.univ.jointsense.feature.measurement.R
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+
+const val SCREEN_HISTORY_TAG = "screen_history"
+
+fun historyDeleteTag(sessionId: String): String = "history_delete_$sessionId"
+
+fun historySessionTag(sessionId: String): String = "history_session_$sessionId"
 
 /**
  * History Screen - Shows all saved test sessions.
@@ -70,6 +82,7 @@ fun HistoryScreen(
     }
 
     Scaffold(
+        modifier = modifier.testTag(SCREEN_HISTORY_TAG),
         topBar = {
             JointSenseTopBar(
                 title = stringResource(R.string.measurement_history_title),
@@ -82,7 +95,7 @@ fun HistoryScreen(
         if (sessions.isEmpty()) {
             // Empty state
             Column(
-                modifier = modifier
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(24.dp),
@@ -116,7 +129,7 @@ fun HistoryScreen(
             }
         } else {
             LazyColumn(
-                modifier = modifier
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -124,10 +137,21 @@ fun HistoryScreen(
             ) {
                 items(sessions.reversed()) { session ->
                     val displayName = session.localizedDisplayName()
+                    val openDescription = stringResource(R.string.measurement_history_open_session, displayName)
+                    val deleteDescription = stringResource(R.string.measurement_history_delete_session, displayName)
                     ClinicalCard(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSessionClick(session) },
+                            .heightIn(min = 48.dp)
+                            .testTag(historySessionTag(session.id))
+                            .semantics {
+                                contentDescription = openDescription
+                                role = Role.Button
+                            }
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = openDescription,
+                            ) { onSessionClick(session) },
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
@@ -213,14 +237,17 @@ fun HistoryScreen(
                             // Delete button
                             IconButton(
                                 onClick = { onDeleteSession(session) },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .testTag(historyDeleteTag(session.id))
+                                    .semantics {
+                                        contentDescription = deleteDescription
+                                        role = Role.Button
+                                    },
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
-                                    contentDescription = stringResource(
-                                        R.string.measurement_history_delete_session,
-                                        displayName,
-                                    ),
+                                    contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )

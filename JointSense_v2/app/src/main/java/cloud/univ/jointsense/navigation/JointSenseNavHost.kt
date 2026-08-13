@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -397,7 +402,8 @@ private fun JointSenseNavHostContent(
                         .border(4.dp, MaterialTheme.colorScheme.surface, CircleShape)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
-                        .clickable {
+                        .testTag(MAIN_NEW_TEST_TAG)
+                        .clickable(role = Role.Button) {
                             sessionCreationDriver?.request(topLevelDestination, sessionNamePrefix)
                         },
                     contentAlignment = Alignment.Center,
@@ -547,16 +553,19 @@ private fun MainBottomBar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(68.dp),
+                    .heightIn(min = 68.dp)
+                    .selectableGroup(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BarTab(
+                    tag = NAV_HOME_TAG,
                     icon = Icons.Default.Home,
                     label = stringResource(R.string.nav_home),
                     selected = activeDestination == TopLevelDestination.HOME,
                     onClick = { onDestination(TopLevelDestination.HOME) },
                 )
                 BarTab(
+                    tag = NAV_TRENDS_TAG,
                     icon = Icons.AutoMirrored.Filled.ShowChart,
                     label = stringResource(R.string.nav_trends),
                     selected = activeDestination == TopLevelDestination.TRENDS,
@@ -577,12 +586,14 @@ private fun MainBottomBar(
                     )
                 }
                 BarTab(
+                    tag = NAV_REPORT_TAG,
                     icon = Icons.Default.Description,
                     label = stringResource(R.string.nav_report),
                     selected = activeDestination == TopLevelDestination.REPORT,
                     onClick = { onDestination(TopLevelDestination.REPORT) },
                 )
                 BarTab(
+                    tag = NAV_PROFILE_TAG,
                     icon = Icons.Default.Person,
                     label = stringResource(R.string.nav_profile),
                     selected = activeDestination == TopLevelDestination.PROFILE,
@@ -600,6 +611,7 @@ private fun MainBottomBar(
 
 @Composable
 private fun RowScope.BarTab(
+    tag: String,
     icon: ImageVector,
     label: String,
     selected: Boolean,
@@ -608,13 +620,19 @@ private fun RowScope.BarTab(
     Column(
         modifier = Modifier
             .weight(1f)
-            .clickable(onClick = onClick)
+            .heightIn(min = 64.dp)
+            .testTag(tag)
+            .selectable(
+                selected = selected,
+                role = Role.Tab,
+                onClick = onClick,
+            )
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = label,
+            contentDescription = null,
             tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )
@@ -627,3 +645,9 @@ private fun RowScope.BarTab(
         )
     }
 }
+
+const val MAIN_NEW_TEST_TAG = "main_new_test"
+const val NAV_HOME_TAG = "nav_home"
+const val NAV_TRENDS_TAG = "nav_trends"
+const val NAV_REPORT_TAG = "nav_report"
+const val NAV_PROFILE_TAG = "nav_profile"

@@ -16,9 +16,18 @@
     <string name="measurement_select_image_instructions">拍摄芯片反应腔照片，或从相册选择已有图像。</string>
     <string name="measurement_title_crop">选择分析区域</string>
     <string name="measurement_crop_instructions">拖动选区可移动，拖动四角可调整大小。</string>
+    <string name="measurement_crop_accessibility_label">分析区域选区</string>
+    <string name="measurement_crop_state">已选区域：左 %1$d、上 %2$d、右 %3$d、下 %4$d 像素</string>
+    <string name="measurement_crop_move_up">向上移动选区</string>
+    <string name="measurement_crop_move_down">向下移动选区</string>
+    <string name="measurement_crop_move_left">向左移动选区</string>
+    <string name="measurement_crop_move_right">向右移动选区</string>
+    <string name="measurement_crop_increase">扩大选区</string>
+    <string name="measurement_crop_decrease">缩小选区</string>
     <string name="measurement_title_factor">选择检测因子</string>
     <string name="measurement_factor_instructions">请选择需要定量分析的炎症生物标志物。</string>
     <string name="measurement_selected">已选择</string>
+    <string name="measurement_factor_accessibility_name">%1$s，%2$s</string>
     <string name="measurement_analyzing">正在分析…</string>
     <string name="measurement_title_result">分析结果</string>
     <string name="measurement_result_not_found_title">未找到检测结果</string>
@@ -48,6 +57,7 @@
     <string name="measurement_history_empty_message">完成一次新检测后，结果将显示在这里。</string>
     <string name="measurement_history_result_count">%1$d/5 项测量</string>
     <string name="measurement_history_delete_session">删除%1$s</string>
+    <string name="measurement_history_open_session">打开%1$s</string>
     <string name="measurement_builtin_test_plate">检测板 %1$d</string>
     <string name="measurement_builtin_clipboard_plate">剪贴板样例 %1$d</string>
     <string name="measurement_factor_separator">、</string>
