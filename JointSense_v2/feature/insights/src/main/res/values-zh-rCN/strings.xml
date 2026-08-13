@@ -3,12 +3,12 @@
     <string name="report_title">JointSense 科研趋势报告</string>
     <string name="report_page_header">炎症生物标志物纵向摘要</string>
     <string name="report_generated">生成时间</string>
-    <string name="report_oa_index">骨关节炎炎症指数（AI）</string>
+    <string name="report_oa_index">OA 炎症综合指数（AI）</string>
     <string name="report_grade">级别</string>
     <string name="report_risk">14 天进展风险</string>
     <string name="report_latest_values">最新定量结果</string>
     <string name="report_week_changes">较前一周变化</string>
-    <string name="report_oa_week_change">骨关节炎指数较前一周变化</string>
+    <string name="report_oa_week_change">OA 炎症综合指数（AI）较前一周变化</string>
     <string name="report_recommendations">科研趋势观察</string>
     <string name="report_not_measured">未测量</string>
     <string name="report_no_comparison">无可比数据</string>

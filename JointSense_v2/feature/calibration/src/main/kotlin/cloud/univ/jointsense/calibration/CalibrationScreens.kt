@@ -274,6 +274,7 @@ internal fun CalibrationReviewScreen(
                         R.string.calibration_knot_summary,
                         knot.concentration,
                         knot.rawSignal,
+                        knot.netSignal,
                         knot.fittedSignal,
                     ),
                     modifier = Modifier.padding(vertical = 3.dp),

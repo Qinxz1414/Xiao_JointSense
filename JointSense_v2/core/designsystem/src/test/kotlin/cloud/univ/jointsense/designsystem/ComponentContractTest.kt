@@ -64,4 +64,19 @@ class ComponentContractTest {
         assertFalse(source.contains("dynamicLightColorScheme"))
         assertFalse(source.contains("dynamicDarkColorScheme"))
     }
+
+    @Test
+    fun chartsRenderCallerOwnedLabelsAndFormatAllNumericTicks() {
+        val source = File(
+            "src/main/kotlin/cloud/univ/jointsense/designsystem/chart/ChartComponents.kt",
+        ).readText()
+
+        assertTrue(source.contains("yAxisLabel: String"))
+        assertTrue(source.contains("drawText(\n                yAxisLabel,"))
+        assertTrue(source.contains("formatValue: (Float) -> String"))
+        assertTrue(source.contains("AI_SCALE_TICKS.forEachIndexed"))
+        assertTrue(source.contains("text = formatValue(tick)"))
+        assertFalse(source.contains("listOf(\"0\", \"0.25\", \"0.50\", \"0.75\", \"1.00\")"))
+        assertFalse(source.contains("text = \"▼\""))
+    }
 }

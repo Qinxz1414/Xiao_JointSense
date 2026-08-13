@@ -384,6 +384,29 @@ class MeasurementViewModelTest {
     }
 
     @Test
+    fun updatingLocalizedPrefixAffectsTheNextSessionWithoutRecreatingViewModel() = runTest(dispatcher) {
+        val repository = RecordingRepository()
+        val viewModel = MeasurementViewModel(
+            repository = repository,
+            analyzer = RecordingAnalyzer(),
+            savedStateHandle = SavedStateHandle(),
+            decoder = RecordingDecoder(),
+            ioDispatcher = dispatcher,
+            defaultDispatcher = dispatcher,
+            sessionNamePrefix = "Test",
+        )
+
+        viewModel.createNewSession("HOME")
+        advanceUntilIdle()
+        viewModel.acceptCreatedSession()
+        viewModel.updateSessionNamePrefix("检测")
+        viewModel.createNewSession("HOME")
+        advanceUntilIdle()
+
+        assertEquals(listOf("Test #1", "检测 #1"), repository.sessions.value.map(TestSession::name))
+    }
+
+    @Test
     fun cropOutsideDecodedImageIsRecoverableAndPreservesLastValidCrop() = runTest(dispatcher) {
         val viewModel = readyViewModel()
         val validCrop = viewModel.state.value.cropRect

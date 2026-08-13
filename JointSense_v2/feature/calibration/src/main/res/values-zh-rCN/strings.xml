@@ -23,7 +23,7 @@
     <string name="calibration_signal">原始信号：%1$.2f</string>
     <string name="calibration_review_curve">审核曲线</string>
     <string name="calibration_curve_title">%1$s 标准曲线</string>
-    <string name="calibration_knot_summary">%1$.2f pg/mL · 原始信号 %2$.1f · 拟合信号 %3$.1f</string>
+    <string name="calibration_knot_summary">%1$.2f pg/mL · 原始信号 %2$.1f · 净信号 %3$.1f · 拟合信号 %4$.1f</string>
     <string name="calibration_invalid">校准数据无效。</string>
     <string name="calibration_return_assign">请返回浓度录入步骤，先检查各孔读数。</string>
     <string name="calibration_saving">正在保存…</string>

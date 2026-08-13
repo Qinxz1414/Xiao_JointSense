@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="calibration_title">Calibrate standard curve</string>
+    <string name="calibration_title">Standard curve calibration</string>
     <string name="calibration_back">Back</string>
     <string name="calibration_step_select">Step 1 / 5 · Capture standard plate</string>
     <string name="calibration_step_crop">Step 2 / 5 · Crop to plate</string>
@@ -23,7 +23,7 @@
     <string name="calibration_signal">Raw signal: %1$.2f</string>
     <string name="calibration_review_curve">Review curve</string>
     <string name="calibration_curve_title">%1$s standard curve</string>
-    <string name="calibration_knot_summary">%1$.2f pg/mL · raw signal %2$.1f · fitted signal %3$.1f</string>
+    <string name="calibration_knot_summary">%1$.2f pg/mL · raw signal %2$.1f · net signal %3$.1f · fitted signal %4$.1f</string>
     <string name="calibration_invalid">Calibration is invalid.</string>
     <string name="calibration_return_assign">Return to concentration assignment and review the readings first.</string>
     <string name="calibration_saving">Saving…</string>

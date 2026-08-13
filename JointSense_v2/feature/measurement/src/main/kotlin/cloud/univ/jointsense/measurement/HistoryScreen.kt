@@ -123,6 +123,7 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(sessions.reversed()) { session ->
+                    val displayName = session.localizedDisplayName()
                     ClinicalCard(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -157,7 +158,7 @@ fun HistoryScreen(
                             // Session info
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = session.name,
+                                    text = displayName,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -218,7 +219,7 @@ fun HistoryScreen(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = stringResource(
                                         R.string.measurement_history_delete_session,
-                                        session.name,
+                                        displayName,
                                     ),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)

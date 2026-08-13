@@ -28,9 +28,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -48,6 +50,7 @@ import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.feature.measurement.R
+import java.text.NumberFormat
 
 /**
  * Analysis result screen — quantitative values for the three factors,
@@ -64,6 +67,13 @@ fun ResultScreen(
     onReturnToOrigin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val locale = LocalConfiguration.current.locales[0]
+    val aiScaleFormat = remember(locale) {
+        NumberFormat.getNumberInstance(locale).apply {
+            minimumFractionDigits = 0
+            maximumFractionDigits = 2
+        }
+    }
     val results = session?.results ?: emptyList()
     val latestPerFactor = BaselineMeasurementMetrics.latestPerFactor(results)
     val ai = BaselineMeasurementMetrics.aiFromResults(results)
@@ -281,7 +291,10 @@ fun ResultScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(10.dp))
-                    AiScaleBar(value = ai)
+                    AiScaleBar(
+                        value = ai,
+                        formatValue = { aiScaleFormat.format(it.toDouble()) },
+                    )
                 }
             }
 

@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -389,6 +390,7 @@ private data class FeatureViewModels(
 @Composable
 private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModels {
     val context = LocalContext.current.applicationContext
+    val sessionNamePrefix = stringResource(R.string.session_name_prefix)
     val insightsFactory = remember(container) { InsightsViewModelFactory(container.testSessions) }
     val measurementFactory = remember(container, context) {
         MeasurementViewModelFactory(
@@ -396,7 +398,6 @@ private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModel
             analyzer = container.measurementAnalysis,
             decoder = SampledBitmapDecoder(context.contentResolver),
             context = context,
-            sessionNamePrefix = { context.getString(R.string.session_name_prefix) },
         )
     }
     val settingsFactory = remember(container) {
@@ -406,11 +407,15 @@ private fun rememberFeatureViewModels(container: AppContainer): FeatureViewModel
             container.dataManagement,
         )
     }
-    return FeatureViewModels(
+    val featureViewModels = FeatureViewModels(
         insights = viewModel(key = "insights", factory = insightsFactory),
         measurement = viewModel(key = "measurement", factory = measurementFactory),
         settings = viewModel(key = "settings", factory = settingsFactory),
     )
+    SideEffect {
+        featureViewModels.measurement.updateSessionNamePrefix(sessionNamePrefix)
+    }
+    return featureViewModels
 }
 
 @Composable

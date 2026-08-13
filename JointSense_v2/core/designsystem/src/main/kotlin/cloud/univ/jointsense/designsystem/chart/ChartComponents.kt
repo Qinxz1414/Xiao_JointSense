@@ -114,7 +114,7 @@ fun MultiLineChart(
         val density = this.density
         fun textSize(sp: Float) = sp * density
 
-        val paddingLeft = 34f * density
+        val paddingLeft = 48f * density
         val paddingRight = 12f * density
         val paddingTop = 10f * density
         val paddingBottom = 22f * density
@@ -135,6 +135,22 @@ fun MultiLineChart(
         fun x(time: Long) = paddingLeft + chartWidth * (time - tMin) / (tMax - tMin)
         fun y(value: Float) =
             paddingTop + chartHeight - (value - yMin) / (yMax - yMin) * chartHeight
+
+        drawContext.canvas.nativeCanvas.apply {
+            save()
+            rotate(-90f)
+            drawText(
+                yAxisLabel,
+                -(paddingTop + chartHeight / 2f),
+                textSize(11f),
+                android.graphics.Paint().apply {
+                    color = labelColor
+                    textSize = textSize(10f)
+                    textAlign = android.graphics.Paint.Align.CENTER
+                },
+            )
+            restore()
+        }
 
         // Horizontal grid + y labels
         val ySteps = 4
@@ -262,8 +278,10 @@ fun GaugeChart(
 @Composable
 fun AiScaleBar(
     value: Float?,
+    formatValue: (Float) -> String,
     modifier: Modifier = Modifier
 ) {
+    val markerColor = MaterialTheme.colorScheme.onSurface
     Column(modifier = modifier) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val width = maxWidth
@@ -278,14 +296,22 @@ fun AiScaleBar(
             )
             if (value != null) {
                 val fraction = value.coerceIn(0f, 1f)
-                Text(
-                    text = "▼",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 10.sp,
+                Canvas(
                     modifier = Modifier
                         .offset(x = width * fraction - 5.dp)
+                        .size(10.dp)
                         .align(Alignment.TopStart)
-                )
+                ) {
+                    drawPath(
+                        path = Path().apply {
+                            moveTo(size.width / 2f, size.height)
+                            lineTo(0f, 0f)
+                            lineTo(size.width, 0f)
+                            close()
+                        },
+                        color = markerColor,
+                    )
+                }
             }
         }
         Row(
@@ -293,9 +319,9 @@ fun AiScaleBar(
                 .fillMaxWidth()
                 .padding(top = 2.dp)
         ) {
-            listOf("0", "0.25", "0.50", "0.75", "1.00").forEachIndexed { i, label ->
+            AI_SCALE_TICKS.forEachIndexed { i, tick ->
                 Text(
-                    text = label,
+                    text = formatValue(tick),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 9.sp,
                     modifier = Modifier.weight(1f),
@@ -309,3 +335,5 @@ fun AiScaleBar(
         }
     }
 }
+
+private val AI_SCALE_TICKS = listOf(0f, 0.25f, 0.5f, 0.75f, 1f)

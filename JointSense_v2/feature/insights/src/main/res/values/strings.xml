@@ -99,6 +99,7 @@
     <string name="factor_il6_name">Interleukin-6</string>
     <string name="factor_tnf_alpha_name">Tumor necrosis factor α</string>
     <string name="factor_il1_beta_name">Interleukin-1β</string>
+    <!-- I18N invariant scientific notation: pg/mL and the AI acronym remain unchanged across locales. -->
     <string name="insights_unit" translatable="false">pg/mL</string>
     <string name="insights_ai_axis" translatable="false">AI</string>
     <string name="value_unavailable" translatable="false">—</string>

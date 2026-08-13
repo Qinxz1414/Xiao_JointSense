@@ -10,9 +10,9 @@ import cloud.univ.jointsense.domain.model.TestSession
 class BuiltInSampleProvider {
     val sessions: List<TestSession> = buildList {
         TEST_CASE_CONCENTRATIONS.indices.forEach { index -> add(testCasePlate(index)) }
-        add(clipboardPlate("builtin-clip-1", "Clipboard Plate 1 · 2026-08-06 19:25", CLIP_1_TIMESTAMP, CLIPBOARD_SIGNALS[0]))
-        add(clipboardPlate("builtin-clip-2", "Clipboard Plate 2 · 2026-08-06 19:31", CLIP_2_TIMESTAMP, CLIPBOARD_SIGNALS[1]))
-        add(clipboardPlate("builtin-clip-3", "Clipboard Plate 3 · 2026-08-06 23:20", CLIP_3_TIMESTAMP, CLIPBOARD_SIGNALS[2]))
+        add(clipboardPlate("builtin-clip-1", CLIP_1_TIMESTAMP, CLIPBOARD_SIGNALS[0]))
+        add(clipboardPlate("builtin-clip-2", CLIP_2_TIMESTAMP, CLIPBOARD_SIGNALS[1]))
+        add(clipboardPlate("builtin-clip-3", CLIP_3_TIMESTAMP, CLIPBOARD_SIGNALS[2]))
     }
 
     private fun testCasePlate(index: Int): TestSession {
@@ -20,7 +20,7 @@ class BuiltInSampleProvider {
         val timestamp = TEST_CASE_TIMESTAMPS[index]
         return TestSession(
             id = id,
-            name = "Test Plate ${index + 1} · 2026-${TEST_CASE_DATES[index]}",
+            name = id,
             createdAt = timestamp,
             source = DataSource.BUILT_IN,
             results = FACTORS.mapIndexed { factorIndex, factor ->
@@ -31,12 +31,11 @@ class BuiltInSampleProvider {
 
     private fun clipboardPlate(
         id: String,
-        name: String,
         timestamp: Long,
         signals: FloatArray,
     ): TestSession = TestSession(
         id = id,
-        name = name,
+        name = id,
         createdAt = timestamp,
         source = DataSource.BUILT_IN,
         results = FACTORS.mapIndexed { index, factor ->
@@ -116,7 +115,6 @@ class BuiltInSampleProvider {
             1_785_499_200_000L, 1_785_585_600_000L, 1_785_672_000_000L,
             1_785_758_400_000L, 1_785_844_800_000L, 1_785_931_200_000L,
         )
-        val TEST_CASE_DATES = listOf("07-28", "07-29", "07-30", "07-31", "08-01", "08-02", "08-03", "08-04", "08-05")
         val TEST_CASE_CONCENTRATIONS = arrayOf(
             floatArrayOf(0f, 0f, 0f),
             floatArrayOf(2f, 5f, 2f),

@@ -144,7 +144,8 @@ fun ImageSelectRouteScreen(
                 )
             },
             onBack = onBack,
-            sessionName = state.currentSession?.name ?: stringResource(R.string.measurement_new_test),
+            sessionName = state.currentSession?.localizedDisplayName()
+                ?: stringResource(R.string.measurement_new_test),
         )
         Stage.Decoding -> MeasurementProgressContent(stringResource(R.string.measurement_progress_preparing_image))
         Stage.RecoverableError -> MeasurementErrorContent(

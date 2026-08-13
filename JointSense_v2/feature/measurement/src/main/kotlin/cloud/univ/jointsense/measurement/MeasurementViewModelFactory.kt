@@ -26,7 +26,7 @@ class MeasurementViewModelFactory(
         VolatileCameraPermissionHistoryStore(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    private val sessionNamePrefix: () -> String = { "Test" },
+    private val sessionNamePrefix: String = "Test",
     private val draftIdFactory: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModelProvider.Factory {
     constructor(
@@ -36,7 +36,7 @@ class MeasurementViewModelFactory(
         context: Context,
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
-        sessionNamePrefix: () -> String = { "Test" },
+        sessionNamePrefix: String = "Test",
         draftIdFactory: () -> String = { UUID.randomUUID().toString() },
     ) : this(
         repository = repository,
