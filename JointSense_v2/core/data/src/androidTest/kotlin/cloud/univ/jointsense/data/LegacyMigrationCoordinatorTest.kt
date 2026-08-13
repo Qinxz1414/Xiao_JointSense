@@ -264,6 +264,37 @@ class LegacyMigrationCoordinatorTest {
         assertEquals("true", metadata("samplesInitialized"))
     }
 
+    @Test
+    fun restoringSamplesLeavesEmptyAndExistingCalibrationKnotsUnchanged() = runTest {
+        val dataManagement = RoomDataManagementRepository(database)
+        val calibrations = RoomCalibrationRepository(database)
+
+        dataManagement.restoreBuiltInSamples()
+        assertEquals(emptyList<Calibration>(), calibrations.observeCalibrations().first())
+
+        val existing = Calibration(
+            factor = InflammationFactor.TNF_ALPHA,
+            createdAt = 222L,
+            version = 4,
+            status = CalibrationStatus.ACTIVE,
+            kitName = "Research kit",
+            kitLot = "Lot 8",
+            knots = listOf(
+                CalibrationKnot(0, 0f, -4f, -3f, -2f, true),
+                CalibrationKnot(1, 25f, 5f, 4f, 3f, false),
+            ),
+        )
+        calibrations.save(existing)
+
+        dataManagement.restoreBuiltInSamples()
+        dataManagement.restoreBuiltInSamples()
+
+        assertEquals(existing, calibrations.observeCalibration(InflammationFactor.TNF_ALPHA).first())
+        val sessions = database.testSessionDao().sessions().first().map { it.toDomain() }
+        assertEquals(12, sessions.size)
+        assertEquals(36, sessions.sumOf { it.results.size })
+    }
+
     private fun legacyDataPrefs() =
         context.getSharedPreferences("joint_sense_data", Context.MODE_PRIVATE)
 

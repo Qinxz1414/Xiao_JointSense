@@ -126,6 +126,18 @@ class JointSenseNavigationTest {
     }
 
     @Test
+    fun typedAboutRouteBackReturnsToProfile() {
+        composeRule.onNodeWithTag("go:profile").performClick()
+        composeRule.onNodeWithTag("go:about").performClick()
+        composeRule.onNodeWithTag("screen:about").assertIsDisplayed()
+
+        pressActivityBack()
+
+        composeRule.onNodeWithTag("screen:profile").assertIsDisplayed()
+        check(!composeRule.activity.isFinishing)
+    }
+
+    @Test
     fun historicalResultContinuationReturnsToHistoryAfterTheNewResult() {
         composeRule.onNodeWithTag("go:profile").performClick()
         composeRule.onNodeWithTag("go:history").performClick()
@@ -229,8 +241,10 @@ class JointSenseNavigationTest {
                 ProfileRoute -> {
                     ScreenMarker("profile")
                     NavButton("go:history", actions::openHistory)
+                    NavButton("go:about", actions::openAbout)
                     NavButton("go:calibration", actions::startCalibration)
                 }
+                AboutRoute -> ScreenMarker("about")
                 HistoryRoute -> {
                     ScreenMarker("history")
                     NavButton("go:historical-result") {

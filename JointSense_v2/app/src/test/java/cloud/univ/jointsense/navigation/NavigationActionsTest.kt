@@ -82,6 +82,19 @@ class NavigationActionsTest {
     }
 
     @Test
+    fun typedAboutBackReturnsToProfile() {
+        val driver = StackNavigationDriver(mutableListOf(HomeRoute))
+        val actions = NavigationActions(driver)
+
+        actions.openTopLevel(TopLevelDestination.PROFILE)
+        actions.openAbout()
+        assertEquals(listOf(HomeRoute, ProfileRoute, AboutRoute), driver.stack)
+
+        actions.navigateBack()
+        assertEquals(listOf(HomeRoute, ProfileRoute), driver.stack)
+    }
+
+    @Test
     fun continuingHistoricalResultStartsMeasurementAboveHistoryAndReturnsThere() {
         val driver = StackNavigationDriver(mutableListOf(HomeRoute))
         val actions = NavigationActions(driver)

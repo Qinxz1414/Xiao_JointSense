@@ -65,6 +65,7 @@ import cloud.univ.jointsense.calibration.CalibrationSelectRouteScreen
 import cloud.univ.jointsense.calibration.CalibrationViewModel
 import cloud.univ.jointsense.calibration.CalibrationViewModelFactory
 import cloud.univ.jointsense.calibration.LegacyCalibrationRevalidator
+import cloud.univ.jointsense.BuildConfig
 import cloud.univ.jointsense.R
 import cloud.univ.jointsense.di.AppContainer
 import cloud.univ.jointsense.insights.HomeRouteScreen
@@ -83,6 +84,7 @@ import cloud.univ.jointsense.measurement.ResultRouteScreen
 import cloud.univ.jointsense.measurement.ResultResolution
 import cloud.univ.jointsense.measurement.resolveResultById
 import cloud.univ.jointsense.settings.SettingsRouteScreen
+import cloud.univ.jointsense.settings.AboutRouteScreen
 import cloud.univ.jointsense.settings.SettingsViewModel
 import cloud.univ.jointsense.settings.SettingsViewModelFactory
 
@@ -238,6 +240,16 @@ private fun JointSenseNavHostContent(
                             languageController = container.languageController,
                             onOpenHistory = actions::openHistory,
                             onCalibrate = actions::startCalibration,
+                            onOpenAbout = actions::openAbout,
+                        )
+                    }
+                }
+                composable<AboutRoute> {
+                    BackHandler { actions.navigateBack() }
+                    Destination(screenSlot, AboutRoute, actions) {
+                        AboutRouteScreen(
+                            appVersionName = BuildConfig.VERSION_NAME,
+                            onBack = { actions.navigateBack() },
                         )
                     }
                 }

@@ -3,8 +3,8 @@
     <string name="settings_title">Profile</string>
     <string name="settings_logo_description">JointSense logo</string>
     <string name="settings_app_name">JointSense</string>
-    <string name="settings_app_summary">OA inflammation monitor · v1.0</string>
-    <string name="settings_counts">%1$s, %2$s</string>
+    <string name="settings_app_summary">Smartphone-photo colorimetry for OA research</string>
+    <string name="settings_counts">%1$s · %2$s</string>
     <plurals name="settings_session_count">
         <item quantity="one">%1$d session</item>
         <item quantity="other">%1$d sessions</item>
@@ -13,37 +13,72 @@
         <item quantity="one">%1$d measurement</item>
         <item quantity="other">%1$d measurements</item>
     </plurals>
-    <string name="settings_history">Test history</string>
-    <string name="settings_history_summary">Browse and manage saved test sessions</string>
-    <string name="settings_about_model">About the model</string>
-    <string name="settings_about_summary">How RGB colorimetry and the analysis model work</string>
-    <string name="settings_calibrate">Calibrate standard curve</string>
-    <string name="settings_clear_all">Clear all data</string>
-    <string name="settings_clear_summary">Delete all saved sessions and user calibration on this device</string>
-    <string name="settings_clear_title">Clear all data?</string>
-    <plurals name="settings_clear_message">
-        <item quantity="one">The saved test session and all user calibration curves will be permanently deleted from this device.</item>
-        <item quantity="other">All %1$d saved test sessions and user calibration curves will be permanently deleted from this device.</item>
+    <plurals name="settings_builtin_sample_count">
+        <item quantity="one">%1$d built-in sample session</item>
+        <item quantity="other">%1$d built-in sample sessions</item>
     </plurals>
-    <string name="settings_delete">Delete</string>
-    <string name="settings_cancel">Cancel</string>
-    <string name="settings_ok">OK</string>
-    <string name="settings_restore_samples_title">Restore built-in samples?</string>
-    <string name="settings_restore_samples_message">Built-in sample sessions will be added back to this device.</string>
-    <string name="settings_restore_samples_calibration_note">Restoring built-in sample sessions does not change or restore user calibration curves.</string>
-    <string name="settings_restore_samples_confirm">Restore samples</string>
-    <string name="settings_restore_samples_success_title">Samples restored</string>
-    <string name="settings_restore_samples_success_message">Built-in sample sessions are available again. User calibration curves were not changed.</string>
-    <string name="settings_restore_samples_failure_title">Samples could not be restored</string>
-    <string name="settings_restore_samples_failure_message">No calibration data was changed. Try restoring the built-in samples again.</string>
-    <string name="settings_about_model_body">JointSense estimates TNF-α, IL-6, and IL-1β from chip reaction-chamber images. Six RGB features—channel means and standard deviations—feed a factor-specific analysis model. The OA inflammation index (AI) combines the three factors into a score from 0 to 1 and maps it to grades 0 through 4.\n\nModel coefficients in this research build are placeholders pending a validated trained export.</string>
+
+    <string name="settings_section_application">Application settings</string>
+    <string name="settings_section_data_model">Data and model</string>
+    <string name="settings_section_support">Support</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_summary">Choose the app display language</string>
+    <string name="settings_language_system">System default</string>
+    <string name="settings_language_zh_cn">简体中文</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_dialog_title">App language</string>
+    <string name="settings_calibrate">Standard-curve calibration</string>
+    <string name="settings_calibration_empty">No active user curve · factory curves in use</string>
     <plurals name="settings_calibration_review">
         <item quantity="one">%1$d calibration requires review</item>
         <item quantity="other">%1$d calibrations require review</item>
     </plurals>
     <plurals name="settings_calibration_active">
-        <item quantity="one">%1$d user curve active</item>
-        <item quantity="other">%1$d user curves active</item>
+        <item quantity="one">%1$d active user curve</item>
+        <item quantity="other">%1$d active user curves</item>
     </plurals>
-    <string name="settings_calibration_empty">Capture a standard plate to improve accuracy</string>
+    <string name="settings_calibration_combined">%1$s · %2$s</string>
+
+    <string name="settings_history">Test history</string>
+    <string name="settings_history_summary">Browse and manage saved test sessions</string>
+    <string name="settings_restore_samples">Restore built-in samples</string>
+    <string name="settings_restore_samples_summary">%1$s currently available</string>
+    <string name="settings_clear_all">Clear all data</string>
+    <string name="settings_clear_summary">Delete all tests, samples, and user calibration on this device</string>
+    <string name="settings_about_model">About JointSense</string>
+    <string name="settings_about_summary">Version, analysis method, and research-use notice</string>
+
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_ok">OK</string>
+    <string name="settings_retry">Retry</string>
+    <string name="settings_delete">Delete all</string>
+    <string name="settings_clear_title">Clear all data?</string>
+    <string name="settings_clear_scope">This permanently deletes user test sessions, built-in sample sessions, and user calibration curves from this device.</string>
+    <string name="settings_restore_samples_title">Restore built-in samples?</string>
+    <string name="settings_restore_samples_message">The 12 built-in sample sessions and their 36 factor results will be restored on this device.</string>
+    <string name="settings_restore_samples_calibration_note">User calibration curves are not restored or changed.</string>
+    <string name="settings_restore_samples_confirm">Restore samples</string>
+    <string name="settings_data_action_running">Updating on-device data…</string>
+    <string name="settings_clear_success_title">Data cleared</string>
+    <string name="settings_clear_success_message">User tests, built-in samples, and user calibration were removed.</string>
+    <string name="settings_clear_failure_title">Data could not be cleared</string>
+    <string name="settings_clear_failure_message">No completion was recorded. Review the data and retry.</string>
+    <string name="settings_restore_samples_success_title">Samples restored</string>
+    <string name="settings_restore_samples_success_message">The 12 built-in sample sessions are available again. User calibration was not changed.</string>
+    <string name="settings_restore_samples_failure_title">Samples could not be restored</string>
+    <string name="settings_restore_samples_failure_message">User calibration was not changed. Retry restoring the built-in samples.</string>
+
+    <string name="settings_about_title">About JointSense</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_about_version">Version %1$s</string>
+    <string name="settings_about_method_heading">Photo colorimetry</string>
+    <string name="settings_about_rgb_features">The selected reaction-chamber crop is summarized by six features: red, green, and blue channel means plus their channel standard deviations.</string>
+    <string name="settings_about_tealness">Net tealness is BMean − RMean.</string>
+    <string name="settings_about_curve_heading">Standard-curve quantification</string>
+    <string name="settings_about_curve_behavior">An active user calibration curve is used for its factor; otherwise the factory standard curve is used. Concentration is obtained by piecewise-linear inversion and labeled below range, in range, or above range.</string>
+    <string name="settings_about_factory_ranges">Factory concentration ranges: TNF-α 0–200 pg/mL, IL-6 0–500 pg/mL, and IL-1β 0–200 pg/mL.</string>
+    <string name="settings_about_index_heading">OA inflammation index (AI)</string>
+    <string name="settings_about_oa_weights">Weights are TNF-α %1$d%%, IL-6 %2$d%%, and IL-1β %3$d%%. When a factor is missing, the available weights are re-normalized.</string>
+    <string name="settings_about_disclaimer_heading">Research-use notice</string>
+    <string name="research_disclaimer">Results in this report are estimates derived from smartphone-photo colorimetry for research and longitudinal trend observation only. They are not intended for clinical diagnosis, treatment decisions, or as a substitute for validated laboratory testing.</string>
 </resources>

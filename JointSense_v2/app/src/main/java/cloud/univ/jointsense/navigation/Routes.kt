@@ -10,6 +10,7 @@ interface JointSenseRoute : NavigationTarget
 @Serializable data object TrendsRoute : JointSenseRoute
 @Serializable data object ReportRoute : JointSenseRoute
 @Serializable data object ProfileRoute : JointSenseRoute
+@Serializable data object AboutRoute : JointSenseRoute
 @Serializable data object HistoryRoute : JointSenseRoute
 
 @Serializable

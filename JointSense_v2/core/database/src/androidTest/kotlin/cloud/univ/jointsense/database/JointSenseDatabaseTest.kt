@@ -93,7 +93,9 @@ class JointSenseDatabaseTest {
         DatabaseTransactions(db).clearAllData()
 
         assertTrue(db.testSessionDao().sessions().first().isEmpty())
+        assertTrue(db.testSessionDao().resultsForSession("s1").first().isEmpty())
         assertTrue(db.calibrationDao().calibrations().first().isEmpty())
+        assertTrue(db.calibrationDao().knotsForFactor(InflammationFactor.IL6).first().isEmpty())
         assertEquals("true", db.metadataDao().value("samplesInitialized").first())
     }
 }

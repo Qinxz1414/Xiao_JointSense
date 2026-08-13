@@ -3,28 +3,39 @@ package cloud.univ.jointsense.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.DataSource
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import cloud.univ.jointsense.domain.repository.DataManagementRepository
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-enum class RestoreSamplesOutcome { SUCCESS, FAILURE }
+enum class DataActionType {
+    CLEAR_ALL,
+    RESTORE_BUILT_IN_SAMPLES,
+}
+
+sealed interface DataAction {
+    data object Idle : DataAction
+    data class Pending(val type: DataActionType) : DataAction
+    data class Running(val type: DataActionType) : DataAction
+    data class Completed(val type: DataActionType) : DataAction
+    data class Error(val type: DataActionType) : DataAction
+}
 
 data class SettingsUiState(
     val sessionCount: Int = 0,
     val measurementCount: Int = 0,
+    val builtInSampleCount: Int = 0,
     val calibrationCount: Int = 0,
     val calibrationReviewCount: Int = 0,
-    val restoreSamplesConfirmationPending: Boolean = false,
-    val restoreSamplesInProgress: Boolean = false,
-    val restoreSamplesOutcome: RestoreSamplesOutcome? = null,
+    val dataAction: DataAction = DataAction.Idle,
 ) {
     val hasCalibration: Boolean
         get() = calibrationCount > 0
@@ -38,25 +49,24 @@ class SettingsViewModel(
     calibrations: CalibrationRepository,
     private val dataManagement: DataManagementRepository,
 ) : ViewModel() {
-    private val restoreSamplesState = MutableStateFlow(RestoreSamplesState())
+    private val dataAction = MutableStateFlow<DataAction>(DataAction.Idle)
 
     val state: StateFlow<SettingsUiState> = combine(
         sessions.observeSessions(),
         calibrations.observeCalibrations(),
-        restoreSamplesState,
-    ) { observedSessions, observedCalibrations, restoreState ->
+        dataAction,
+    ) { observedSessions, observedCalibrations, action ->
         SettingsUiState(
             sessionCount = observedSessions.size,
             measurementCount = observedSessions.sumOf { it.results.size },
+            builtInSampleCount = observedSessions.count { it.source == DataSource.BUILT_IN },
             calibrationCount = observedCalibrations.count {
                 it.status == CalibrationStatus.ACTIVE
             },
             calibrationReviewCount = observedCalibrations.count {
                 it.status == CalibrationStatus.NEEDS_REVIEW
             },
-            restoreSamplesConfirmationPending = restoreState.confirmationPending,
-            restoreSamplesInProgress = restoreState.inProgress,
-            restoreSamplesOutcome = restoreState.outcome,
+            dataAction = action,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -64,65 +74,84 @@ class SettingsViewModel(
         initialValue = SettingsUiState(),
     )
 
-    fun clearAllData() {
-        viewModelScope.launch { dataManagement.clearAllData() }
+    fun requestClearAllConfirmation() {
+        request(DataActionType.CLEAR_ALL)
     }
 
     fun requestRestoreBuiltInSamplesConfirmation() {
-        restoreSamplesState.update { current ->
-            if (current.confirmationPending || current.inProgress) {
-                current
-            } else {
-                current.copy(confirmationPending = true, outcome = null)
+        request(DataActionType.RESTORE_BUILT_IN_SAMPLES)
+    }
+
+    fun dismissDataAction() {
+        dataAction.update { current ->
+            when (current) {
+                is DataAction.Running -> current
+                else -> DataAction.Idle
             }
         }
     }
 
-    fun cancelRestoreBuiltInSamplesConfirmation() {
-        restoreSamplesState.update { current ->
-            if (current.inProgress) current else current.copy(confirmationPending = false)
+    fun confirmDataAction() {
+        val action = claimPending() ?: return
+        execute(action)
+    }
+
+    fun retryDataAction() {
+        val action = claimError() ?: return
+        execute(action)
+    }
+
+    fun consumeDataActionResult() {
+        dataAction.update { current ->
+            when (current) {
+                is DataAction.Completed, is DataAction.Error -> DataAction.Idle
+                else -> current
+            }
         }
     }
 
-    fun confirmRestoreBuiltInSamples() {
-        if (!claimRestoreBuiltInSamples()) return
+    private fun request(type: DataActionType) {
+        dataAction.compareAndSet(DataAction.Idle, DataAction.Pending(type))
+    }
+
+    private fun claimPending(): DataActionType? {
+        while (true) {
+            val current = dataAction.value as? DataAction.Pending ?: return null
+            if (dataAction.compareAndSet(current, DataAction.Running(current.type))) {
+                return current.type
+            }
+        }
+    }
+
+    private fun claimError(): DataActionType? {
+        while (true) {
+            val current = dataAction.value as? DataAction.Error ?: return null
+            if (dataAction.compareAndSet(current, DataAction.Running(current.type))) {
+                return current.type
+            }
+        }
+    }
+
+    private fun execute(type: DataActionType) {
         viewModelScope.launch {
             try {
-                dataManagement.restoreBuiltInSamples()
-                restoreSamplesState.update {
-                    it.copy(inProgress = false, outcome = RestoreSamplesOutcome.SUCCESS)
+                when (type) {
+                    DataActionType.CLEAR_ALL -> dataManagement.clearAllData()
+                    DataActionType.RESTORE_BUILT_IN_SAMPLES -> dataManagement.restoreBuiltInSamples()
                 }
+                dataAction.compareAndSet(
+                    DataAction.Running(type),
+                    DataAction.Completed(type),
+                )
             } catch (cancellation: CancellationException) {
-                restoreSamplesState.update { it.copy(inProgress = false) }
+                dataAction.compareAndSet(DataAction.Running(type), DataAction.Idle)
                 throw cancellation
             } catch (_: Exception) {
-                restoreSamplesState.update {
-                    it.copy(inProgress = false, outcome = RestoreSamplesOutcome.FAILURE)
-                }
+                dataAction.compareAndSet(
+                    DataAction.Running(type),
+                    DataAction.Error(type),
+                )
             }
-        }
-    }
-
-    fun dismissRestoreSamplesOutcome() {
-        restoreSamplesState.update { it.copy(outcome = null) }
-    }
-
-    private fun claimRestoreBuiltInSamples(): Boolean {
-        while (true) {
-            val current = restoreSamplesState.value
-            if (!current.confirmationPending || current.inProgress) return false
-            val claimed = current.copy(
-                confirmationPending = false,
-                inProgress = true,
-                outcome = null,
-            )
-            if (restoreSamplesState.compareAndSet(current, claimed)) return true
         }
     }
 }
-
-private data class RestoreSamplesState(
-    val confirmationPending: Boolean = false,
-    val inProgress: Boolean = false,
-    val outcome: RestoreSamplesOutcome? = null,
-)

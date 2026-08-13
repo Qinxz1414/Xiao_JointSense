@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.feature.settings.R
+import cloud.univ.jointsense.settings.locale.LanguageOption
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -27,12 +28,21 @@ class ProfileRestoreSamplesTest {
         composeRule.setContent {
             JointSenseTheme {
                 SettingsScreen(
-                    state = SettingsUiState(restoreSamplesConfirmationPending = true),
+                    state = SettingsUiState(
+                        dataAction = DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+                    ),
+                    selectedLanguage = LanguageOption.SYSTEM,
+                    readCurrentLanguage = { LanguageOption.SYSTEM },
+                    onApplyLanguage = {},
                     onOpenHistory = {},
                     onCalibrate = {},
-                    onClearAllData = {},
-                    onConfirmRestoreSamples = { confirms += 1 },
-                    onCancelRestoreSamples = {},
+                    onOpenAbout = {},
+                    onRequestClearAll = {},
+                    onRequestRestoreSamples = {},
+                    onConfirmDataAction = { confirms += 1 },
+                    onDismissDataAction = {},
+                    onRetryDataAction = {},
+                    onConsumeDataActionResult = {},
                 )
             }
         }
@@ -51,12 +61,21 @@ class ProfileRestoreSamplesTest {
         composeRule.setContent {
             JointSenseTheme {
                 SettingsScreen(
-                    state = SettingsUiState(restoreSamplesConfirmationPending = true),
+                    state = SettingsUiState(
+                        dataAction = DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+                    ),
+                    selectedLanguage = LanguageOption.SYSTEM,
+                    readCurrentLanguage = { LanguageOption.SYSTEM },
+                    onApplyLanguage = {},
                     onOpenHistory = {},
                     onCalibrate = {},
-                    onClearAllData = {},
-                    onConfirmRestoreSamples = { confirms += 1 },
-                    onCancelRestoreSamples = { cancels += 1 },
+                    onOpenAbout = {},
+                    onRequestClearAll = {},
+                    onRequestRestoreSamples = {},
+                    onConfirmDataAction = { confirms += 1 },
+                    onDismissDataAction = { cancels += 1 },
+                    onRetryDataAction = {},
+                    onConsumeDataActionResult = {},
                 )
             }
         }

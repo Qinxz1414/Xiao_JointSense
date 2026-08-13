@@ -6,29 +6,30 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cloud.univ.jointsense.settings.locale.LanguageController
 
-/**
- * Public app-facing settings entry. Language selection remains deliberately
- * outside this Task 7 migration; the controller is accepted at the boundary
- * established by the locale infrastructure task.
- */
 @Composable
-@Suppress("UNUSED_PARAMETER")
 fun SettingsRouteScreen(
     viewModel: SettingsViewModel,
     languageController: LanguageController,
     onOpenHistory: () -> Unit,
     onCalibrate: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     SettingsScreen(
         state = state,
+        selectedLanguage = languageController.current(),
+        readCurrentLanguage = languageController::current,
+        onApplyLanguage = languageController::apply,
         onOpenHistory = onOpenHistory,
         onCalibrate = onCalibrate,
-        onClearAllData = viewModel::clearAllData,
-        onConfirmRestoreSamples = viewModel::confirmRestoreBuiltInSamples,
-        onCancelRestoreSamples = viewModel::cancelRestoreBuiltInSamplesConfirmation,
-        onDismissRestoreSamplesOutcome = viewModel::dismissRestoreSamplesOutcome,
+        onOpenAbout = onOpenAbout,
+        onRequestClearAll = viewModel::requestClearAllConfirmation,
+        onRequestRestoreSamples = viewModel::requestRestoreBuiltInSamplesConfirmation,
+        onConfirmDataAction = viewModel::confirmDataAction,
+        onDismissDataAction = viewModel::dismissDataAction,
+        onRetryDataAction = viewModel::retryDataAction,
+        onConsumeDataActionResult = viewModel::consumeDataActionResult,
         modifier = modifier,
     )
 }

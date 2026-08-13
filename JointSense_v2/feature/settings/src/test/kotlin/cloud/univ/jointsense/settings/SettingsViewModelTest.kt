@@ -47,15 +47,21 @@ class SettingsViewModelTest {
 
     @Test
     fun repositoryFlowsDriveSessionMeasurementAndCalibrationCounts() = runTest(dispatcher) {
-        val sessions = FakeSettingsSessionRepository(listOf(sessionWithTwoResults()))
+        val sessions = FakeSettingsSessionRepository(
+            listOf(
+                sessionWithTwoResults(),
+                sessionWithTwoResults().copy(id = "built-in", source = DataSource.BUILT_IN),
+            ),
+        )
         val calibrations = FakeSettingsCalibrationRepository(listOf(calibration(InflammationFactor.IL6)))
         val viewModel = SettingsViewModel(sessions, calibrations, FakeDataManagementRepository())
         val collection = backgroundScope.launch { viewModel.state.collect {} }
 
         testScheduler.advanceUntilIdle()
 
-        assertEquals(1, viewModel.state.value.sessionCount)
-        assertEquals(2, viewModel.state.value.measurementCount)
+        assertEquals(2, viewModel.state.value.sessionCount)
+        assertEquals(4, viewModel.state.value.measurementCount)
+        assertEquals(1, viewModel.state.value.builtInSampleCount)
         assertEquals(1, viewModel.state.value.calibrationCount)
         assertTrue(viewModel.state.value.hasCalibration)
 
@@ -76,9 +82,12 @@ class SettingsViewModelTest {
             data,
         )
 
-        viewModel.clearAllData()
+        viewModel.requestClearAllConfirmation()
+        viewModel.confirmDataAction()
+        testScheduler.advanceUntilIdle()
+        viewModel.consumeDataActionResult()
         viewModel.requestRestoreBuiltInSamplesConfirmation()
-        viewModel.confirmRestoreBuiltInSamples()
+        viewModel.confirmDataAction()
         testScheduler.advanceUntilIdle()
 
         assertEquals(1, data.clearCalls)
@@ -95,16 +104,20 @@ class SettingsViewModelTest {
         viewModel.requestRestoreBuiltInSamplesConfirmation()
         testScheduler.advanceUntilIdle()
 
-        assertTrue(viewModel.state.value.restoreSamplesConfirmationPending)
+        assertEquals(
+            DataAction.Pending(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+            viewModel.state.value.dataAction,
+        )
         assertEquals(0, data.restoreCalls)
 
-        viewModel.confirmRestoreBuiltInSamples()
-        viewModel.confirmRestoreBuiltInSamples()
+        viewModel.confirmDataAction()
+        viewModel.confirmDataAction()
         testScheduler.advanceUntilIdle()
 
-        assertFalse(viewModel.state.value.restoreSamplesConfirmationPending)
-        assertFalse(viewModel.state.value.restoreSamplesInProgress)
-        assertEquals(RestoreSamplesOutcome.SUCCESS, viewModel.state.value.restoreSamplesOutcome)
+        assertEquals(
+            DataAction.Completed(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+            viewModel.state.value.dataAction,
+        )
         assertEquals(1, data.restoreCalls)
         collection.cancel()
     }
@@ -116,10 +129,10 @@ class SettingsViewModelTest {
         val collection = backgroundScope.launch { viewModel.state.collect {} }
 
         viewModel.requestRestoreBuiltInSamplesConfirmation()
-        viewModel.cancelRestoreBuiltInSamplesConfirmation()
+        viewModel.dismissDataAction()
         testScheduler.advanceUntilIdle()
 
-        assertFalse(viewModel.state.value.restoreSamplesConfirmationPending)
+        assertEquals(DataAction.Idle, viewModel.state.value.dataAction)
         assertEquals(0, data.restoreCalls)
         collection.cancel()
     }
@@ -131,11 +144,13 @@ class SettingsViewModelTest {
         val collection = backgroundScope.launch { viewModel.state.collect {} }
 
         viewModel.requestRestoreBuiltInSamplesConfirmation()
-        viewModel.confirmRestoreBuiltInSamples()
+        viewModel.confirmDataAction()
         testScheduler.advanceUntilIdle()
 
-        assertFalse(viewModel.state.value.restoreSamplesInProgress)
-        assertEquals(RestoreSamplesOutcome.FAILURE, viewModel.state.value.restoreSamplesOutcome)
+        assertEquals(
+            DataAction.Error(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+            viewModel.state.value.dataAction,
+        )
         assertEquals(1, data.restoreCalls)
         collection.cancel()
     }
@@ -149,13 +164,16 @@ class SettingsViewModelTest {
 
         withContext(Dispatchers.Default) {
             List(128) {
-                async { viewModel.confirmRestoreBuiltInSamples() }
+                async { viewModel.confirmDataAction() }
             }.awaitAll()
         }
         testScheduler.advanceUntilIdle()
 
         assertEquals(1, data.restoreCalls)
-        assertEquals(RestoreSamplesOutcome.SUCCESS, viewModel.state.value.restoreSamplesOutcome)
+        assertEquals(
+            DataAction.Completed(DataActionType.RESTORE_BUILT_IN_SAMPLES),
+            viewModel.state.value.dataAction,
+        )
         collection.cancel()
     }
 

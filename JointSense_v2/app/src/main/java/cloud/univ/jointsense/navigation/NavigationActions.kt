@@ -47,6 +47,10 @@ class NavigationActions internal constructor(
         driver.navigate(HistoryRoute, launchSingleTop = true)
     }
 
+    fun openAbout() {
+        driver.navigate(AboutRoute, launchSingleTop = true)
+    }
+
     fun startCalibration() {
         driver.navigate(CalibrationGraph, launchSingleTop = true)
     }

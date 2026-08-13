@@ -136,8 +136,8 @@ class ResourceParityTest {
             assertTrue("feature/insights/values:$key must use the approved OA term", insightsEn.text(key).contains(ENGLISH_OA_TERM))
             assertTrue("feature/insights/values-zh-rCN:$key must use the approved OA term", insightsZh.text(key).contains(CHINESE_OA_TERM))
         }
-        assertTrue(settingsEn.text("settings_about_model_body").contains(ENGLISH_OA_TERM))
-        assertTrue(settingsZh.text("settings_about_model_body").contains(CHINESE_OA_TERM))
+        assertEquals(ENGLISH_OA_TERM, settingsEn.text("settings_about_index_heading"))
+        assertEquals(CHINESE_OA_TERM, settingsZh.text("settings_about_index_heading"))
         localizedModules.forEach { module ->
             listOf("values", "values-zh-rCN").forEach { directory ->
                 resources(module, directory).forEach { (key, entry) ->
@@ -154,6 +154,8 @@ class ResourceParityTest {
         }
         assertEquals(ENGLISH_DISCLAIMER, insightsEn.text("report_disclaimer"))
         assertEquals(CHINESE_DISCLAIMER, insightsZh.text("report_disclaimer"))
+        assertEquals(ENGLISH_DISCLAIMER, settingsEn.text("research_disclaimer"))
+        assertEquals(CHINESE_DISCLAIMER, settingsZh.text("research_disclaimer"))
         invariantScientificResources().forEach { (path, declaration) ->
             assertTrue("$path must document invariant scientific notation", File(projectRoot, path).readText().contains(declaration))
         }

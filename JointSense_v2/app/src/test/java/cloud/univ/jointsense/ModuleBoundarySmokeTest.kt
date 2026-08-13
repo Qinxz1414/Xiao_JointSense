@@ -76,5 +76,6 @@ private fun ImportedFeatureRouteEntries(
         languageController = languageController,
         onOpenHistory = {},
         onCalibrate = {},
+        onOpenAbout = {},
     )
 }
