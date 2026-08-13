@@ -1,6 +1,5 @@
 package cloud.univ.jointsense.insights.report
 
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
@@ -8,15 +7,21 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.feature.insights.R
 import java.io.File
+import java.io.IOException
 import java.util.Locale
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -25,7 +30,7 @@ class PdfReportExporterTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test
-    fun exportCreatesNonEmptyMultipagePdfAndRepeatsHeaderInk() {
+    fun exportCreatesNonEmptyMultipagePdfAndRepeatsTitleAndPageHeader() {
         val report = FormattedReport(
             title = "JointSense Research Trend Report",
             pageHeader = "Generated: Jan 1, 2026, 12:00:00 PM",
@@ -49,12 +54,62 @@ class PdfReportExporterTest {
                         val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
                         bitmap.eraseColor(Color.WHITE)
                         page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        assertTrue("page ${pageIndex + 1} has no repeated header ink", bitmap.hasInkInHeader())
+                        assertTrue(
+                            "page ${pageIndex + 1} has no repeated title",
+                            bitmap.hasInkBetween(top = 35, bottom = 66),
+                        )
+                        assertTrue(
+                            "page ${pageIndex + 1} has no repeated page header",
+                            bitmap.hasInkBetween(top = 68, bottom = 90),
+                        )
                         bitmap.recycle()
                     }
                 }
             }
         }
+    }
+
+    @Test
+    fun multipageTransitionFinishFailureHasSingleShotCleanup() {
+        val report = FormattedReport(
+            title = "Title",
+            pageHeader = "Header",
+            body = List(80) { index -> "Observation ${index + 1}" }.joinToString("\n"),
+        )
+        val output = File(
+            context.cacheDir,
+            "pdf-page-transition-failure-${System.nanoTime()}.pdf",
+        )
+        val document = PdfDocument()
+        val finishFailure = IOException("finish failed")
+        val closeFailure = SecurityException("close failed")
+        var finishAttempts = 0
+        var closeAttempts = 0
+        val backend = PdfReportExporter.AndroidReportDocumentBackend(
+            output = output,
+            report = report,
+            document = document,
+            finishPlatformPage = { page ->
+                finishAttempts += 1
+                document.finishPage(page)
+                throw finishFailure
+            },
+            closePlatformDocument = {
+                closeAttempts += 1
+                document.close()
+                throw closeFailure
+            },
+        )
+
+        val thrown: IOException = assertThrows(IOException::class.java) {
+            writeDocumentWithBackend(backend)
+        }
+
+        assertSame(finishFailure, thrown)
+        assertEquals(1, finishAttempts)
+        assertFalse(output.exists())
+        assertEquals(1, closeAttempts)
+        assertArrayEquals(arrayOf(closeFailure), thrown.suppressed)
     }
 
     @Test
@@ -99,9 +154,8 @@ class PdfReportExporterTest {
         return createConfigurationContext(configuration)
     }
 
-    private fun Bitmap.hasInkInHeader(): Boolean {
-        val bottom = minOf(height, 125)
-        for (y in 30 until bottom step 2) {
+    private fun Bitmap.hasInkBetween(top: Int, bottom: Int): Boolean {
+        for (y in top until minOf(height, bottom)) {
             for (x in 30 until width - 30 step 2) {
                 if (getPixel(x, y) != Color.WHITE) return true
             }

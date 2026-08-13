@@ -47,14 +47,37 @@ object PdfReportExporter {
         outputDirectory: File,
         report: FormattedReport,
         now: () -> Long = System::currentTimeMillis,
+    ): PdfExportResult = exportWithWriter(
+        outputDirectory = outputDirectory,
+        report = report,
+        now = now,
+        writer = ::writeDocument,
+    )
+
+    internal fun exportWithWriter(
+        outputDirectory: File,
+        report: FormattedReport,
+        now: () -> Long = System::currentTimeMillis,
+        beforeDirectoryCreation: () -> Unit = {},
+        writer: (File, FormattedReport) -> Unit,
     ): PdfExportResult {
-        if ((!outputDirectory.exists() && !outputDirectory.mkdirs()) || !outputDirectory.isDirectory) {
+        val directoryReady = try {
+            ensureOutputDirectory(outputDirectory, beforeDirectoryCreation)
+        } catch (_: Exception) {
+            false
+        }
+        if (!directoryReady) {
             return PdfExportResult.Failure(ReportError.CREATE_FILE)
         }
 
-        val output = File(outputDirectory, "JointSense_report_${now()}.pdf")
+        val output = try {
+            allocateOutputFile(outputDirectory, now())
+        } catch (_: Exception) {
+            return PdfExportResult.Failure(ReportError.CREATE_FILE)
+        } ?: return PdfExportResult.Failure(ReportError.CREATE_FILE)
+
         return try {
-            writeDocument(output, report)
+            writer(output, report)
             if (!output.isFile || output.length() <= 0L) {
                 output.delete()
                 PdfExportResult.Failure(ReportError.EMPTY_FILE)
@@ -67,28 +90,70 @@ object PdfReportExporter {
         }
     }
 
+    private fun ensureOutputDirectory(
+        outputDirectory: File,
+        beforeDirectoryCreation: () -> Unit,
+    ): Boolean {
+        if (outputDirectory.exists()) return outputDirectory.isDirectory
+        beforeDirectoryCreation()
+        if (outputDirectory.mkdirs()) return true
+        return outputDirectory.isDirectory
+    }
+
+    private fun allocateOutputFile(outputDirectory: File, timestamp: Long): File? {
+        var suffix = 0L
+        while (suffix < Long.MAX_VALUE) {
+            val suffixText = if (suffix == 0L) "" else "_$suffix"
+            val candidate = File(outputDirectory, "JointSense_report_$timestamp$suffixText.pdf")
+            if (candidate.createNewFile()) return candidate
+            suffix += 1
+        }
+        return null
+    }
+
     private fun writeDocument(output: File, report: FormattedReport) {
-        val document = PdfDocument()
-        try {
-            val writer = PageWriter(document, report.title, report.pageHeader)
-            writer.startPage()
-            layoutLines(report.body, writer.bodyPaint, PAGE_WIDTH - LEFT - RIGHT).forEach { line ->
-                writer.drawBodyLine(line)
+        writeDocumentWithBackend(AndroidReportDocumentBackend(output, report))
+    }
+
+    internal class AndroidReportDocumentBackend(
+        private val output: File,
+        private val report: FormattedReport,
+        private val document: PdfDocument = PdfDocument(),
+        finishPlatformPage: (PdfDocument.Page) -> Unit = document::finishPage,
+        private val closePlatformDocument: () -> Unit = document::close,
+    ) : ReportDocumentBackend {
+        private val pageWriter = PageWriter(
+            document = document,
+            title = report.title,
+            header = report.pageHeader,
+            finishPlatformPage = finishPlatformPage,
+        )
+
+        override fun startPage() = pageWriter.startPage()
+
+        override fun drawReport() {
+            layoutLines(report.body, pageWriter.bodyPaint, PAGE_WIDTH - LEFT - RIGHT).forEach { line ->
+                pageWriter.drawBodyLine(line)
             }
-            writer.finishPage()
+        }
+
+        override fun finishPage() = pageWriter.finishPage()
+
+        override fun writeDocument() {
             FileOutputStream(output).use { stream ->
                 document.writeTo(stream)
                 stream.fd.sync()
             }
-        } finally {
-            document.close()
         }
+
+        override fun closeDocument() = closePlatformDocument()
     }
 
     private class PageWriter(
         private val document: PdfDocument,
         private val title: String,
         private val header: String,
+        private val finishPlatformPage: (PdfDocument.Page) -> Unit,
     ) {
         val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#0E2841")
@@ -133,8 +198,67 @@ object PdfReportExporter {
         }
 
         fun finishPage() {
-            page?.let(document::finishPage)
+            val finishingPage = page ?: return
             page = null
+            finishPlatformPage(finishingPage)
+        }
+    }
+}
+
+internal interface ReportDocumentBackend {
+    fun startPage()
+    fun drawReport()
+    fun finishPage()
+    fun writeDocument()
+    fun closeDocument()
+}
+
+/** Production lifecycle orchestration, kept platform-neutral for deterministic failure testing. */
+internal fun writeDocumentWithBackend(backend: ReportDocumentBackend) {
+    runPreservingPrimaryFailure(cleanup = backend::closeDocument) {
+        var pageStarted = false
+        var finishAttempted = false
+        try {
+            backend.startPage()
+            pageStarted = true
+            backend.drawReport()
+            finishAttempted = true
+            backend.finishPage()
+            backend.writeDocument()
+        } catch (failure: Throwable) {
+            if (pageStarted && !finishAttempted) {
+                try {
+                    backend.finishPage()
+                } catch (finishFailure: Throwable) {
+                    if (finishFailure !== failure) failure.addSuppressed(finishFailure)
+                }
+            }
+            throw failure
+        }
+    }
+}
+
+/** Runs cleanup exactly once and keeps a block failure primary if cleanup also fails. */
+internal inline fun <T> runPreservingPrimaryFailure(
+    cleanup: () -> Unit,
+    block: () -> T,
+): T {
+    var primaryFailure: Throwable? = null
+    try {
+        return block()
+    } catch (failure: Throwable) {
+        primaryFailure = failure
+        throw failure
+    } finally {
+        try {
+            cleanup()
+        } catch (cleanupFailure: Throwable) {
+            val primary = primaryFailure
+            if (primary != null) {
+                if (cleanupFailure !== primary) primary.addSuppressed(cleanupFailure)
+            } else {
+                throw cleanupFailure
+            }
         }
     }
 }

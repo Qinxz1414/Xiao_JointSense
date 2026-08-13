@@ -62,10 +62,10 @@ import cloud.univ.jointsense.feature.insights.R
 import cloud.univ.jointsense.insights.report.LocalizedReportFormatter
 import cloud.univ.jointsense.insights.report.PdfExportResult
 import cloud.univ.jointsense.insights.report.PdfReportExporter
+import cloud.univ.jointsense.insights.report.ReportActionModelFactory
 import cloud.univ.jointsense.insights.report.ReportError
 import cloud.univ.jointsense.insights.report.ReportShareResult
 import cloud.univ.jointsense.insights.report.ReportSharing
-import cloud.univ.jointsense.insights.report.toReportModel
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -87,8 +87,8 @@ fun ReportScreen(
     val formatter = remember(context.resources, locale) {
         LocalizedReportFormatter.from(context.resources, locale)
     }
-    val exportReport = remember(state, formatter) {
-        formatter.formatExport(state.toReportModel(System.currentTimeMillis()))
+    val reportModelFactory = remember(state) {
+        ReportActionModelFactory(stateProvider = { state }, clock = System::currentTimeMillis)
     }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -101,6 +101,7 @@ fun ReportScreen(
     }
 
     fun shareTextReport() {
+        val exportReport = formatter.formatExport(reportModelFactory.create())
         when (
             val result = ReportSharing.shareText(
                 context,
@@ -406,6 +407,7 @@ fun ReportScreen(
                                 onClick = {
                                     if (isExporting) return@Button
                                     isExporting = true
+                                    val exportReport = formatter.formatExport(reportModelFactory.create())
                                     scope.launch {
                                         val exportResult = withContext(Dispatchers.IO) {
                                             PdfReportExporter.export(

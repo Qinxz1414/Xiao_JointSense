@@ -8,6 +8,21 @@ import org.junit.Test
 
 class ReportModelMapperTest {
     @Test
+    fun actionFactoryReadsGenerationTimeForEveryUserAction() {
+        var currentTime = 100L
+        val factory = ReportActionModelFactory(
+            stateProvider = { ReportUiState() },
+            clock = { currentTime++ },
+        )
+
+        val first = factory.create()
+        val second = factory.create()
+
+        assertEquals(100L, first.generatedAtEpochMillis)
+        assertEquals(101L, second.generatedAtEpochMillis)
+    }
+
+    @Test
     fun mapsUiPercentagesToFractionsAndBuildsStructuredRecommendations() {
         val state = ReportUiState(
             latestValues = mapOf(InflammationFactor.IL6 to 12.5f),

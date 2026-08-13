@@ -5,6 +5,13 @@ import cloud.univ.jointsense.domain.report.ReportModel
 import cloud.univ.jointsense.domain.report.ReportRecommendation
 import cloud.univ.jointsense.insights.ReportUiState
 
+internal class ReportActionModelFactory(
+    private val stateProvider: () -> ReportUiState,
+    private val clock: () -> Long,
+) {
+    fun create(): ReportModel = stateProvider().toReportModel(clock())
+}
+
 internal fun ReportUiState.toReportModel(generatedAtEpochMillis: Long): ReportModel = ReportModel(
     generatedAtEpochMillis = generatedAtEpochMillis,
     oaIndex = currentAi?.toDouble(),
