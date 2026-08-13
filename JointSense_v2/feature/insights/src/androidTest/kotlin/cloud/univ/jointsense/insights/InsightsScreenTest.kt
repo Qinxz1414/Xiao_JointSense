@@ -117,14 +117,19 @@ class InsightsScreenTest {
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription))
         composeRule.onNodeWithTag(OA_TREND_CHART_TAG)
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription))
-        composeRule.onNodeWithTag(TREND_SERIES_TNF_ALPHA_LEGEND_TAG)
-            .assertContentDescriptionEquals("TNF-α: solid line, circle markers")
-        composeRule.onNodeWithTag(TREND_SERIES_IL6_LEGEND_TAG)
-            .assertContentDescriptionEquals("IL-6: dashed line, square markers")
-        composeRule.onNodeWithTag(TREND_SERIES_IL1_BETA_LEGEND_TAG)
-            .assertContentDescriptionEquals("IL-1β: dotted line, triangle markers")
+        listOf(
+            TREND_SERIES_TNF_ALPHA_LEGEND_TAG to "TNF-α: solid line, circle markers",
+            TREND_SERIES_IL6_LEGEND_TAG to "IL-6: dashed line, square markers",
+            TREND_SERIES_IL1_BETA_LEGEND_TAG to "IL-1β: dotted line, triangle markers",
+        ).forEach { (tag, summary) ->
+            composeRule.onNodeWithTag(tag).assertContentDescriptionEquals(summary)
+            composeRule.onAllNodes(
+                SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf(summary)),
+            ).assertCountEquals(1)
+        }
         listOf("TNF-α", "IL-6", "IL-1β").forEach { seriesName ->
-            composeRule.onAllNodesWithText(seriesName, useUnmergedTree = true).assertCountEquals(0)
+            composeRule.onAllNodesWithText(seriesName).assertCountEquals(0)
+            composeRule.onAllNodesWithText(seriesName, useUnmergedTree = true).assertCountEquals(1)
         }
 
         composeRule.onNodeWithTag(FACTOR_TREND_CHART_TAG).assert(
