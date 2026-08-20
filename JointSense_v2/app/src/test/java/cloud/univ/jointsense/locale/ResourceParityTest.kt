@@ -196,7 +196,10 @@ class ResourceParityTest {
             "feature/calibration/src/main/kotlin/cloud/univ/jointsense/calibration/CalibrationScreens.kt",
         ).readText()
         assertTrue(calibrationScreen.contains("knot.netSignal"))
-        assertTrue(calibrationScreen.contains("stringResource(\n                        R.string.calibration_knot_summary"))
+        assertTrue(
+            Regex("""stringResource\(\s*R\.string\.calibration_knot_summary""")
+                .containsMatchIn(calibrationScreen),
+        )
         val navigation = File(
             projectRoot,
             "app/src/main/java/cloud/univ/jointsense/navigation/JointSenseNavHost.kt",

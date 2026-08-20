@@ -72,7 +72,7 @@ class ComponentContractTest {
         ).readText()
 
         assertTrue(source.contains("yAxisLabel: String"))
-        assertTrue(source.contains("drawText(\n                yAxisLabel,"))
+        assertTrue(Regex("""drawText\(\s*yAxisLabel,""").containsMatchIn(source))
         assertTrue(source.contains("formatValue: (Float) -> String"))
         assertTrue(source.contains("AI_SCALE_TICKS.forEachIndexed"))
         assertTrue(source.contains("text = formatValue(tick)"))
