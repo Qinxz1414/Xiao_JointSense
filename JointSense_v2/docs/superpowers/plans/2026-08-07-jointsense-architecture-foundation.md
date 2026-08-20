@@ -57,7 +57,7 @@
 - Consumes: current AGP/Kotlin settings and `libs.versions.toml` aliases.
 - Produces: plugin IDs `jointsense.kotlin.library`, `jointsense.android.library`, `jointsense.android.compose`, `jointsense.android.room`; Gradle projects `:core:*` and `:feature:*`.
 
-- [ ] **Step 1: Record the pre-migration project graph**
+- [x] **Step 1: Record the pre-migration project graph**
 
 Run:
 
@@ -67,7 +67,7 @@ Run:
 
 Expected: output contains only root project and `:app`; if Java is unavailable, record the exact failure and locate Android Studio's bundled JBR before continuing.
 
-- [ ] **Step 2: Add pinned stable dependencies to the version catalog**
+- [x] **Step 2: Add pinned stable dependencies to the version catalog**
 
 Add these exact versions and aliases:
 
@@ -102,7 +102,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ```
 
-- [ ] **Step 3: Implement convention plugins**
+- [x] **Step 3: Implement convention plugins**
 
 Use precompiled script plugins. The Android library convention must apply API 36.1/minSdk 24/Java 11; the Compose convention must enable Compose; the Room convention must add Room runtime/ktx/compiler and schema export.
 
@@ -123,7 +123,7 @@ extensions.configure<KspExtension> {
 }
 ```
 
-- [ ] **Step 4: Register and configure all modules**
+- [x] **Step 4: Register and configure all modules**
 
 Add `pluginManagement { includeBuild("build-logic") }` and these includes to `settings.gradle.kts`:
 
@@ -161,7 +161,7 @@ Use this one-way project dependency graph in the module build files:
 
 Declare core contracts with `api(project(...))` only when the type appears in a public signature; otherwise use `implementation`. No core or feature module may depend on `:app`, and no feature may depend on another feature.
 
-- [ ] **Step 5: Verify the graph and empty-module compilation**
+- [x] **Step 5: Verify the graph and empty-module compilation**
 
 Run:
 
@@ -172,7 +172,7 @@ Run:
 
 Expected: all ten modules appear; commands exit 0.
 
-- [ ] **Step 6: Commit the build foundation**
+- [x] **Step 6: Commit the build foundation**
 
 ```powershell
 git add settings.gradle.kts build.gradle.kts gradle/libs.versions.toml app/build.gradle.kts build-logic core feature
@@ -196,7 +196,7 @@ git commit -m "build: establish JointSense module graph"
 - Consumes: Kotlin stdlib and `kotlinx.coroutines.flow.Flow`.
 - Produces: `InflammationFactor`, `DataSource`, `RangeStatus`, `TestSession`, `TestResult`, `NewTestResult`, `Calibration`, `CalibrationKnot`, `CalibrationStatus`, `TestSessionRepository`, `CalibrationRepository`, `DataManagementRepository`.
 
-- [ ] **Step 1: Write the failing domain invariant test**
+- [x] **Step 1: Write the failing domain invariant test**
 
 ```kotlin
 class TestModelsTest {
@@ -213,13 +213,13 @@ class TestModelsTest {
 }
 ```
 
-- [ ] **Step 2: Run the domain test and confirm RED**
+- [x] **Step 2: Run the domain test and confirm RED**
 
 Run: `.\gradlew.bat :core:domain:test --tests "*TestModelsTest"`
 
 Expected: compilation fails because domain types do not exist.
 
-- [ ] **Step 3: Implement immutable models and contracts**
+- [x] **Step 3: Implement immutable models and contracts**
 
 Use these exact core types:
 
@@ -305,13 +305,13 @@ interface DataManagementRepository {
 }
 ```
 
-- [ ] **Step 4: Run domain tests and confirm GREEN**
+- [x] **Step 4: Run domain tests and confirm GREEN**
 
 Run: `.\gradlew.bat :core:domain:test`
 
 Expected: all domain tests pass.
 
-- [ ] **Step 5: Commit domain contracts**
+- [x] **Step 5: Commit domain contracts**
 
 ```powershell
 git add core/domain
@@ -340,7 +340,7 @@ git commit -m "feat: define JointSense domain contracts"
 - Consumes: domain enums/models from Task 2.
 - Produces: `JointSenseDatabase`, DAO interfaces, `DatabaseTransactions.clearAllData()`, `DatabaseTransactions.commitResult()`.
 
-- [ ] **Step 1: Write failing Room relationship tests**
+- [x] **Step 1: Write failing Room relationship tests**
 
 ```kotlin
 @RunWith(AndroidJUnit4::class)
@@ -371,13 +371,13 @@ class JointSenseDatabaseTest {
 }
 ```
 
-- [ ] **Step 2: Compile the tests and confirm RED**
+- [x] **Step 2: Compile the tests and confirm RED**
 
 Run: `.\gradlew.bat :core:database:compileDebugAndroidTestSources`
 
 Expected: compilation fails because database types do not exist.
 
-- [ ] **Step 3: Implement the v1 schema**
+- [x] **Step 3: Implement the v1 schema**
 
 The result entity must declare the exact foreign key and unique draft index:
 
@@ -440,7 +440,7 @@ data class CalibrationKnotEntity(
 )
 ```
 
-- [ ] **Step 4: Implement DAO queries and database transactions**
+- [x] **Step 4: Implement DAO queries and database transactions**
 
 Continuous reads return Flow; cross-table writes are transactional:
 
@@ -453,7 +453,7 @@ suspend fun clearAllData() {
 }
 ```
 
-- [ ] **Step 5: Run database verification**
+- [x] **Step 5: Run database verification**
 
 Run:
 
@@ -464,7 +464,7 @@ Run:
 
 Expected: compilation exits 0; when a device is available, cascade and unique-index tests pass. If no device exists, record only the instrumentation run as unavailable, not passed.
 
-- [ ] **Step 6: Commit the Room schema**
+- [x] **Step 6: Commit the Room schema**
 
 ```powershell
 git add core/database
@@ -493,7 +493,7 @@ git commit -m "feat: add Room persistence schema"
 - Consumes: Task 2 repositories; Task 3 database/transactions; legacy prefs names `joint_sense_data` and `joint_sense_calibration`.
 - Produces: repository implementations; `LegacyMigrationCoordinator.migrate(): MigrationOutcome`; one-transaction clear; deterministic sample restoration.
 
-- [ ] **Step 1: Write failing legacy parser tests with real field names**
+- [x] **Step 1: Write failing legacy parser tests with real field names**
 
 ```kotlin
 @Test fun parsesLegacySessionWithoutInventingRangeOrDraft() {
@@ -508,17 +508,17 @@ git commit -m "feat: add Room persistence schema"
 }
 ```
 
-- [ ] **Step 2: Run parser tests and confirm RED**
+- [x] **Step 2: Run parser tests and confirm RED**
 
 Run: `.\gradlew.bat :core:data:testDebugUnitTest --tests "*LegacyJsonParserTest"`
 
 Expected: compilation fails because parser types do not exist.
 
-- [ ] **Step 3: Implement strict kotlinx.serialization JSON parsing**
+- [x] **Step 3: Implement strict kotlinx.serialization JSON parsing**
 
 Use `Json.parseToJsonElement`; require every ID, enum and numeric field. Do not catch an exception and return an empty list. Map legacy results to `rangeStatus=UNKNOWN` and `draftId=null`.
 
-- [ ] **Step 4: Write failing migration transaction tests**
+- [x] **Step 4: Write failing migration transaction tests**
 
 Cover these exact outcomes:
 
@@ -535,11 +535,11 @@ Tests must verify: valid payload imports all rows; malformed payload imports zer
 
 Import every structurally valid legacy calibration as `CalibrationStatus.NEEDS_REVIEW`. Phase 2 revalidates the scientific constraints and promotes only valid curves to `ACTIVE`; this prevents Phase 1 migration from silently activating an unverified curve.
 
-- [ ] **Step 5: Implement atomic migration and repository idempotency**
+- [x] **Step 5: Implement atomic migration and repository idempotency**
 
 `commitResult()` performs one transaction and returns the existing row ID when `draftId` already exists. `RoomDataManagementRepository.clearAllData()` delegates to the single Room transaction from Task 3. `restoreBuiltInSamples()` upserts stable built-in IDs and writes `samplesInitialized=true`, so repeated calls never duplicate rows and clearing data never triggers automatic reseeding after restart.
 
-- [ ] **Step 6: Run repository and migration tests**
+- [x] **Step 6: Run repository and migration tests**
 
 Run:
 
@@ -551,7 +551,7 @@ Run:
 
 Expected: JVM tests pass; instrumentation tests pass when a device is available.
 
-- [ ] **Step 7: Commit data migration**
+- [x] **Step 7: Commit data migration**
 
 ```powershell
 git add core/data app/src/main/java/cloud/univ/jointsense/data/BuiltInData.kt
@@ -575,17 +575,17 @@ git commit -m "feat: migrate legacy data into Room"
 - Consumes: current app screen composables through callback slots; Task 7 later replaces their implementations with feature-module entries without changing routes.
 - Produces: serializable routes; `JointSenseNavHost()`; unified Back behavior; `MainActivity : AppCompatActivity`.
 
-- [ ] **Step 1: Write failing route and Back policy tests**
+- [x] **Step 1: Write failing route and Back policy tests**
 
 Test navigation sequence Home → Trends → Report → Back → Trends → Back → Home, measurement Crop → Back → ImageSelect, and Result → Back → origin.
 
-- [ ] **Step 2: Compile navigation tests and confirm RED**
+- [x] **Step 2: Compile navigation tests and confirm RED**
 
 Run: `.\gradlew.bat :app:compileDebugAndroidTestSources`
 
 Expected: typed routes and NavHost do not exist.
 
-- [ ] **Step 3: Define exact typed routes**
+- [x] **Step 3: Define exact typed routes**
 
 ```kotlin
 @Serializable data object HomeRoute
@@ -606,11 +606,11 @@ Expected: typed routes and NavHost do not exist.
 @Serializable data object CalibrationDoneRoute
 ```
 
-- [ ] **Step 4: Implement one NavHost and remove duplicate manual branches**
+- [x] **Step 4: Implement one NavHost and remove duplicate manual branches**
 
 Bottom destinations use `launchSingleTop=true`; nested flow routes use the natural NavController stack. Result Back pops the whole `MeasurementGraph` and restores its `origin`. Remove `MainTab`, `FlowScreen`, `AnimatedContent` route switching, and both duplicate `CALIBRATION` branches.
 
-- [ ] **Step 5: Verify Back behavior**
+- [x] **Step 5: Verify Back behavior**
 
 Run:
 
@@ -621,7 +621,7 @@ Run:
 
 Expected: compilation exits 0; navigation tests pass with a device.
 
-- [ ] **Step 6: Commit typed navigation**
+- [x] **Step 6: Commit typed navigation**
 
 ```powershell
 git add app/src/main/java/cloud/univ/jointsense/navigation app/src/main/java/cloud/univ/jointsense/MainActivity.kt app/src/main/AndroidManifest.xml app/src/androidTest
@@ -647,7 +647,7 @@ git commit -m "feat: adopt typed Navigation Compose"
 - Consumes: AppCompat 1.7.1 and Android resource locale generation.
 - Produces: feature-owned `LanguageOption.SYSTEM`, `.SIMPLIFIED_CHINESE`, `.ENGLISH` and `LanguageController`; app-owned `AppCompatLanguageController` implementation.
 
-- [ ] **Step 1: Write failing language-tag tests**
+- [x] **Step 1: Write failing language-tag tests**
 
 ```kotlin
 @Test fun languageTagsAreStable() {
@@ -657,13 +657,13 @@ git commit -m "feat: adopt typed Navigation Compose"
 }
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 Run: `.\gradlew.bat :feature:settings:testDebugUnitTest --tests "*LanguageOptionTest"`
 
 Expected: `LanguageOption` is unresolved.
 
-- [ ] **Step 3: Implement AppCompat locale selection**
+- [x] **Step 3: Implement AppCompat locale selection**
 
 ```kotlin
 fun apply(option: LanguageOption) {
@@ -677,11 +677,11 @@ fun apply(option: LanguageOption) {
 
 Enable `androidResources { generateLocaleConfig = true }`, set `unqualifiedResLocale=en-US`, and add AppCompat's disabled metadata holder service with `autoStoreLocales=true` for API 24–32.
 
-- [ ] **Step 4: Add matched base and Chinese bootstrap resources**
+- [x] **Step 4: Add matched base and Chinese bootstrap resources**
 
 Both resource files must contain identical keys for app name, top-level navigation, language labels, Back, Cancel, Retry, and migration states. Base values are English; `values-zh-rCN` values use confirmed clinical Chinese.
 
-- [ ] **Step 5: Run resource and locale verification**
+- [x] **Step 5: Run resource and locale verification**
 
 Run:
 
@@ -692,7 +692,7 @@ Run:
 
 Expected: tests and Android resource merge pass; no missing default resource.
 
-- [ ] **Step 6: Commit locale infrastructure**
+- [x] **Step 6: Commit locale infrastructure**
 
 ```powershell
 git add app/src/main/java/cloud/univ/jointsense/locale feature/settings/src/main/kotlin/cloud/univ/jointsense/settings/locale feature/settings/src/test app/src/main/res app/src/main/AndroidManifest.xml app/build.gradle.kts
@@ -739,17 +739,17 @@ git commit -m "feat: add Chinese and English app locales"
 - Consumes: Tasks 2–6 contracts, repositories, routes, locale controller.
 - Produces: feature-owned route-screen Composables with state/callback inputs; `AppContainer` repository instances. Typed routes and `NavGraphBuilder` destination registration remain in `:app`, preventing an `app ↔ feature` dependency cycle.
 
-- [ ] **Step 1: Write a failing module-boundary smoke test**
+- [x] **Step 1: Write a failing module-boundary smoke test**
 
 The test imports only public route-screen Composables from each feature and asserts that `AppContainer` exposes `testSessions`, `calibrations`, `dataManagement`, and `migrationCoordinator`. A separate MigrationGate test asserts that Failed shows retry/start-empty choices and that NavHost is not composed until migration is Completed, AlreadyCompleted, or SKIPPED_BY_USER.
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 Run: `.\gradlew.bat :app:testDebugUnitTest --tests "*ModuleBoundarySmokeTest"`
 
 Expected: entry functions and container are unresolved.
 
-- [ ] **Step 3: Move code without changing user-visible behavior**
+- [x] **Step 3: Move code without changing user-visible behavior**
 
 Preserve the current screen content for this task. Split `JointSenseViewModel` responsibilities as follows: `InsightsViewModel` observes sessions and derives dashboard/trend/report inputs; the baseline `MeasurementViewModel` owns the current session/image/crop/factor/result flow; `SettingsViewModel` observes counts and exposes repository actions; calibration remains graph-local and receives its repository through `CalibrationEntry`. Every ViewModel uses domain repositories and exposes immutable UI state/callbacks. Do not fix the image pipeline or redesign screens here; Plan 2 replaces the baseline measurement internals with the coroutine state machine and Plan 3 expands settings/UI state.
 
@@ -775,17 +775,17 @@ composable<HomeRoute> {
 }
 ```
 
-- [ ] **Step 4: Wire explicit dependencies**
+- [x] **Step 4: Wire explicit dependencies**
 
 `AppContainer(application)` builds one Room database, test/calibration/data-management repositories, migration coordinator, and analysis engine. `MainActivity` obtains it from a custom `JointSenseApplication` and passes dependencies to app-owned navigation entries.
 
 `MigrationGate` runs the coordinator from a lifecycle-aware coroutine before composing the NavHost. `MigrationOutcome.Failed` renders a localized recoverable error. Retry reruns migration; “start with an empty database” requires a second confirmation and calls `LegacyMigrationCoordinator.skipLegacyAndStartFresh()`, which transactionally clears partial Room rows, writes `legacyMigrationStatus=SKIPPED_BY_USER` and `samplesInitialized=true`, and leaves both legacy SharedPreferences files untouched.
 
-- [ ] **Step 5: Remove old cross-layer classes only after compilation**
+- [x] **Step 5: Remove old cross-layer classes only after compilation**
 
 Delete the monolithic ViewModel and old moved files after `rg` confirms no imports remain. Preserve the user's calibration/built-in work by moving its behavior into the new modules before deleting originals.
 
-- [ ] **Step 6: Run the architecture gate**
+- [x] **Step 6: Run the architecture gate**
 
 Run:
 
@@ -797,7 +797,7 @@ Run:
 
 Expected: all JVM tests pass, Debug APK builds, Lint has no blocking errors.
 
-- [ ] **Step 7: Commit module migration**
+- [x] **Step 7: Commit module migration**
 
 ```powershell
 git add app core feature
@@ -816,7 +816,7 @@ git commit -m "refactor: move JointSense into feature modules"
 - Consumes: all Phase 1 deliverables.
 - Produces: checked plan steps and an evidence-backed Phase 1 status in the handoff document.
 
-- [ ] **Step 1: Run the complete Phase 1 verification**
+- [x] **Step 1: Run the complete Phase 1 verification**
 
 ```powershell
 .\gradlew.bat testDebugUnitTest
@@ -832,7 +832,7 @@ If an emulator/device is available:
 
 Expected: all available commands exit 0; report exact skipped device tests.
 
-- [ ] **Step 2: Audit architecture and localization boundaries**
+- [x] **Step 2: Audit architecture and localization boundaries**
 
 Run:
 
@@ -843,11 +843,11 @@ rg -n "Text\(\s*\"|contentDescription\s*=\s*\"" feature app core/designsystem
 
 Expected: no feature imports database packages; remaining hardcoded UI strings are listed for Plan 3 and are not claimed localized.
 
-- [ ] **Step 3: Update documentation with actual evidence**
+- [x] **Step 3: Update documentation with actual evidence**
 
 Replace the target-only Phase 1 language in `项目结构需求梳理.md` with the actual module tree, migration state, command outputs, and any unavailable instrumentation tests. Check completed boxes in this plan.
 
-- [ ] **Step 4: Commit Phase 1 documentation**
+- [x] **Step 4: Commit Phase 1 documentation**
 
 ```powershell
 git add 项目结构需求梳理.md docs/superpowers/plans/2026-08-07-jointsense-architecture-foundation.md

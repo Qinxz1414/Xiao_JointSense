@@ -1,0 +1,110 @@
+package cloud.univ.jointsense.calibration
+
+import android.graphics.Bitmap
+import android.graphics.Rect
+import cloud.univ.jointsense.analysis.FACTORY_CURVE_SIGNAL_PERCENTILE
+import cloud.univ.jointsense.analysis.nearestRankPercentile
+
+internal data class GridWellReading(
+    val row: Int,
+    val col: Int,
+    val index: Int,
+    val signal: Float,
+)
+
+internal interface GridPixelSource {
+    val width: Int
+    val height: Int
+    fun getPixels(left: Int, top: Int, width: Int, height: Int): IntArray
+}
+
+internal object GridSignalDetector {
+    fun detectGridSignals(
+        bitmap: Bitmap,
+        crop: CalibrationIntBounds,
+        rows: Int = 3,
+        cols: Int = 3,
+        wellFraction: Float = 0.6f,
+    ): List<GridWellReading> = detectGridSignals(
+        source = BitmapPixelSource(bitmap),
+        crop = crop,
+        rows = rows,
+        cols = cols,
+        wellFraction = wellFraction,
+    )
+
+    fun detectGridSignals(
+        bitmap: Bitmap,
+        crop: Rect,
+        rows: Int = 3,
+        cols: Int = 3,
+        wellFraction: Float = 0.6f,
+    ): List<GridWellReading> = detectGridSignals(
+        bitmap = bitmap,
+        crop = CalibrationIntBounds(crop.left, crop.top, crop.right, crop.bottom),
+        rows = rows,
+        cols = cols,
+        wellFraction = wellFraction,
+    )
+
+    fun detectGridSignals(
+        source: GridPixelSource,
+        crop: CalibrationIntBounds,
+        rows: Int,
+        cols: Int,
+        wellFraction: Float = 0.6f,
+    ): List<GridWellReading> {
+        require(rows > 0 && cols > 0) { "rows and cols must be positive" }
+        require(wellFraction > 0f && wellFraction <= 1f) {
+            "wellFraction must be in (0, 1]"
+        }
+        require(source.width > 0 && source.height > 0) { "source must be non-empty" }
+        require(
+            crop.left >= 0 && crop.top >= 0 &&
+                crop.right > crop.left && crop.bottom > crop.top &&
+                crop.right <= source.width && crop.bottom <= source.height,
+        ) { "crop must be non-empty and fully inside the source" }
+        return legacyCalibrationSampleWindows(crop, rows, cols, wellFraction).map { window ->
+            val left = window.left.coerceIn(crop.left, crop.right - 1)
+            val top = window.top.coerceIn(crop.top, crop.bottom - 1)
+            val width = window.width.coerceIn(1, crop.right - left)
+            val height = window.height.coerceIn(1, crop.bottom - top)
+            val pixels = source.getPixels(left, top, width, height)
+            val signals = IntArray(pixels.size)
+            var signalCount = 0
+            val radiusX = width / 2.0
+            val radiusY = height / 2.0
+            pixels.forEachIndexed { index, pixel ->
+                val x = index % width
+                val y = index / width
+                val normalizedX = (x + 0.5 - radiusX) / radiusX
+                val normalizedY = (y + 0.5 - radiusY) / radiusY
+                if (normalizedX * normalizedX + normalizedY * normalizedY <= 1.0) {
+                    signals[signalCount++] = (pixel and 0xff) - ((pixel ushr 16) and 0xff)
+                }
+            }
+            check(signalCount > 0)
+            GridWellReading(
+                row = window.row,
+                col = window.col,
+                index = window.index,
+                signal = nearestRankPercentile(
+                    signals.copyOf(signalCount),
+                    FACTORY_CURVE_SIGNAL_PERCENTILE,
+                ),
+            )
+        }
+    }
+}
+
+private class BitmapPixelSource(
+    private val bitmap: Bitmap,
+) : GridPixelSource {
+    override val width: Int get() = bitmap.width
+    override val height: Int get() = bitmap.height
+
+    override fun getPixels(left: Int, top: Int, width: Int, height: Int): IntArray =
+        IntArray(width * height).also { pixels ->
+            bitmap.getPixels(pixels, 0, width, left, top, width, height)
+        }
+}

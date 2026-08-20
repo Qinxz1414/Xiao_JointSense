@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">JointSense</string>
+    <string name="nav_home">首页</string>
+    <string name="nav_trends">趋势</string>
+    <string name="nav_test">检测</string>
+    <string name="nav_report">报告</string>
+    <string name="nav_profile">个人中心</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_retry">重试</string>
+    <string name="migration_preparing_data">正在准备已保存的数据…</string>
+    <string name="migration_error_title">无法准备已保存的数据</string>
+    <string name="migration_error_message">现有数据尚未被更改。你可以重试，或使用空数据库开始。</string>
+    <string name="migration_start_empty">使用空数据库</string>
+    <string name="migration_start_empty_confirm_title">确定使用空数据库开始吗？</string>
+    <string name="migration_start_empty_confirm_message">这会删除 Room 中可能存在的部分导入数据并跳过旧数据导入，但不会修改原有的旧版文件。</string>
+    <string name="migration_start_empty_confirm_action">确认使用空数据库</string>
+    <string name="new_test">新建检测</string>
+    <string name="session_name_prefix">检测</string>
+    <string name="session_creation_error">无法开始新的检测，请重试。</string>
+</resources>

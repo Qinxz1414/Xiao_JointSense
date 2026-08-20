@@ -1,0 +1,107 @@
+package cloud.univ.jointsense.calibration
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+
+@Composable
+fun CalibrationSelectRouteScreen(
+    viewModel: CalibrationViewModel,
+    onImageReady: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.imageReadyToOpenCrop) {
+        if (state.imageReadyToOpenCrop) {
+            viewModel.consumeImageReady()
+            onImageReady()
+        }
+    }
+    CalibrationSelectScreen(
+        state = state,
+        onImageSelected = viewModel::onImageSelected,
+        onRetryLegacyReview = viewModel::retryLegacyRevalidation,
+        onBack = onBack,
+    )
+}
+
+@Composable
+fun CalibrationCropRouteScreen(
+    viewModel: CalibrationViewModel,
+    onSignalsReady: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.signalsReadyToOpenAssign) {
+        if (state.signalsReadyToOpenAssign) {
+            viewModel.consumeSignalsReady()
+            onSignalsReady()
+        }
+    }
+    CalibrationCropScreen(
+        state = state,
+        onCropChanged = viewModel::updateCrop,
+        onDetect = viewModel::detectSignals,
+        onBack = onBack,
+    )
+}
+
+@Composable
+fun CalibrationAssignRouteScreen(
+    viewModel: CalibrationViewModel,
+    onReviewReady: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    CalibrationAssignScreen(
+        state = state,
+        onFactorChanged = viewModel::selectFactor,
+        onConcentrationChanged = viewModel::updateConcentration,
+        onReview = { if (viewModel.review()) onReviewReady() },
+        onBack = onBack,
+    )
+}
+
+@Composable
+fun CalibrationReviewRouteScreen(
+    viewModel: CalibrationViewModel,
+    onSaved: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    BackHandler(enabled = state.isPersistenceBusy) { }
+    LaunchedEffect(state.saveCompleted) {
+        if (viewModel.claimSaveNavigation()) {
+            onSaved()
+        }
+    }
+    CalibrationReviewScreen(state, viewModel::save, onBack)
+}
+
+@Composable
+fun CalibrationDoneRouteScreen(
+    viewModel: CalibrationViewModel,
+    onDone: () -> Unit,
+    onAnother: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    BackHandler(enabled = state.isPersistenceBusy) { }
+    LaunchedEffect(Unit) {
+        viewModel.acknowledgeSaveDestination()
+    }
+    CalibrationDoneScreen(
+        state = state,
+        onDone = onDone,
+        onAnother = {
+            if (!state.isPersistenceBusy) {
+                viewModel.resetForAnotherFactor()
+                onAnother()
+            }
+        },
+        onRestoreConfirmed = viewModel::confirmRestoreFactory,
+        onBack = onBack,
+    )
+}

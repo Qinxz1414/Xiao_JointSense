@@ -4,8 +4,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Solid deep purple background matching logo color -->
     <path
-        android:fillColor="#7D21DC"
-        android:pathData="M0,0h108v108h-108z" />
+        android:fillColor="#0E2841"
+        android:pathData="M0,0 H108 V108 H0 Z" />
 </vector>
