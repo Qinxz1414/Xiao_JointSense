@@ -169,6 +169,7 @@ fun ImageSelectScreen(
 fun ImageCropScreen(
     bitmap: Bitmap,
     cropRect: Rect,
+    isCropValid: Boolean = true,
     onCropRectChanged: (Rect) -> Unit,
     onConfirm: () -> Unit,
     onBack: () -> Unit,
@@ -194,7 +195,13 @@ fun ImageCropScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(
+                        if (isCropValid) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer
+                        },
+                    )
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -202,13 +209,27 @@ fun ImageCropScreen(
                     imageVector = Icons.Default.Crop,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = if (isCropValid) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = stringResource(R.string.measurement_crop_instructions),
+                    text = stringResource(
+                        if (isCropValid) {
+                            R.string.measurement_crop_instructions
+                        } else {
+                            R.string.measurement_error_invalid_crop
+                        },
+                    ),
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isCropValid) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    },
                 )
             }
 
@@ -235,6 +256,7 @@ fun ImageCropScreen(
             ) {
                 Button(
                     onClick = onConfirm,
+                    enabled = isCropValid,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 52.dp)

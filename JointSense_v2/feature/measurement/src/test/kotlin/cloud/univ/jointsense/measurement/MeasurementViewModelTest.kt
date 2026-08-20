@@ -507,16 +507,35 @@ class MeasurementViewModelTest {
     }
 
     @Test
-    fun cropOutsideDecodedImageIsRecoverableAndPreservesLastValidCrop() = runTest(dispatcher) {
+    fun cropOutsideDecodedImageStaysInEditorAndPreservesLastValidCrop() = runTest(dispatcher) {
         val viewModel = readyViewModel()
         val validCrop = viewModel.state.value.cropRect
 
         viewModel.onAction(MeasurementAction.CropChanged(CropBounds(-10, 20, 310, 220)))
 
-        assertEquals(Stage.RecoverableError, viewModel.state.value.stage)
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
         assertEquals(MeasurementError.InvalidCrop, viewModel.state.value.error)
-        assertEquals(Stage.ReadyToCrop, viewModel.state.value.resumeStage)
+        assertNull(viewModel.state.value.resumeStage)
         assertEquals(validCrop, viewModel.state.value.cropRect)
+    }
+
+    @Test
+    fun transientInvalidResizeStaysEditableAndClearsGuidanceWhenValidAgain() = runTest(dispatcher) {
+        val viewModel = readyViewModel()
+        val invalidCrop = CropBounds(10, 20, 210, 220)
+        val recoveredCrop = CropBounds(10, 20, 310, 120)
+
+        viewModel.onAction(MeasurementAction.CropChanged(invalidCrop))
+
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
+        assertEquals(invalidCrop, viewModel.state.value.cropRect)
+        assertEquals(MeasurementError.InvalidCrop, viewModel.state.value.error)
+
+        viewModel.onAction(MeasurementAction.CropChanged(recoveredCrop))
+
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
+        assertEquals(recoveredCrop, viewModel.state.value.cropRect)
+        assertNull(viewModel.state.value.error)
     }
 
     @Test
@@ -531,7 +550,7 @@ class MeasurementViewModelTest {
 
         assertEquals(CropBounds(0, 0, 1, 1), viewModel.state.value.cropRect)
         viewModel.onAction(MeasurementAction.CropConfirmed)
-        assertEquals(Stage.RecoverableError, viewModel.state.value.stage)
+        assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
         assertEquals(MeasurementError.InvalidCrop, viewModel.state.value.error)
     }
 

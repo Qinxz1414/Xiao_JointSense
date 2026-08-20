@@ -195,6 +195,7 @@ fun CropRouteScreen(
                 ImageCropScreen(
                     bitmap = bitmap,
                     cropRect = state.cropBounds.toRect(),
+                    isCropValid = state.error != MeasurementError.InvalidCrop,
                     onCropRectChanged = {
                         viewModel.onAction(MeasurementAction.CropChanged(it.toBounds()))
                     },

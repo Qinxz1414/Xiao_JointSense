@@ -14,8 +14,10 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performScrollTo
@@ -174,6 +176,31 @@ class MeasurementAccessibilityTest {
             .fetchSemanticsNode().config[SemanticsActions.CustomActions].first()
         composeRule.runOnIdle { assertTrue(action.action()) }
         composeRule.runOnIdle { assertEquals(Rect(0, 0, 100, 100), updated) }
+    }
+
+    @Test
+    fun invalidCropUsesInlineGuidanceWithoutInterruptingMeasurement() {
+        val bitmap = Bitmap.createBitmap(300, 200, Bitmap.Config.ARGB_8888)
+        composeRule.setContent {
+            JointSenseTheme {
+                ImageCropScreen(
+                    bitmap = bitmap,
+                    cropRect = Rect(10, 20, 210, 180),
+                    isCropValid = false,
+                    onCropRectChanged = {},
+                    onConfirm = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(
+            composeRule.activity.getString(R.string.measurement_error_invalid_crop),
+        ).assertIsDisplayed()
+        composeRule.onAllNodesWithText(
+            composeRule.activity.getString(R.string.measurement_interrupted),
+        ).assertCountEquals(0)
+        composeRule.onNodeWithTag(MEASUREMENT_CROP_CONFIRM_TAG).assertIsNotEnabled()
     }
 
     @Test

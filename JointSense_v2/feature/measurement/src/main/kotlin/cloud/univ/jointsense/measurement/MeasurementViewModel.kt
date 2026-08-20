@@ -410,15 +410,17 @@ class MeasurementViewModel(
 
     private fun updateCrop(bounds: CropBounds) {
         cropConfirmed = false
-        if (!isValidCrop(bounds, state.value.image)) {
-            setRecoverableError(MeasurementError.InvalidCrop, Stage.ReadyToCrop)
-            return
-        }
+        val image = state.value.image
+        val isWithinImage = image != null &&
+            bounds.left >= 0 && bounds.top >= 0 &&
+            bounds.right <= image.width && bounds.bottom <= image.height &&
+            bounds.width > 0 && bounds.height > 0
+        val isValid = isWithinImage && isValidCrop(bounds, image)
         updateState {
             it.copy(
                 stage = Stage.ReadyToCrop,
-                cropRect = bounds,
-                error = null,
+                cropRect = bounds.takeIf { isWithinImage } ?: it.cropRect,
+                error = MeasurementError.InvalidCrop.takeUnless { isValid },
                 resumeStage = null,
                 errorMessage = null,
             )
@@ -428,7 +430,14 @@ class MeasurementViewModel(
     private fun confirmCrop() {
         val crop = state.value.cropRect
         if (crop == null || !isValidCrop(crop, state.value.image)) {
-            setRecoverableError(MeasurementError.InvalidCrop, Stage.ReadyToCrop)
+            updateState {
+                it.copy(
+                    stage = Stage.ReadyToCrop,
+                    error = MeasurementError.InvalidCrop,
+                    resumeStage = null,
+                    errorMessage = null,
+                )
+            }
             return
         }
         cropConfirmed = true
