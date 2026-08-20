@@ -35,8 +35,8 @@ class NavigationActions internal constructor(
         driver.navigate(CropRoute, launchSingleTop = true)
     }
 
-    fun openFactorSelect() {
-        driver.navigate(FactorSelectRoute, launchSingleTop = true)
+    fun openAnalysis() {
+        driver.navigate(AnalysisRoute, launchSingleTop = true)
     }
 
     fun openResult(resultId: String) {
@@ -76,7 +76,7 @@ class NavigationActions internal constructor(
         driver.navigate(CalibrationGraph, launchSingleTop = true)
     }
 
-    /** Natural back for ordinary destinations, including Crop and FactorSelect. */
+    /** Natural back for ordinary destinations, including Crop and Analysis. */
     fun navigateBack(): Boolean = driver.popOne()
 
     /** Result exits an active measurement graph; historical results pop one entry. */

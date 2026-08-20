@@ -7,6 +7,7 @@ import cloud.univ.jointsense.analysis.calibration.CalibrationValidation
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import java.util.concurrent.CountDownLatch
@@ -135,6 +136,7 @@ class CalibrationViewModelTest {
         assertEquals(InflammationFactor.TNF_ALPHA, saved.factor)
         assertEquals(456L, saved.createdAt)
         assertEquals(CalibrationStatus.ACTIVE, saved.status)
+        assertEquals(ColorSignalMethod.PIXEL_BR_P90_V1, saved.signalMethod)
         assertEquals(9, saved.knots.size)
         assertEquals(10f, saved.knots.first().rawSignal)
         assertEquals(0f, saved.knots.first().fittedSignal)

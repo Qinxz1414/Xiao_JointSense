@@ -1,6 +1,7 @@
 package cloud.univ.jointsense.measurement
 
 import cloud.univ.jointsense.domain.model.DataSource
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
@@ -24,6 +25,10 @@ class ResultUiModelTest {
             assertEquals(42.5f, model.concentration)
             assertEquals(status, model.rangeStatus)
             assertEquals(FEATURES, model.features)
+            assertEquals(
+                ColorSignalMethod.LEGACY_MEAN_BR,
+                model.measurements.single().signalMethod,
+            )
         }
     }
 
@@ -47,6 +52,25 @@ class ResultUiModelTest {
         assertEquals(42.5f, model.factorValues.single { it.factor == InflammationFactor.TNF_ALPHA }.value)
         assertEquals(null, model.factorValues.single { it.factor == InflammationFactor.IL6 }.value)
         assertEquals(null, model.factorValues.single { it.factor == InflammationFactor.IL1_BETA }.value)
+    }
+
+    @Test
+    fun selectedPhotoUsesOnlyItsOwnThreeResultsWhenSessionContainsMultiplePhotos() {
+        val firstPhoto = triplex("batch-first", listOf(10f, 20f, 30f), timestamp = 10L)
+        val secondPhoto = triplex("batch-second", listOf(110f, 120f, 130f), timestamp = 20L)
+        val session = TestSession(
+            id = "session",
+            name = "Session",
+            createdAt = 1L,
+            source = DataSource.USER,
+            results = firstPhoto + secondPhoto,
+        )
+
+        val model = createResultUiModel(session, firstPhoto.first())
+
+        assertEquals(APPROVED_FACTOR_ORDER, model.measurements.map(ResultMeasurementPresentation::factor))
+        assertEquals(listOf(10f, 20f, 30f), model.measurements.map(ResultMeasurementPresentation::concentration))
+        assertEquals(listOf(10f, 20f, 30f), model.factorValues.map(ResultFactorPresentation::value))
     }
 
     @Test
@@ -130,6 +154,21 @@ class ResultUiModelTest {
         source = DataSource.USER,
         results = listOf(result),
     )
+
+    private fun triplex(batchId: String, concentrations: List<Float>, timestamp: Long) =
+        APPROVED_FACTOR_ORDER.mapIndexed { index, factor ->
+            TestResult(
+                id = "$batchId-$index",
+                sessionId = "session",
+                draftId = null,
+                factor = factor,
+                concentration = concentrations[index],
+                rangeStatus = RangeStatus.IN_RANGE,
+                features = FEATURES,
+                timestamp = timestamp,
+                measurementBatchId = batchId,
+            )
+        }
 
     private companion object {
         val FEATURES = RgbFeatures(11f, 22f, 33f, 1f, 2f, 3f)

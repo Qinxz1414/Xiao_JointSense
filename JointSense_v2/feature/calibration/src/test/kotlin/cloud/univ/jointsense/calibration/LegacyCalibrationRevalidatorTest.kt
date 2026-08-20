@@ -5,6 +5,7 @@ import cloud.univ.jointsense.analysis.calibration.CalibrationValidator
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import kotlinx.coroutines.CancellationException
@@ -23,6 +24,28 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LegacyCalibrationRevalidatorTest {
+    @Test
+    fun legacyMeanCurveIsRetainedForRecalibrationAndNeverPromotedIntoP90Domain() = runTest {
+        val legacy = calibration(InflammationFactor.TNF_ALPHA, validSignals).copy(
+            signalMethod = ColorSignalMethod.LEGACY_MEAN_BR,
+        )
+        val repository = RevalidationRepository(listOf(legacy))
+        var validationCalls = 0
+        val revalidator = LegacyCalibrationRevalidator(repository) {
+            validationCalls += 1
+            error("Legacy mean curve must not reach the P90 validator")
+        }
+
+        val summary = revalidator.revalidateNeedsReview()
+
+        assertEquals(0, validationCalls)
+        assertEquals(1, summary.attempted)
+        assertEquals(0, summary.promoted)
+        assertEquals(1, summary.retained)
+        assertTrue(repository.saved.isEmpty())
+        assertEquals(CalibrationStatus.NEEDS_REVIEW, repository.current.value.single().status)
+    }
+
     @Test
     fun scansEachNeedsReviewRecordOncePromotingOnlyValidatorApprovedRecords() = runTest {
         val valid = calibration(

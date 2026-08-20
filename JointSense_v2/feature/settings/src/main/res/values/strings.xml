@@ -74,13 +74,13 @@
     <string name="settings_back">Back</string>
     <string name="settings_about_version">Version %1$s</string>
     <string name="settings_about_method_heading">Photo colorimetry</string>
-    <string name="settings_about_rgb_features">The selected reaction-chamber crop is summarized by six features: red, green, and blue channel means plus their channel standard deviations.</string>
-    <string name="settings_about_tealness">Tealness is defined as BMean − RMean.</string>
+    <string name="settings_about_rgb_features">Each fixed disc ROI is summarized separately: left TNF-α, center IL-6, and right IL-1β. RGB channel means and population standard deviations are retained for quality traceability.</string>
+    <string name="settings_about_tealness">Quantification uses the nearest-rank P90 of per-pixel B − R inside each central elliptical ROI. BMean − RMean is retained only as an RGB quality-traceability statistic and is not the standard-curve input.</string>
     <string name="settings_about_curve_heading">Standard-curve quantification</string>
-    <string name="settings_about_curve_behavior">An active user calibration curve is applied after subtracting that calibration’s blank raw tealness from the measurement’s raw tealness; otherwise the factory standard curve is used. Concentration is obtained by piecewise-linear inversion and labeled below range, in range, or above range.</string>
+    <string name="settings_about_curve_behavior">A user calibration is used only when it matches the current B − R P90 signal method. Its blank B − R P90 signal is subtracted from the measurement B − R P90 signal before piecewise-linear inversion; otherwise the factory standard curve is used. Results are labeled below range, in range, or above range.</string>
     <string name="settings_about_factory_ranges">Factory concentration ranges: TNF-α 0–200 pg/mL, IL-6 0–500 pg/mL, and IL-1β 0–200 pg/mL.</string>
     <string name="settings_about_index_heading">OA inflammation index (AI)</string>
-    <string name="settings_about_oa_weights">Weights are TNF-α %1$d%%, IL-6 %2$d%%, and IL-1β %3$d%%. When a factor is missing, the available weights are re-normalized.</string>
+    <string name="settings_about_oa_weights">Weights are TNF-α %1$d%%, IL-6 %2$d%%, and IL-1β %3$d%%. A current photo result requires all three factors. Only compatible legacy history and trend aggregation re-normalizes available weights when a factor is missing.</string>
     <string name="settings_about_disclaimer_heading">Research-use notice</string>
     <string name="research_disclaimer">Results in this report are estimates derived from smartphone-photo colorimetry for research and longitudinal trend observation only. They are not intended for clinical diagnosis, treatment decisions, or as a substitute for validated laboratory testing.</string>
 </resources>

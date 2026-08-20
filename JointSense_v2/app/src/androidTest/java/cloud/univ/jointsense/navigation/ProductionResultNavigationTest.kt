@@ -17,12 +17,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.domain.model.DataSource
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.NewTestResult
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import cloud.univ.jointsense.measurement.BaselineAnalysisResult
 import cloud.univ.jointsense.measurement.BaselinePhotoAnalysisAdapter
@@ -173,7 +175,7 @@ private fun JointSenseRoute.marker(): String = when (this) {
     HistoryRoute -> "history"
     ImageSelectRoute -> "image-select"
     CropRoute -> "crop"
-    FactorSelectRoute -> "factor"
+    AnalysisRoute -> "analysis"
     is ResultRoute -> "result"
     CalibrationSelectRoute -> "calibration-select"
     CalibrationCropRoute -> "calibration-crop"
@@ -187,8 +189,16 @@ private object ProductionResultAnalyzer : BaselinePhotoAnalysisAdapter {
     override suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ) = BaselineAnalysisResult(12f, RangeStatus.IN_RANGE, FEATURES)
+    ): List<BaselineAnalysisResult> = inflammationFactorPresentationOrder.map { factor ->
+        BaselineAnalysisResult(
+            factor = factor,
+            concentration = 12f,
+            rangeStatus = RangeStatus.IN_RANGE,
+            features = FEATURES,
+            rawSignal = 22f,
+            signalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
+        )
+    }
 }
 
 private class ProductionResultRepository : TestSessionRepository {
@@ -226,6 +236,12 @@ private class ProductionResultRepository : TestSessionRepository {
         sessionId: String,
         draftId: String,
         result: NewTestResult,
+    ): String = "unused"
+
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
     ): String = "unused"
 
     override suspend fun deleteSession(id: String) = Unit

@@ -14,8 +14,6 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.assertIsSelectable
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -47,30 +45,25 @@ class MeasurementAccessibilityTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun factorChoicesAreASelectableGroupWithNamedLargeRadioTargets() {
+    fun imageSelectionActionsAreNamedLargeButtonTargets() {
         composeRule.setContent {
             JointSenseTheme {
-                FactorSelectScreen(
-                    selectedFactor = InflammationFactor.IL6,
-                    onFactorSelected = {},
-                    onAnalyze = {},
+                ImageSelectScreen(
+                    onTakePhoto = {},
+                    onPickImage = {},
                     onBack = {},
-                    isAnalyzing = false,
+                    sessionName = "Study visit",
                 )
             }
         }
 
-        composeRule.onNodeWithTag(MEASUREMENT_FACTOR_GROUP_TAG)
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
-        InflammationFactor.entries.forEach { factor ->
-            composeRule.onNodeWithTag(measurementFactorTag(factor))
-                .assertIsSelectable()
-                .assertHeightIsAtLeast(48.dp)
-                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
-        }
-        composeRule.onNodeWithTag(measurementFactorTag(InflammationFactor.IL6)).assertIsSelected()
-        composeRule.onNodeWithTag(ANALYZE_BUTTON_TAG).assertHeightIsAtLeast(48.dp)
-        composeRule.onNodeWithTag(SCREEN_MEASUREMENT_FACTOR_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(MEASUREMENT_TAKE_PHOTO_TAG)
+            .assertHeightIsAtLeast(48.dp)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        composeRule.onNodeWithTag(MEASUREMENT_GALLERY_TAG)
+            .assertHeightIsAtLeast(48.dp)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        composeRule.onNodeWithTag(SCREEN_MEASUREMENT_SELECT_TAG).assertIsDisplayed()
     }
 
     @Test
@@ -190,20 +183,18 @@ class MeasurementAccessibilityTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
                 JointSenseTheme {
                     Box(Modifier.requiredSize(360.dp, 640.dp)) {
-                        FactorSelectScreen(
-                            selectedFactor = InflammationFactor.TNF_ALPHA,
-                            onFactorSelected = {},
-                            onAnalyze = {},
+                        ImageSelectScreen(
+                            onTakePhoto = {},
+                            onPickImage = {},
                             onBack = {},
-                            isAnalyzing = false,
+                            sessionName = "Study visit",
                         )
                     }
                 }
             }
         }
 
-        composeRule.onNodeWithTag(ANALYZE_BUTTON_TAG).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(measurementFactorTag(InflammationFactor.IL1_BETA))
+        composeRule.onNodeWithTag(MEASUREMENT_GALLERY_TAG)
             .performScrollTo()
             .assertIsDisplayed()
     }

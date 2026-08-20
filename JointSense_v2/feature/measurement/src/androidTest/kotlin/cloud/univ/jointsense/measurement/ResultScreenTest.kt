@@ -31,22 +31,31 @@ class ResultScreenTest {
 
     @Test
     fun resultExposesMeasurementDetailsAndIndependentActionsWithoutDisclaimer() {
-        val result = TestResult(
-            id = "result",
-            sessionId = "session",
-            draftId = "draft",
-            factor = InflammationFactor.IL6,
-            concentration = 42f,
-            rangeStatus = RangeStatus.UNKNOWN,
-            features = RgbFeatures(10f, 20f, 30f, 1f, 2f, 3f),
-            timestamp = 2L,
-        )
+        val results = listOf(
+            InflammationFactor.TNF_ALPHA,
+            InflammationFactor.IL6,
+            InflammationFactor.IL1_BETA,
+        ).mapIndexed { index, factor ->
+            TestResult(
+                id = "result-$index",
+                sessionId = "session",
+                draftId = null,
+                factor = factor,
+                concentration = 42f + index,
+                rangeStatus = RangeStatus.UNKNOWN,
+                features = RgbFeatures(10f, 20f, 30f, 1f, 2f, 3f),
+                timestamp = 2L,
+                measurementBatchId = "batch",
+                rawSignal = 18f + index,
+            )
+        }
+        val result = results.first()
         val session = TestSession(
             id = "session",
             name = "Session",
             createdAt = 1L,
             source = DataSource.USER,
-            results = listOf(result),
+            results = results,
         )
         composeRule.setContent {
             JointSenseTheme {
@@ -59,13 +68,14 @@ class ResultScreenTest {
             }
         }
 
-        listOf(
-            "result_concentration",
-            "result_range_status",
-            "result_features_summary",
-            "result_home_action",
-            "continue_measurement",
-        ).forEach { tag ->
+        results.flatMap { measured ->
+            listOf(
+                resultFactorTag(measured.factor),
+                resultFactorConcentrationTag(measured.factor),
+                resultFactorRangeTag(measured.factor),
+                resultFactorFeaturesTag(measured.factor),
+            )
+        }.plus(listOf("result_home_action", "continue_measurement")).forEach { tag ->
             composeRule.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
         }
         composeRule.onAllNodesWithText(
@@ -98,7 +108,9 @@ class ResultScreenTest {
             assertEquals(1, backs)
             assertEquals(1, homes)
         }
-        composeRule.onAllNodesWithTag(RESULT_RANGE_STATUS_TAG).assertCountEquals(0)
+        InflammationFactor.entries.forEach { factor ->
+            composeRule.onAllNodesWithTag(resultFactorRangeTag(factor)).assertCountEquals(0)
+        }
     }
 
     @Test
@@ -167,7 +179,7 @@ class ResultScreenTest {
             }
         }
 
-        composeRule.onAllNodesWithTag(RESULT_FEATURES_SUMMARY_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(resultFactorFeaturesTag(InflammationFactor.TNF_ALPHA)).assertCountEquals(0)
         composeRule.onAllNodesWithText("Infinity", substring = true).assertCountEquals(0)
     }
 

@@ -3,6 +3,7 @@ package cloud.univ.jointsense.data.legacy
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.DataSource
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
@@ -88,6 +89,7 @@ class LegacyJsonParser(
                 kitName = null,
                 kitLot = null,
                 knots = knots,
+                signalMethod = ColorSignalMethod.LEGACY_MEAN_BR,
             )
         }
     }

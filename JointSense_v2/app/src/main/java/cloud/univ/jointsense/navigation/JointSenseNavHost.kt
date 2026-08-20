@@ -79,7 +79,7 @@ import cloud.univ.jointsense.insights.ReportRouteScreen
 import cloud.univ.jointsense.insights.TrendsRouteScreen
 import cloud.univ.jointsense.image.SampledBitmapDecoder
 import cloud.univ.jointsense.measurement.CropRouteScreen
-import cloud.univ.jointsense.measurement.FactorSelectRouteScreen
+import cloud.univ.jointsense.measurement.TriplexAnalysisRouteScreen
 import cloud.univ.jointsense.measurement.HistoryRouteScreen
 import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
 import cloud.univ.jointsense.measurement.MeasurementViewModel
@@ -307,14 +307,14 @@ private fun JointSenseNavHostContent(
                         Destination(screenSlot, CropRoute, actions) {
                             CropRouteScreen(
                                 viewModel = requireNotNull(measurementViewModel),
-                                onConfirm = actions::openFactorSelect,
+                                onConfirm = actions::openAnalysis,
                                 onBack = { actions.navigateBack() },
                             )
                         }
                     }
-                    composable<FactorSelectRoute> {
-                        Destination(screenSlot, FactorSelectRoute, actions) {
-                            FactorSelectRouteScreen(
+                    composable<AnalysisRoute> {
+                        Destination(screenSlot, AnalysisRoute, actions) {
+                            TriplexAnalysisRouteScreen(
                                 viewModel = requireNotNull(measurementViewModel),
                                 onResultReady = actions::openResult,
                                 onBack = { actions.navigateBack() },

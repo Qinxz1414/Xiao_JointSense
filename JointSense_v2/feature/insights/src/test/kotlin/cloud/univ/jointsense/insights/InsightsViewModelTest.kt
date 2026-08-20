@@ -75,6 +75,25 @@ class InsightsViewModelTest {
         assertEquals(3, viewModel.reportState.value.latestValues.size)
     }
 
+    @Test
+    fun aiSeriesKeepsEveryTriplexPhotoWithinTheSameSession() {
+        val first = completeSession().results.map { it.copy(measurementBatchId = "batch-1", timestamp = NOW - 1_000) }
+        val second = completeSession().results.map {
+            it.copy(
+                id = "second-${it.id}",
+                concentration = it.concentration / 2f,
+                measurementBatchId = "batch-2",
+                timestamp = NOW - 500,
+            )
+        }
+        val session = completeSession().copy(results = first + second)
+
+        val series = BaselineInsightsMetrics.aiSeries(listOf(session))
+
+        assertEquals(listOf(NOW - 1_000, NOW - 500), series.map(InsightPoint::time))
+        assertEquals(2, series.size)
+    }
+
     private fun completeSession(): TestSession = TestSession(
         id = "session",
         name = "Complete",
@@ -96,6 +115,7 @@ class InsightsViewModelTest {
         rangeStatus = RangeStatus.IN_RANGE,
         features = RgbFeatures(1f, 2f, 3f, 4f, 5f, 6f),
         timestamp = NOW - 500,
+        measurementBatchId = "batch",
     )
 
     private companion object {
@@ -116,5 +136,10 @@ private class FakeTestSessionRepository(initial: List<TestSession>) : TestSessio
 
     override suspend fun createSession(name: String, source: DataSource): String = error("unused")
     override suspend fun commitResult(sessionId: String, draftId: String, result: NewTestResult): String = error("unused")
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
+    ): String = error("unused")
     override suspend fun deleteSession(id: String) = error("unused")
 }

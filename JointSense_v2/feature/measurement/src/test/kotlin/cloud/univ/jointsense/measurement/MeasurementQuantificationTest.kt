@@ -4,6 +4,7 @@ import cloud.univ.jointsense.analysis.FactoryCurves
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import org.junit.Assert.assertEquals
@@ -103,6 +104,14 @@ class MeasurementQuantificationTest {
         assertEquals(
             expected,
             quantifyMeasurementSignal(factor, rawSignal, active.copy(factor = InflammationFactor.IL6)),
+        )
+        assertEquals(
+            expected,
+            quantifyMeasurementSignal(
+                factor,
+                rawSignal,
+                active.copy(signalMethod = ColorSignalMethod.LEGACY_MEAN_BR),
+            ),
         )
     }
 

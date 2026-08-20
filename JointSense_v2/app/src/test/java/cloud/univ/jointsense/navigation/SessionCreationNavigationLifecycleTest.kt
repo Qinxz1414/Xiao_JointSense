@@ -1,7 +1,6 @@
 package cloud.univ.jointsense.navigation
 
 import cloud.univ.jointsense.domain.model.DataSource
-import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.NewTestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
@@ -155,6 +154,12 @@ private class DelayedSessionRepository : TestSessionRepository {
         result: NewTestResult,
     ): String = error("unused")
 
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
+    ): String = error("unused")
+
     override suspend fun deleteSession(id: String) {
         deletedIds += id
         sessions.value = sessions.value.filterNot { it.id == id }
@@ -165,8 +170,7 @@ private object UnusedAnalyzer : BaselinePhotoAnalysisAdapter {
     override suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ): BaselineAnalysisResult = error("unused")
+    ): List<BaselineAnalysisResult> = error("unused")
 }
 
 private class LifecycleStackNavigationDriver(

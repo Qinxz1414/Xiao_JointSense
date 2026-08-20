@@ -3,12 +3,15 @@ package cloud.univ.jointsense.measurement
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import cloud.univ.jointsense.domain.model.DataSource
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.NewTestResult
+import cloud.univ.jointsense.domain.model.NewMeasurementBatch
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.CountDownLatch
@@ -114,6 +117,8 @@ class MeasurementViewModelTest {
         advanceUntilIdle()
         assertEquals(Stage.Success, viewModel.state.value.stage)
         assertEquals("persisted-result", viewModel.state.value.resultId)
+        assertNull(viewModel.state.value.imageUri)
+        assertNull(viewModel.state.value.cropRect)
     }
 
     @Test
@@ -260,7 +265,26 @@ class MeasurementViewModelTest {
     }
 
     @Test
-    fun uriCropFactorOriginAndDraftSurviveSavedStateRecreation() = runTest(dispatcher) {
+    fun cancelIsIgnoredAfterAtomicPersistenceHasStarted() = runTest(dispatcher) {
+        val repository = RecordingRepository().apply { suspendCommit = true }
+        val viewModel = readyViewModel(repository = repository)
+
+        viewModel.onAction(MeasurementAction.Analyze)
+        runCurrent()
+        assertEquals(Stage.Persisting, viewModel.state.value.stage)
+
+        viewModel.onAction(MeasurementAction.CancelAnalysis)
+        runCurrent()
+
+        assertEquals(Stage.Persisting, viewModel.state.value.stage)
+        repository.releaseCommit()
+        advanceUntilIdle()
+        assertEquals(Stage.Success, viewModel.state.value.stage)
+        assertEquals(1, repository.commitCalls)
+    }
+
+    @Test
+    fun uriCropOriginAndDraftSurviveSavedStateRecreation() = runTest(dispatcher) {
         var draftNumber = 0
         val repository = RecordingRepository()
         val originalHandle = SavedStateHandle()
@@ -279,9 +303,8 @@ class MeasurementViewModelTest {
         original.acceptCreatedSession()
         original.onAction(MeasurementAction.ImageSelected("content://measurement/photo"))
         advanceUntilIdle()
-        original.onAction(MeasurementAction.CropChanged(CropBounds(11, 12, 111, 112)))
+        original.onAction(MeasurementAction.CropChanged(CropBounds(11, 12, 311, 112)))
         original.onAction(MeasurementAction.CropConfirmed)
-        original.onAction(MeasurementAction.FactorSelected(InflammationFactor.IL1_BETA))
 
         val restoredHandle = SavedStateHandle(
             originalHandle.keys().associateWith { key -> originalHandle.get<Any?>(key) },
@@ -298,8 +321,7 @@ class MeasurementViewModelTest {
         advanceUntilIdle()
 
         assertEquals("content://measurement/photo", restored.state.value.imageUri)
-        assertEquals(CropBounds(11, 12, 111, 112), restored.state.value.cropRect)
-        assertEquals(InflammationFactor.IL1_BETA, restored.state.value.factor)
+        assertEquals(CropBounds(11, 12, 311, 112), restored.state.value.cropRect)
         assertEquals("REPORT", restored.state.value.originDestination)
         assertEquals(original.state.value.draftId, restored.state.value.draftId)
         assertEquals(Stage.ReadyToAnalyze, restored.state.value.stage)
@@ -335,7 +357,7 @@ class MeasurementViewModelTest {
         advanceUntilIdle()
 
         assertEquals(Stage.ReadyToCrop, restored.state.value.stage)
-        assertEquals(CropBounds(1, 2, 101, 102), restored.state.value.cropRect)
+        assertEquals(CropBounds(80, 193, 720, 406), restored.state.value.cropRect)
     }
 
     @Test
@@ -358,7 +380,7 @@ class MeasurementViewModelTest {
         assertNull(viewModel.state.value.cropRect)
         advanceUntilIdle()
 
-        assertEquals(CropBounds(200, 150, 600, 450), viewModel.state.value.cropRect)
+        assertEquals(CropBounds(80, 193, 720, 406), viewModel.state.value.cropRect)
         assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
     }
 
@@ -498,7 +520,7 @@ class MeasurementViewModelTest {
     }
 
     @Test
-    fun onePixelImageGetsAConfirmableDefaultCrop() = runTest(dispatcher) {
+    fun onePixelImageCannotFormAThreeDiscMeasurementRow() = runTest(dispatcher) {
         val viewModel = MeasurementViewModel(
             repository = RecordingRepository(),
             analyzer = RecordingAnalyzer(),
@@ -509,7 +531,8 @@ class MeasurementViewModelTest {
 
         assertEquals(CropBounds(0, 0, 1, 1), viewModel.state.value.cropRect)
         viewModel.onAction(MeasurementAction.CropConfirmed)
-        assertEquals(Stage.ReadyToAnalyze, viewModel.state.value.stage)
+        assertEquals(Stage.RecoverableError, viewModel.state.value.stage)
+        assertEquals(MeasurementError.InvalidCrop, viewModel.state.value.error)
     }
 
     @Test
@@ -610,7 +633,7 @@ class MeasurementViewModelTest {
             defaultDispatcher = dispatcher,
         )
         viewModel.setImage(oldImage)
-        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 220)))
+        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 120)))
         viewModel.onAction(MeasurementAction.CropConfirmed)
         val capturedDraft = viewModel.state.value.draftId
 
@@ -739,7 +762,7 @@ class MeasurementViewModelTest {
         advanceUntilIdle()
 
         assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
-        assertEquals(CropBounds(50, 25, 150, 75), viewModel.state.value.cropRect)
+        assertEquals(CropBounds(20, 23, 180, 76), viewModel.state.value.cropRect)
     }
 
     @Test
@@ -767,7 +790,7 @@ class MeasurementViewModelTest {
         advanceUntilIdle()
 
         assertEquals(Stage.ReadyToCrop, viewModel.state.value.stage)
-        assertEquals(CropBounds(50, 25, 150, 75), viewModel.state.value.cropRect)
+        assertEquals(CropBounds(20, 23, 180, 76), viewModel.state.value.cropRect)
         assertFalse(requireNotNull(handle.get<Boolean>("measurement.crop.confirmed")))
     }
 
@@ -1941,7 +1964,7 @@ class MeasurementViewModelTest {
         viewModel.acceptCreatedSession()
         viewModel.onAction(MeasurementAction.ImageSelected("content://measurement/photo"))
         testScheduler.advanceUntilIdle()
-        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 220)))
+        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 120)))
         viewModel.onAction(MeasurementAction.CropConfirmed)
         return viewModel
     }
@@ -1964,7 +1987,7 @@ class MeasurementViewModelTest {
         testScheduler.advanceUntilIdle()
         viewModel.acceptCreatedSession()
         viewModel.setImage(image)
-        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 220)))
+        viewModel.onAction(MeasurementAction.CropChanged(CropBounds(10, 20, 310, 120)))
         viewModel.onAction(MeasurementAction.CropConfirmed)
         return viewModel
     }
@@ -1983,7 +2006,7 @@ class MeasurementViewModelTest {
         testScheduler.advanceUntilIdle()
         viewModel.acceptCreatedSession()
         val recoveryData = viewModel.state.value.let {
-            listOf(it.draftId, it.imageUri, it.cropRect, it.factor, it.originDestination)
+            listOf(it.draftId, it.imageUri, it.cropRect, it.originDestination)
         }
 
         viewModel.onAction(MeasurementAction.CameraPermissionRequestStarted)
@@ -2006,7 +2029,7 @@ class MeasurementViewModelTest {
         assertEquals(
             recoveryData,
             viewModel.state.value.let {
-                listOf(it.draftId, it.imageUri, it.cropRect, it.factor, it.originDestination)
+                listOf(it.draftId, it.imageUri, it.cropRect, it.originDestination)
             },
         )
 
@@ -2018,14 +2041,14 @@ class MeasurementViewModelTest {
         assertEquals(
             recoveryData,
             viewModel.state.value.let {
-                listOf(it.draftId, it.imageUri, it.cropRect, it.factor, it.originDestination)
+                listOf(it.draftId, it.imageUri, it.cropRect, it.originDestination)
             },
         )
     }
 }
 
 private fun MeasurementUiState.recoveryData(): List<Any?> =
-    listOf(draftId, imageUri, cropRect, factor, originDestination)
+    listOf(draftId, imageUri, cropRect, originDestination)
 
 private suspend fun MeasurementViewModel.acknowledgePermissionLaunch(): CameraPermissionLaunchClaim {
     val effect = effects.first() as MeasurementEffect.RequestCameraPermission
@@ -2208,8 +2231,7 @@ private class RecordingAnalyzer(
     override suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ): BaselineAnalysisResult {
+    ): List<BaselineAnalysisResult> {
         calls += 1
         boundary = activeBoundary?.get()
         if (nonCooperativeAnalysis) {
@@ -2218,11 +2240,16 @@ private class RecordingAnalyzer(
             analysisGate.await()
         }
         if (failuresRemaining-- > 0) error("analysis failed")
-        return BaselineAnalysisResult(
-            concentration = 42f,
-            rangeStatus = RangeStatus.IN_RANGE,
-            features = RgbFeatures(10f, 20f, 30f, 1f, 2f, 3f),
-        )
+        return inflammationFactorPresentationOrder.mapIndexed { index, factor ->
+            BaselineAnalysisResult(
+                factor = factor,
+                concentration = 42f + index,
+                rangeStatus = RangeStatus.IN_RANGE,
+                features = RgbFeatures(10f + index, 20f, 30f + index, 1f, 2f, 3f),
+                rawSignal = 20f,
+                signalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
+            )
+        }
     }
 }
 
@@ -2307,6 +2334,48 @@ private class RecordingRepository(
             sessions.value = committedSnapshot
         }
         return id
+    }
+
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: NewMeasurementBatch,
+    ): String {
+        commitCalls += 1
+        committedDrafts += draftId
+        commitBoundary = activeBoundary?.get()
+        if (commitFailuresRemaining-- > 0) error("persistence failed")
+        val batchId = when {
+            nonCooperativeCommit -> suspendCoroutine { commitContinuation = it }
+            suspendCommit -> commitGate.await()
+            else -> "result-${nextResult.getAndIncrement()}"
+        }
+        val stored = measurement.results.mapIndexed { index, result ->
+            TestResult(
+                id = if (index == 0) batchId else "$batchId-${result.factor.name.lowercase()}",
+                sessionId = sessionId,
+                draftId = null,
+                factor = result.factor,
+                concentration = result.concentration,
+                rangeStatus = result.rangeStatus,
+                features = result.features,
+                timestamp = measurement.timestamp,
+                measurementBatchId = batchId,
+            )
+        }
+        val committedSnapshot = sessions.value.map { session ->
+            if (session.id == sessionId && session.results.none { it.measurementBatchId == batchId }) {
+                session.copy(results = session.results + stored)
+            } else {
+                session
+            }
+        }
+        if (delaySnapshotAfterCommit) {
+            delayedCommitSnapshot = committedSnapshot
+        } else {
+            sessions.value = committedSnapshot
+        }
+        return batchId
     }
 
     override suspend fun deleteSession(id: String) {

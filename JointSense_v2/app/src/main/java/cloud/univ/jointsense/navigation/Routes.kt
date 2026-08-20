@@ -18,7 +18,7 @@ data class MeasurementGraph(val origin: TopLevelDestination) : NavigationTarget
 
 @Serializable data object ImageSelectRoute : JointSenseRoute
 @Serializable data object CropRoute : JointSenseRoute
-@Serializable data object FactorSelectRoute : JointSenseRoute
+@Serializable data object AnalysisRoute : JointSenseRoute
 @Serializable data class ResultRoute(val resultId: String) : JointSenseRoute
 
 @Serializable data object CalibrationGraph : NavigationTarget

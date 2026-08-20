@@ -61,7 +61,7 @@ class NavigationActionsTest {
         actions.openTopLevel(TopLevelDestination.TRENDS)
         actions.startMeasurement(TopLevelDestination.TRENDS)
         actions.openCrop()
-        actions.openFactorSelect()
+        actions.openAnalysis()
         actions.openResult("actual-result-id")
         actions.exitResult()
 
@@ -129,7 +129,7 @@ class NavigationActionsTest {
         actions.openTopLevel(TopLevelDestination.TRENDS)
         actions.startMeasurement(TopLevelDestination.TRENDS)
         actions.openCrop()
-        actions.openFactorSelect()
+        actions.openAnalysis()
         actions.openResult("completed-result")
 
         actions.continueMeasurementFromResult(TopLevelDestination.TRENDS)

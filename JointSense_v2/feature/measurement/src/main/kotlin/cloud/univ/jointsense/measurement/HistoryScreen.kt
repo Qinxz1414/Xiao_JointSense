@@ -54,6 +54,7 @@ import cloud.univ.jointsense.designsystem.component.ClinicalCard
 import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.measurementBatchCount
 import cloud.univ.jointsense.feature.measurement.R
 import java.text.DateFormat
 import java.util.Date
@@ -139,7 +140,7 @@ fun HistoryScreen(
                 items(sessions.reversed()) { session ->
                     val displayName = session.localizedDisplayName()
                     val dateLabel = dateFormat.format(Date(session.createdAt))
-                    val resultCount = session.results.size
+                    val resultCount = session.measurementBatchCount()
                     val resultCountLabel = pluralStringResource(
                         R.plurals.measurement_history_result_count_plural,
                         resultCount,

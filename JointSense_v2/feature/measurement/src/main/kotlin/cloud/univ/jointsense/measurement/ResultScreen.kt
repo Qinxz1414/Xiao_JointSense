@@ -49,6 +49,7 @@ import cloud.univ.jointsense.designsystem.component.JointSenseBarAction
 import cloud.univ.jointsense.designsystem.component.JointSenseTopBar
 import cloud.univ.jointsense.designsystem.theme.factorColor
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
@@ -173,61 +174,81 @@ fun ResultScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = presentation.measuredFactor?.shortName
-                            ?: stringResource(R.string.value_unavailable),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = presentation.concentration?.let {
-                                aiScaleFormat.format(it.toDouble())
-                            } ?: stringResource(R.string.value_unavailable),
-                            modifier = Modifier.testTag(RESULT_CONCENTRATION_TAG),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = stringResource(R.string.factor_unit),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    presentation.measurements.forEachIndexed { index, measurement ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(resultFactorTag(measurement.factor)),
+                        ) {
+                            Text(
+                                text = measurement.factor.shortName,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = factorColor(measurement.factor),
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    text = measurement.concentration?.let {
+                                        aiScaleFormat.format(it.toDouble())
+                                    } ?: stringResource(R.string.value_unavailable),
+                                    modifier = Modifier.testTag(resultFactorConcentrationTag(measurement.factor)),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.factor_unit),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(
+                                    R.string.measurement_range_status,
+                                    measurement.rangeStatus?.let { stringResource(it.labelResource()) }
+                                        ?: stringResource(R.string.measurement_range_unknown),
+                                ),
+                                modifier = Modifier.testTag(resultFactorRangeTag(measurement.factor)),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            measurement.features?.let { features ->
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(
+                                        R.string.measurement_rgb_features,
+                                        features.rMean,
+                                        features.rStd,
+                                        features.gMean,
+                                        features.gStd,
+                                        features.bMean,
+                                        features.bStd,
+                                    ),
+                                    modifier = Modifier.testTag(resultFactorFeaturesTag(measurement.factor)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            measurement.rawSignal?.let { signal ->
+                                Text(
+                                    text = stringResource(measurement.signalMethod.labelResource(), signal),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (index != presentation.measurements.lastIndex) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 12.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(
-                            R.string.measurement_range_status,
-                            presentation.rangeStatus?.let { stringResource(it.labelResource()) }
-                                ?: stringResource(R.string.measurement_range_unknown),
-                        ),
-                        modifier = Modifier.testTag(RESULT_RANGE_STATUS_TAG),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    presentation.features?.let { features ->
-                        Spacer(modifier = Modifier.height(8.dp))
+                    if (presentation.measurements.isEmpty()) {
                         Text(
-                            text = stringResource(
-                                R.string.measurement_rgb_features,
-                                features.rMean,
-                                features.rStd,
-                                features.gMean,
-                                features.gStd,
-                                features.bMean,
-                                features.bStd,
-                            ),
-                            modifier = Modifier.testTag(RESULT_FEATURES_SUMMARY_TAG),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = stringResource(
-                                R.string.measurement_tealness,
-                                features.tealness,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
+                            text = stringResource(R.string.value_unavailable),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -283,20 +304,10 @@ fun ResultScreen(
                     // Value rows
                     inflammationFactorPresentationOrder.forEach { factor ->
                         val value = presentation.factorValues.first { it.factor == factor }.value
-                        val isJustMeasured = lastResult?.factor == factor
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .then(
-                                    if (isJustMeasured) {
-                                        Modifier.background(
-                                            factorColor(factor).copy(alpha = 0.08f)
-                                        )
-                                    } else {
-                                        Modifier
-                                    }
-                                )
                                 .padding(horizontal = 8.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -328,10 +339,10 @@ fun ResultScreen(
                     }
 
                     // Well signal swatch (ELISA palette, Rule/SKILL.md)
-                    val measuredConcentration = presentation.concentration
-                    val measuredFeatures = presentation.features
-                    if (measuredConcentration != null && measuredFeatures != null) {
-                        val result = lastResult
+                    presentation.measurements.forEach { measurement ->
+                        val measuredConcentration = measurement.concentration
+                        val measuredFeatures = measurement.features
+                        if (measuredConcentration == null || measuredFeatures == null) return@forEach
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
@@ -341,7 +352,7 @@ fun ResultScreen(
                                     .background(
                                         BaselineMeasurementMetrics.wellColor(
                                             BaselineMeasurementMetrics.normalize(
-                                                result.factor,
+                                                measurement.factor,
                                                 measuredConcentration,
                                             )
                                         )
@@ -352,7 +363,7 @@ fun ResultScreen(
                                 Text(
                                     text = stringResource(
                                         R.string.measurement_well_signal,
-                                        result.factor.shortName,
+                                        measurement.factor.shortName,
                                         measuredConcentration,
                                     ),
                                     fontSize = 11.sp,
@@ -368,6 +379,13 @@ fun ResultScreen(
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                measurement.rawSignal?.let { signal ->
+                                    Text(
+                                        text = stringResource(measurement.signalMethod.labelResource(), signal),
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
@@ -517,6 +535,11 @@ fun ResultScreen(
     }
 }
 
+private fun ColorSignalMethod.labelResource(): Int = when (this) {
+    ColorSignalMethod.LEGACY_MEAN_BR -> R.string.measurement_legacy_quantification_signal
+    ColorSignalMethod.PIXEL_BR_P90_V1 -> R.string.measurement_quantification_signal
+}
+
 @Composable
 private fun ResultLoadingScreen(
     onBack: () -> Unit,
@@ -637,9 +660,11 @@ private fun ResultNotFoundScreen(
 }
 
 const val MEASUREMENT_CLEANUP_WARNING_TAG = "measurement_cleanup_warning"
-const val RESULT_CONCENTRATION_TAG = "result_concentration"
-const val RESULT_RANGE_STATUS_TAG = "result_range_status"
-const val RESULT_FEATURES_SUMMARY_TAG = "result_features_summary"
+
+fun resultFactorTag(factor: InflammationFactor): String = "result_factor_${factor.name.lowercase()}"
+fun resultFactorConcentrationTag(factor: InflammationFactor): String = "${resultFactorTag(factor)}_concentration"
+fun resultFactorRangeTag(factor: InflammationFactor): String = "${resultFactorTag(factor)}_range"
+fun resultFactorFeaturesTag(factor: InflammationFactor): String = "${resultFactorTag(factor)}_features"
 const val RESULT_HOME_ACTION_TAG = "result_home_action"
 const val RESULT_NOT_FOUND_TAG = "result_not_found"
 const val RESULT_NOT_FOUND_BACK_TAG = "result_not_found_back"

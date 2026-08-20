@@ -3,7 +3,7 @@ package cloud.univ.jointsense.measurement
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.NewMeasurementBatch
 import cloud.univ.jointsense.domain.model.NewTestResult
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
@@ -139,9 +139,6 @@ class MeasurementViewModel(
                 updateCrop(action.bounds)
             }
             MeasurementAction.CropConfirmed -> if (!blocksMutuallyExclusiveInputs()) confirmCrop()
-            is MeasurementAction.FactorSelected -> if (!blocksMutuallyExclusiveInputs()) {
-                updateState { it.copy(factor = action.factor, error = null, errorMessage = null) }
-            }
             MeasurementAction.Analyze -> startAnalysis()
             MeasurementAction.Retry -> retry()
             MeasurementAction.CancelAnalysis -> cancelAnalysis()
@@ -289,10 +286,6 @@ class MeasurementViewModel(
 
     fun updateCropBounds(bounds: CropBounds) {
         onAction(MeasurementAction.CropChanged(bounds))
-    }
-
-    fun selectFactor(factor: InflammationFactor) {
-        onAction(MeasurementAction.FactorSelected(factor))
     }
 
     fun analyze() {
@@ -455,7 +448,6 @@ class MeasurementViewModel(
             draftId = current.draftId,
             image = image,
             crop = crop,
-            factor = current.factor,
             capture = selectedCapture,
         )
         val operation = ActiveOperation(snapshot)
@@ -473,16 +465,22 @@ class MeasurementViewModel(
         analysisJob = viewModelScope.launch {
             try {
                 val analysis = withContext(defaultDispatcher) {
-                    analyzer.analyze(snapshot.image, snapshot.crop, snapshot.factor)
+                    analyzer.analyze(snapshot.image, snapshot.crop)
                 }
                 if (!isCurrent(operation)) return@launch
                 val persistence = PersistenceOperationSnapshot(
                     analysis = snapshot,
-                    result = NewTestResult(
-                        factor = snapshot.factor,
-                        concentration = analysis.concentration,
-                        rangeStatus = analysis.rangeStatus,
-                        features = analysis.features,
+                    measurement = NewMeasurementBatch(
+                        results = analysis.map { result ->
+                            NewTestResult(
+                                factor = result.factor,
+                                concentration = result.concentration,
+                                rangeStatus = result.rangeStatus,
+                                features = result.features,
+                                rawSignal = result.rawSignal,
+                                signalMethod = result.signalMethod,
+                            )
+                        },
                     ),
                 )
                 persist(operation, persistence)
@@ -506,10 +504,10 @@ class MeasurementViewModel(
         updateState { it.copy(stage = Stage.Persisting, error = null, resumeStage = null) }
         try {
             val resultId = withContext(ioDispatcher) {
-                repository.commitResult(
+                repository.commitMeasurement(
                     snapshot.analysis.sessionId,
                     snapshot.analysis.draftId,
-                    snapshot.result,
+                    snapshot.measurement,
                 )
             }
             if (!isCurrent(operation)) return
@@ -530,13 +528,16 @@ class MeasurementViewModel(
             retryPersistence = null
             if (cleanup == CaptureCleanupResult.Removed) selectedCapture = null
             operation.releaseWhenFinished = true
+            cropConfirmed = false
             updateState {
-                val repositoryResult = findResult(it.sessions, resultId)
+                val repositoryResult = findMeasurementAnchor(it.sessions, resultId)
                 it.copy(
                     stage = Stage.Success,
                     resultId = resultId,
                     awaitingRepositoryResultId = resultId.takeIf { repositoryResult == null },
                     image = null,
+                    imageUri = null,
+                    cropRect = null,
                     lastResult = repositoryResult,
                     captureCleanupWarning = (cleanup as? CaptureCleanupResult.Failed)?.reason,
                 )
@@ -597,7 +598,7 @@ class MeasurementViewModel(
     }
 
     private fun cancelAnalysis() {
-        if (state.value.stage != Stage.Analyzing && state.value.stage != Stage.Persisting) return
+        if (state.value.stage != Stage.Analyzing) return
         activeOperation?.invalidated = true
         analysisJob?.cancel()
         updateState {
@@ -1154,7 +1155,7 @@ class MeasurementViewModel(
     ) {
         mutableState.update { current ->
             val repositoryConfirmedAwaitingResult = receivedFromRepository &&
-                current.awaitingRepositoryResultId?.let { id -> findResult(sessions, id) } != null
+                current.awaitingRepositoryResultId?.let { id -> findMeasurementAnchor(sessions, id) } != null
             current.copy(
                 sessions = sessions,
                 hasReceivedSessionsSnapshot =
@@ -1165,7 +1166,7 @@ class MeasurementViewModel(
                     current.awaitingRepositoryResultId
                 },
                 currentSession = sessions.firstOrNull { it.id == currentSessionId },
-                lastResult = current.resultId?.let { findResult(sessions, it) },
+                lastResult = current.resultId?.let { findMeasurementAnchor(sessions, it) },
             )
         }
         savedStateHandle[KEY_AWAITING_REPOSITORY_RESULT_ID] =
@@ -1181,16 +1182,12 @@ class MeasurementViewModel(
             ?: draftIdFactory().also { savedStateHandle[KEY_DRAFT_ID] = it }
         val uri = savedStateHandle.get<String>(KEY_IMAGE_URI)
         val crop = restoredCrop()
-        val factor = savedStateHandle.get<String>(KEY_FACTOR)
-            ?.let { runCatching { InflammationFactor.valueOf(it) }.getOrNull() }
-            ?: InflammationFactor.IL6
         val origin = savedStateHandle.get<String>(KEY_ORIGIN)
         return MeasurementUiState(
             stage = if (uri == null) Stage.AwaitingImage else Stage.Decoding,
             draftId = draftId,
             imageUri = uri,
             cropRect = crop,
-            factor = factor,
             originDestination = origin,
             hasRequestedCameraPermission = savedStateHandle[KEY_PERMISSION_REQUESTED] ?: false,
             captureCleanupWarning = savedStateHandle[KEY_CAPTURE_CLEANUP_WARNING],
@@ -1209,7 +1206,6 @@ class MeasurementViewModel(
     private fun persistFormalState(state: MeasurementUiState) {
         savedStateHandle[KEY_DRAFT_ID] = state.draftId
         savedStateHandle[KEY_IMAGE_URI] = state.imageUri
-        savedStateHandle[KEY_FACTOR] = state.factor.name
         savedStateHandle[KEY_ORIGIN] = state.originDestination
         savedStateHandle[KEY_CROP_LEFT] = state.cropRect?.left
         savedStateHandle[KEY_CROP_TOP] = state.cropRect?.top
@@ -1314,13 +1310,15 @@ class MeasurementViewModel(
     }
 
     private fun defaultCrop(image: MeasurementImage): CropBounds {
-        val left = image.width / 4
-        val top = image.height / 4
+        val cropWidth = maxOf(1, image.width * 4 / 5).coerceAtMost(image.width)
+        val cropHeight = maxOf(1, cropWidth / 3).coerceAtMost(image.height)
+        val left = (image.width - cropWidth) / 2
+        val top = (image.height - cropHeight) / 2
         return CropBounds(
             left = left,
             top = top,
-            right = maxOf(image.width * 3 / 4, left + 1).coerceAtMost(image.width),
-            bottom = maxOf(image.height * 3 / 4, top + 1).coerceAtMost(image.height),
+            right = left + cropWidth,
+            bottom = top + cropHeight,
         )
     }
 
@@ -1328,11 +1326,11 @@ class MeasurementViewModel(
         image != null &&
             bounds.left >= 0 && bounds.top >= 0 &&
             bounds.right <= image.width && bounds.bottom <= image.height &&
-            bounds.width > 0 && bounds.height > 0
+            runCatching { calculateThreeWellSamplingRegions(bounds) }.isSuccess
 
-    private fun findResult(sessions: List<TestSession>, id: String) = sessions.asSequence()
+    private fun findMeasurementAnchor(sessions: List<TestSession>, id: String) = sessions.asSequence()
         .flatMap { it.results.asSequence() }
-        .firstOrNull { it.id == id }
+        .firstOrNull { it.measurementBatchId == id || it.id == id }
 
     private data class AnalysisOperationSnapshot(
         val token: Long,
@@ -1340,7 +1338,6 @@ class MeasurementViewModel(
         val draftId: String,
         val image: MeasurementImage,
         val crop: CropBounds,
-        val factor: InflammationFactor,
         val capture: MeasurementCapture?,
     )
 
@@ -1403,7 +1400,7 @@ class MeasurementViewModel(
 
     private data class PersistenceOperationSnapshot(
         val analysis: AnalysisOperationSnapshot,
-        val result: NewTestResult,
+        val measurement: NewMeasurementBatch,
     )
 
     private class ActiveOperation(
@@ -1428,7 +1425,6 @@ class MeasurementViewModel(
         const val KEY_CROP_RIGHT = "measurement.crop.right"
         const val KEY_CROP_BOTTOM = "measurement.crop.bottom"
         const val KEY_CROP_CONFIRMED = "measurement.crop.confirmed"
-        const val KEY_FACTOR = "measurement.factor"
         const val KEY_ORIGIN = "measurement.origin"
         const val KEY_SESSION_ID = "measurement.sessionId"
         const val KEY_PERMISSION_REQUESTED = "measurement.permission.camera.requested"

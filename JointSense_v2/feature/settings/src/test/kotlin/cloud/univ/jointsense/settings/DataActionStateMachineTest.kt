@@ -127,6 +127,11 @@ private object EmptySessionRepository : TestSessionRepository {
     override fun observeSession(id: String): Flow<TestSession?> = MutableStateFlow(null)
     override suspend fun createSession(name: String, source: DataSource): String = error("unused")
     override suspend fun commitResult(sessionId: String, draftId: String, result: NewTestResult): String = error("unused")
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
+    ): String = error("unused")
     override suspend fun deleteSession(id: String) = error("unused")
 }
 

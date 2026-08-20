@@ -138,15 +138,37 @@ class ResourceParityTest {
         }
         assertEquals(ENGLISH_OA_TERM, settingsEn.text("settings_about_index_heading"))
         assertEquals(CHINESE_OA_TERM, settingsZh.text("settings_about_index_heading"))
-        assertEquals("Tealness is defined as BMean − RMean.", settingsEn.text("settings_about_tealness"))
-        assertEquals("青色信号（tealness）定义为 BMean − RMean。", settingsZh.text("settings_about_tealness"))
         assertEquals(
-            "An active user calibration curve is applied after subtracting that calibration’s blank raw tealness from the measurement’s raw tealness; otherwise the factory standard curve is used. Concentration is obtained by piecewise-linear inversion and labeled below range, in range, or above range.",
+            "Each fixed disc ROI is summarized separately: left TNF-α, center IL-6, and right IL-1β. RGB channel means and population standard deviations are retained for quality traceability.",
+            settingsEn.text("settings_about_rgb_features"),
+        )
+        assertEquals(
+            "分别分析三个固定圆盘 ROI：左侧 TNF-α、中间 IL-6、右侧 IL-1β。各 ROI 的 RGB 三通道均值和总体标准差仅用于质量追溯。",
+            settingsZh.text("settings_about_rgb_features"),
+        )
+        assertEquals(
+            "Quantification uses the nearest-rank P90 of per-pixel B − R inside each central elliptical ROI. BMean − RMean is retained only as an RGB quality-traceability statistic and is not the standard-curve input.",
+            settingsEn.text("settings_about_tealness"),
+        )
+        assertEquals(
+            "定量信号采用各中央椭圆 ROI 内逐像素 B − R 的 nearest-rank P90。BMean − RMean 仅作为 RGB 质量追溯统计量保留，不作为标准曲线输入。",
+            settingsZh.text("settings_about_tealness"),
+        )
+        assertEquals(
+            "A user calibration is used only when it matches the current B − R P90 signal method. Its blank B − R P90 signal is subtracted from the measurement B − R P90 signal before piecewise-linear inversion; otherwise the factory standard curve is used. Results are labeled below range, in range, or above range.",
             settingsEn.text("settings_about_curve_behavior"),
         )
         assertEquals(
-            "对应因子存在启用中的用户校准曲线时，先从测量的原始青色信号中减去该校准的空白孔原始青色信号，再应用用户曲线；否则使用工厂标准曲线。通过分段线性反演得到浓度，并标注低于范围、范围内或高于范围。",
+            "仅当用户校准与当前 B − R P90 信号方法一致时才使用该曲线；先从测量 B − R P90 信号中减去该校准的空白孔 B − R P90 信号，再进行分段线性反演，否则使用工厂标准曲线。结果标注为低于范围、范围内或高于范围。",
             settingsZh.text("settings_about_curve_behavior"),
+        )
+        assertEquals(
+            "Weights are TNF-α %1\$d%%, IL-6 %2\$d%%, and IL-1β %3\$d%%. A current photo result requires all three factors. Only compatible legacy history and trend aggregation re-normalizes available weights when a factor is missing.",
+            settingsEn.text("settings_about_oa_weights"),
+        )
+        assertEquals(
+            "权重为 TNF-α %1\$d%%、IL-6 %2\$d%%、IL-1β %3\$d%%。当前照片结果必须包含三个因子；仅在兼容旧历史和趋势聚合时，缺项才对已有权重重新归一化。",
+            settingsZh.text("settings_about_oa_weights"),
         )
         localizedModules.forEach { module ->
             listOf("values", "values-zh-rCN").forEach { directory ->

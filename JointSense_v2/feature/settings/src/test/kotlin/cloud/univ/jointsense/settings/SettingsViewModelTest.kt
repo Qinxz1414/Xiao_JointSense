@@ -371,6 +371,12 @@ private class FakeSettingsSessionRepository(initial: List<TestSession>) : TestSe
         result: NewTestResult,
     ): String = error("unused")
 
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
+    ): String = error("unused")
+
     override suspend fun deleteSession(id: String) = error("unused")
 }
 
@@ -384,6 +390,12 @@ private class DelayedSettingsSessionRepository : TestSessionRepository {
         sessionId: String,
         draftId: String,
         result: NewTestResult,
+    ): String = error("unused")
+
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
     ): String = error("unused")
 
     override suspend fun deleteSession(id: String) = error("unused")

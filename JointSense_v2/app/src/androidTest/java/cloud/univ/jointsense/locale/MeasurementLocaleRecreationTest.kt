@@ -28,11 +28,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import cloud.univ.jointsense.R
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.domain.model.DataSource
-import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.NewTestResult
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import cloud.univ.jointsense.measurement.BaselineAnalysisResult
 import cloud.univ.jointsense.measurement.BaselinePhotoAnalysisAdapter
@@ -42,8 +43,9 @@ import cloud.univ.jointsense.measurement.MeasurementImage
 import cloud.univ.jointsense.measurement.MeasurementImageDecoder
 import cloud.univ.jointsense.measurement.MeasurementViewModel
 import cloud.univ.jointsense.measurement.MeasurementViewModelFactory
+import cloud.univ.jointsense.measurement.Stage
+import cloud.univ.jointsense.navigation.AnalysisRoute
 import cloud.univ.jointsense.navigation.CropRoute
-import cloud.univ.jointsense.navigation.FactorSelectRoute
 import cloud.univ.jointsense.navigation.HomeRoute
 import cloud.univ.jointsense.navigation.ImageSelectRoute
 import cloud.univ.jointsense.navigation.JointSenseNavHost
@@ -95,21 +97,20 @@ class MeasurementLocaleRecreationTest {
             waitUntil { viewModel.state.value.image != null }
             viewModel.onAction(MeasurementAction.CropChanged(CropBounds(11, 12, 111, 112)))
             viewModel.onAction(MeasurementAction.CropConfirmed)
-            viewModel.onAction(MeasurementAction.FactorSelected(InflammationFactor.IL1_BETA))
             composeRule.onNodeWithTag(LOCALE_OPEN_CROP_TAG).performClick()
-            composeRule.onNodeWithTag(LOCALE_OPEN_FACTOR_TAG).performClick()
-            composeRule.onNodeWithTag(LOCALE_ROUTE_FACTOR_TAG).assertIsDisplayed()
+            composeRule.onNodeWithTag(LOCALE_OPEN_ANALYSIS_TAG).performClick()
+            composeRule.onNodeWithTag(LOCALE_ROUTE_ANALYSIS_TAG).assertIsDisplayed()
             val draftId = viewModel.state.value.draftId
 
             applyLocales("zh-CN")
             val chinese = waitForRecreated(scenario, initial, "zh")
             assertNotSame(initial, chinese)
-            composeRule.onNodeWithTag(LOCALE_ROUTE_FACTOR_TAG).assertIsDisplayed()
+            composeRule.onNodeWithTag(LOCALE_ROUTE_ANALYSIS_TAG).assertIsDisplayed()
             assertLocalizedConfiguration(chinese, "zh", "检测")
             with(chinese.measurementViewModel.state.value) {
                 assertEquals("content://measurement/locale-photo", imageUri)
                 assertEquals(CropBounds(11, 12, 111, 112), cropRect)
-                assertEquals(InflammationFactor.IL1_BETA, factor)
+                assertEquals(Stage.ReadyToAnalyze, stage)
                 assertEquals(draftId, this.draftId)
                 assertEquals(sessionId, currentSession?.id)
                 assertEquals("HOME", originDestination)
@@ -234,9 +235,9 @@ class LocaleMeasurementHostActivity : AppCompatActivity() {
                                     modifier = Modifier.testTag(LOCALE_OPEN_CROP_TAG),
                                 ) { Text("Crop") }
                                 CropRoute -> Button(
-                                    onClick = actions::openFactorSelect,
-                                    modifier = Modifier.testTag(LOCALE_OPEN_FACTOR_TAG),
-                                ) { Text("Factor") }
+                                    onClick = actions::openAnalysis,
+                                    modifier = Modifier.testTag(LOCALE_OPEN_ANALYSIS_TAG),
+                                ) { Text("Analyze") }
                                 else -> Unit
                             }
                         }
@@ -251,16 +252,16 @@ private fun localeRouteTag(route: JointSenseRoute): String = when (route) {
     HomeRoute -> LOCALE_ROUTE_HOME_TAG
     ImageSelectRoute -> LOCALE_ROUTE_IMAGE_TAG
     CropRoute -> LOCALE_ROUTE_CROP_TAG
-    FactorSelectRoute -> LOCALE_ROUTE_FACTOR_TAG
+    AnalysisRoute -> LOCALE_ROUTE_ANALYSIS_TAG
     else -> "locale-route:${route::class.simpleName}"
 }
 
 private const val LOCALE_ROUTE_HOME_TAG = "locale-route:home"
 private const val LOCALE_ROUTE_IMAGE_TAG = "locale-route:image"
 private const val LOCALE_ROUTE_CROP_TAG = "locale-route:crop"
-private const val LOCALE_ROUTE_FACTOR_TAG = "locale-route:factor"
+private const val LOCALE_ROUTE_ANALYSIS_TAG = "locale-route:analysis"
 private const val LOCALE_OPEN_CROP_TAG = "locale-action:crop"
-private const val LOCALE_OPEN_FACTOR_TAG = "locale-action:factor"
+private const val LOCALE_OPEN_ANALYSIS_TAG = "locale-action:analysis"
 private const val LOCALE_PREFIX_TAG = "locale-prefix"
 
 private object LocaleMeasurementHarness {
@@ -270,12 +271,16 @@ private object LocaleMeasurementHarness {
         override suspend fun analyze(
             image: MeasurementImage,
             cropBounds: CropBounds,
-            factor: InflammationFactor,
-        ) = BaselineAnalysisResult(
-            concentration = 1f,
-            rangeStatus = RangeStatus.IN_RANGE,
-            features = RgbFeatures(1f, 2f, 3f, 0f, 0f, 0f),
-        )
+        ): List<BaselineAnalysisResult> = inflammationFactorPresentationOrder.map { factor ->
+            BaselineAnalysisResult(
+                factor = factor,
+                concentration = 1f,
+                rangeStatus = RangeStatus.IN_RANGE,
+                features = RgbFeatures(1f, 2f, 3f, 0f, 0f, 0f),
+                rawSignal = 2f,
+                signalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
+            )
+        }
     }
 
     fun reset() {
@@ -308,6 +313,12 @@ private class LocaleMeasurementRepository : TestSessionRepository {
         sessionId: String,
         draftId: String,
         result: NewTestResult,
+    ): String = "unused-result"
+
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
     ): String = "unused-result"
 
     override suspend fun deleteSession(id: String) {

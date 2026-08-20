@@ -12,7 +12,9 @@ import cloud.univ.jointsense.database.entity.CalibrationEntity
 import cloud.univ.jointsense.database.entity.CalibrationKnotEntity
 import cloud.univ.jointsense.database.entity.TestResultEntity
 import cloud.univ.jointsense.database.entity.TestSessionEntity
+import cloud.univ.jointsense.database.entity.MeasurementBatchEntity
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.DataSource
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
@@ -24,8 +26,9 @@ import cloud.univ.jointsense.domain.model.RangeStatus
         CalibrationEntity::class,
         CalibrationKnotEntity::class,
         AppMetadataEntity::class,
+        MeasurementBatchEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(DatabaseConverters::class)
@@ -59,4 +62,10 @@ object DatabaseConverters {
 
     @TypeConverter
     fun stringToCalibrationStatus(value: String): CalibrationStatus = CalibrationStatus.valueOf(value)
+
+    @TypeConverter
+    fun colorSignalMethodToString(value: ColorSignalMethod): String = value.name
+
+    @TypeConverter
+    fun stringToColorSignalMethod(value: String): ColorSignalMethod = ColorSignalMethod.valueOf(value)
 }

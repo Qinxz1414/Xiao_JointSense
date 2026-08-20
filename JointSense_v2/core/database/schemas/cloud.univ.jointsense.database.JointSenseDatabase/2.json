@@ -1,0 +1,443 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "f9c9704ce901c7a5a875815d017432fe",
+    "entities": [
+      {
+        "tableName": "test_session",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `source` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "test_result",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `draftId` TEXT, `factor` TEXT NOT NULL, `concentration` REAL NOT NULL, `rangeStatus` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `rMean` REAL NOT NULL, `gMean` REAL NOT NULL, `bMean` REAL NOT NULL, `rStd` REAL NOT NULL, `gStd` REAL NOT NULL, `bStd` REAL NOT NULL, `measurementBatchId` TEXT, `rawSignal` REAL NOT NULL, `signalMethod` TEXT NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`sessionId`) REFERENCES `test_session`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`measurementBatchId`) REFERENCES `measurement_batch`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "draftId",
+            "columnName": "draftId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "factor",
+            "columnName": "factor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "concentration",
+            "columnName": "concentration",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rangeStatus",
+            "columnName": "rangeStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rMean",
+            "columnName": "rMean",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gMean",
+            "columnName": "gMean",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bMean",
+            "columnName": "bMean",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rStd",
+            "columnName": "rStd",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gStd",
+            "columnName": "gStd",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bStd",
+            "columnName": "bStd",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "measurementBatchId",
+            "columnName": "measurementBatchId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rawSignal",
+            "columnName": "rawSignal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signalMethod",
+            "columnName": "signalMethod",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_test_result_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_test_result_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_test_result_draftId",
+            "unique": true,
+            "columnNames": [
+              "draftId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_test_result_draftId` ON `${TABLE_NAME}` (`draftId`)"
+          },
+          {
+            "name": "index_test_result_measurementBatchId",
+            "unique": false,
+            "columnNames": [
+              "measurementBatchId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_test_result_measurementBatchId` ON `${TABLE_NAME}` (`measurementBatchId`)"
+          },
+          {
+            "name": "index_test_result_measurementBatchId_factor",
+            "unique": true,
+            "columnNames": [
+              "measurementBatchId",
+              "factor"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_test_result_measurementBatchId_factor` ON `${TABLE_NAME}` (`measurementBatchId`, `factor`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "test_session",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "measurement_batch",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "measurementBatchId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "calibration",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`factor` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `version` INTEGER NOT NULL, `status` TEXT NOT NULL, `kitName` TEXT, `kitLot` TEXT, `signalMethod` TEXT NOT NULL DEFAULT 'LEGACY_MEAN_BR', PRIMARY KEY(`factor`))",
+        "fields": [
+          {
+            "fieldPath": "factor",
+            "columnName": "factor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kitName",
+            "columnName": "kitName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "kitLot",
+            "columnName": "kitLot",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "signalMethod",
+            "columnName": "signalMethod",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'LEGACY_MEAN_BR'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "factor"
+          ]
+        }
+      },
+      {
+        "tableName": "calibration_knot",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`factor` TEXT NOT NULL, `position` INTEGER NOT NULL, `concentration` REAL NOT NULL, `rawSignal` REAL NOT NULL, `netSignal` REAL NOT NULL, `fittedSignal` REAL NOT NULL, `isBlank` INTEGER NOT NULL, PRIMARY KEY(`factor`, `position`), FOREIGN KEY(`factor`) REFERENCES `calibration`(`factor`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "factor",
+            "columnName": "factor",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "concentration",
+            "columnName": "concentration",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rawSignal",
+            "columnName": "rawSignal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "netSignal",
+            "columnName": "netSignal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fittedSignal",
+            "columnName": "fittedSignal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isBlank",
+            "columnName": "isBlank",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "factor",
+            "position"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_calibration_knot_factor",
+            "unique": false,
+            "columnNames": [
+              "factor"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_calibration_knot_factor` ON `${TABLE_NAME}` (`factor`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "calibration",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "factor"
+            ],
+            "referencedColumns": [
+              "factor"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "app_metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`key` TEXT NOT NULL, `value` TEXT NOT NULL, PRIMARY KEY(`key`))",
+        "fields": [
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "value",
+            "columnName": "value",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "key"
+          ]
+        }
+      },
+      {
+        "tableName": "measurement_batch",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `draftId` TEXT NOT NULL, `measuredAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`sessionId`) REFERENCES `test_session`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "draftId",
+            "columnName": "draftId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "measuredAt",
+            "columnName": "measuredAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_measurement_batch_sessionId",
+            "unique": false,
+            "columnNames": [
+              "sessionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_measurement_batch_sessionId` ON `${TABLE_NAME}` (`sessionId`)"
+          },
+          {
+            "name": "index_measurement_batch_draftId",
+            "unique": true,
+            "columnNames": [
+              "draftId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_measurement_batch_draftId` ON `${TABLE_NAME}` (`draftId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "test_session",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "sessionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f9c9704ce901c7a5a875815d017432fe')"
+    ]
+  }
+}

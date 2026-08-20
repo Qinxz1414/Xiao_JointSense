@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import cloud.univ.jointsense.domain.model.CalibrationStatus
 import cloud.univ.jointsense.domain.model.DataSource
+import cloud.univ.jointsense.domain.model.measurementBatchCount
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import cloud.univ.jointsense.domain.repository.DataManagementRepository
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
@@ -66,7 +67,7 @@ class SettingsViewModel(
             SettingsUiState(
                 countsLoaded = true,
                 sessionCount = observedSessions.size,
-                measurementCount = observedSessions.sumOf { it.results.size },
+                measurementCount = observedSessions.sumOf { it.measurementBatchCount() },
                 builtInSampleCount = observedSessions.count { it.source == DataSource.BUILT_IN },
                 calibrationCount = observedCalibrations.count {
                     it.status == CalibrationStatus.ACTIVE

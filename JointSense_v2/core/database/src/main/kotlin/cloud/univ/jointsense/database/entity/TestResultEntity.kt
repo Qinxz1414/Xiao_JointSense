@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
 import cloud.univ.jointsense.domain.model.TestResult
@@ -18,10 +19,18 @@ import cloud.univ.jointsense.domain.model.TestResult
             childColumns = ["sessionId"],
             onDelete = ForeignKey.CASCADE,
         ),
+        ForeignKey(
+            entity = MeasurementBatchEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["measurementBatchId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     indices = [
         Index("sessionId"),
         Index(value = ["draftId"], unique = true),
+        Index("measurementBatchId"),
+        Index(value = ["measurementBatchId", "factor"], unique = true),
     ],
 )
 data class TestResultEntity(
@@ -38,6 +47,9 @@ data class TestResultEntity(
     val rStd: Float,
     val gStd: Float,
     val bStd: Float,
+    val measurementBatchId: String? = null,
+    val rawSignal: Float = bMean - rMean,
+    val signalMethod: ColorSignalMethod = ColorSignalMethod.LEGACY_MEAN_BR,
 )
 
 fun TestResultEntity.toDomain(): TestResult = TestResult(
@@ -56,6 +68,9 @@ fun TestResultEntity.toDomain(): TestResult = TestResult(
         bStd = bStd,
     ),
     timestamp = timestamp,
+    measurementBatchId = measurementBatchId,
+    rawSignal = rawSignal,
+    signalMethod = signalMethod,
 )
 
 fun TestResult.toEntity(): TestResultEntity = TestResultEntity(
@@ -72,4 +87,7 @@ fun TestResult.toEntity(): TestResultEntity = TestResultEntity(
     rStd = features.rStd,
     gStd = features.gStd,
     bStd = features.bStd,
+    measurementBatchId = measurementBatchId,
+    rawSignal = rawSignal,
+    signalMethod = signalMethod,
 )

@@ -102,7 +102,7 @@ class JointSenseNavigationTest {
         composeRule.onNodeWithTag("go:trends").performClick()
         composeRule.onNodeWithTag("go:measurement-from-trends").performClick()
         composeRule.onNodeWithTag("go:crop").performClick()
-        composeRule.onNodeWithTag("go:factor").performClick()
+        composeRule.onNodeWithTag("go:analysis").performClick()
         composeRule.onNodeWithTag("go:result").performClick()
         composeRule.onNodeWithTag("screen:result:real-result-id").assertIsDisplayed()
 
@@ -261,11 +261,11 @@ class JointSenseNavigationTest {
 
                 CropRoute -> {
                     ScreenMarker("crop")
-                    NavButton("go:factor", actions::openFactorSelect)
+                    NavButton("go:analysis", actions::openAnalysis)
                 }
 
-                FactorSelectRoute -> {
-                    ScreenMarker("factor")
+                AnalysisRoute -> {
+                    ScreenMarker("analysis")
                     NavButton("go:result") { actions.openResult("real-result-id") }
                 }
 

@@ -69,13 +69,13 @@
     <string name="settings_back">返回</string>
     <string name="settings_about_version">版本 %1$s</string>
     <string name="settings_about_method_heading">照片色度分析</string>
-    <string name="settings_about_rgb_features">对选定的反应腔裁剪区域提取 6 项特征：红、绿、蓝三通道均值及各通道标准差。</string>
-    <string name="settings_about_tealness">青色信号（tealness）定义为 BMean − RMean。</string>
+    <string name="settings_about_rgb_features">分别分析三个固定圆盘 ROI：左侧 TNF-α、中间 IL-6、右侧 IL-1β。各 ROI 的 RGB 三通道均值和总体标准差仅用于质量追溯。</string>
+    <string name="settings_about_tealness">定量信号采用各中央椭圆 ROI 内逐像素 B − R 的 nearest-rank P90。BMean − RMean 仅作为 RGB 质量追溯统计量保留，不作为标准曲线输入。</string>
     <string name="settings_about_curve_heading">标准曲线定量</string>
-    <string name="settings_about_curve_behavior">对应因子存在启用中的用户校准曲线时，先从测量的原始青色信号中减去该校准的空白孔原始青色信号，再应用用户曲线；否则使用工厂标准曲线。通过分段线性反演得到浓度，并标注低于范围、范围内或高于范围。</string>
+    <string name="settings_about_curve_behavior">仅当用户校准与当前 B − R P90 信号方法一致时才使用该曲线；先从测量 B − R P90 信号中减去该校准的空白孔 B − R P90 信号，再进行分段线性反演，否则使用工厂标准曲线。结果标注为低于范围、范围内或高于范围。</string>
     <string name="settings_about_factory_ranges">工厂曲线浓度范围：TNF-α 0–200 pg/mL、IL-6 0–500 pg/mL、IL-1β 0–200 pg/mL。</string>
     <string name="settings_about_index_heading">OA 炎症综合指数（AI）</string>
-    <string name="settings_about_oa_weights">权重为 TNF-α %1$d%%、IL-6 %2$d%%、IL-1β %3$d%%；缺少某项因子时，对已有因子的权重重新归一化。</string>
+    <string name="settings_about_oa_weights">权重为 TNF-α %1$d%%、IL-6 %2$d%%、IL-1β %3$d%%。当前照片结果必须包含三个因子；仅在兼容旧历史和趋势聚合时，缺项才对已有权重重新归一化。</string>
     <string name="settings_about_disclaimer_heading">科研用途说明</string>
     <string name="research_disclaimer">本报告结果基于手机照片色度代理估算，仅供科研与纵向趋势观察，不作为临床诊断、治疗决策或替代经验证实验室检测的依据。</string>
 </resources>

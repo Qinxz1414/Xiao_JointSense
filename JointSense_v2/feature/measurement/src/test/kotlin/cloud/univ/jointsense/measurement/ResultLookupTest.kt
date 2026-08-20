@@ -39,6 +39,31 @@ class ResultLookupTest {
     }
 
     @Test
+    fun measurementBatchIdResolvesTheWholeThreeFactorPhoto() {
+        val batchId = "batch-1"
+        val results = listOf(
+            result("tnf", "current").copy(
+                factor = InflammationFactor.TNF_ALPHA,
+                measurementBatchId = batchId,
+            ),
+            result("il6", "current").copy(measurementBatchId = batchId),
+            result("il1", "current").copy(
+                factor = InflammationFactor.IL1_BETA,
+                measurementBatchId = batchId,
+            ),
+        )
+        val current = TestSession("current", "current", 1L, DataSource.USER, results)
+
+        val located = resolveResultById(batchId, current, emptyList(), false) as ResultResolution.Found
+
+        assertEquals(batchId, located.measurement.id)
+        assertEquals(
+            listOf(InflammationFactor.TNF_ALPHA, InflammationFactor.IL6, InflammationFactor.IL1_BETA),
+            located.measurement.results.map(TestResult::factor),
+        )
+    }
+
+    @Test
     fun missingResultReturnsNoSyntheticUnknownResult() {
         val current = session("current", result("other", "current"))
 

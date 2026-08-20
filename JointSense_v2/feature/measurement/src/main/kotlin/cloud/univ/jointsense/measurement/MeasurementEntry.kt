@@ -26,6 +26,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.TestMeasurementBatch
+import cloud.univ.jointsense.domain.model.measurementBatches
 import cloud.univ.jointsense.feature.measurement.R
 
 @Composable
@@ -207,7 +209,7 @@ fun CropRouteScreen(
             onOpenSettings = {},
         )
         Stage.Decoding -> MeasurementProgressContent(stringResource(R.string.measurement_progress_restoring_image))
-        Stage.ReadyToAnalyze -> MeasurementProgressContent(stringResource(R.string.measurement_progress_opening_factor))
+        Stage.ReadyToAnalyze -> MeasurementProgressContent(stringResource(R.string.measurement_progress_opening_analysis))
         Stage.Analyzing,
         Stage.Persisting,
         Stage.Success,
@@ -217,13 +219,12 @@ fun CropRouteScreen(
 }
 
 @Composable
-fun FactorSelectRouteScreen(
+fun TriplexAnalysisRouteScreen(
     viewModel: MeasurementViewModel,
     onResultReady: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
-    val isBusy = state.stage == Stage.Analyzing || state.stage == Stage.Persisting
     val canReturnToCrop = state.stage == Stage.ReadyToAnalyze ||
         state.stage == Stage.RecoverableError
     val performBack = {
@@ -233,6 +234,11 @@ fun FactorSelectRouteScreen(
         }
     }
     BackHandler(onBack = performBack)
+    LaunchedEffect(state.stage) {
+        if (state.stage == Stage.ReadyToAnalyze) {
+            viewModel.onAction(MeasurementAction.Analyze)
+        }
+    }
     LaunchedEffect(viewModel, onResultReady) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -246,14 +252,7 @@ fun FactorSelectRouteScreen(
         Stage.ReadyToAnalyze,
         Stage.Analyzing,
         Stage.Persisting,
-        -> FactorSelectScreen(
-            selectedFactor = state.factor,
-            onFactorSelected = { viewModel.onAction(MeasurementAction.FactorSelected(it)) },
-            onAnalyze = { viewModel.onAction(MeasurementAction.Analyze) },
-            onBack = performBack,
-            isAnalyzing = isBusy,
-            backEnabled = canReturnToCrop,
-        )
+        -> MeasurementProgressContent(stringResource(R.string.measurement_progress_analyzing_three_factors))
         Stage.RecoverableError -> MeasurementErrorContent(
             error = state.error ?: MeasurementError.AnalysisFailed,
             onRetry = { viewModel.onAction(MeasurementAction.Retry) },
@@ -312,8 +311,8 @@ fun HistoryRouteScreen(
     )
 }
 
-internal fun latestHistoryResultId(session: TestSession): String? = session.results
-    .maxWithOrNull(compareBy<TestResult> { it.timestamp }.thenBy { it.id })
+internal fun latestHistoryResultId(session: TestSession): String? = session.measurementBatches()
+    .maxWithOrNull(compareBy<TestMeasurementBatch> { it.timestamp }.thenBy { it.id })
     ?.id
 
 private fun Context.openApplicationSettings() {

@@ -36,8 +36,12 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cloud.univ.jointsense.feature.measurement.R
 import cloud.univ.jointsense.measurement.MEASUREMENT_CROP_VIEW_TAG
+import cloud.univ.jointsense.measurement.CropBounds
+import cloud.univ.jointsense.measurement.calculateThreeWellSamplingRegions
+import cloud.univ.jointsense.measurement.shortName
 import kotlin.math.roundToInt
 
 /**
@@ -68,6 +72,22 @@ fun ImageCropView(
         cropRect.bottom,
     )
     val actionStep = maxOf(1, minOf(bitmap.width, bitmap.height) / 20)
+    val localDensity = LocalDensity.current
+    val guideLabelSizePx = with(localDensity) { 12.sp.toPx() }
+    val guideLabelPaint = remember(guideLabelSizePx, localDensity.density) {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.WHITE
+            textAlign = android.graphics.Paint.Align.CENTER
+            textSize = guideLabelSizePx
+            isFakeBoldText = true
+            setShadowLayer(
+                3f * localDensity.density,
+                0f,
+                localDensity.density,
+                android.graphics.Color.BLACK,
+            )
+        }
+    }
     val updateCrop: (Rect) -> Boolean = { updated ->
         if (updated != cropRect) {
             onCropRectChanged(updated)
@@ -291,9 +311,8 @@ fun ImageCropView(
                 style = Stroke(width = 3f)
             )
 
-            // Draw grid lines (rule of thirds)
+            // Draw the same left/center/right geometry used by the triplex sampler.
             val thirdW = (screenCropRight - screenCropLeft) / 3
-            val thirdH = (screenCropBottom - screenCropTop) / 3
             val gridColor = Color.White.copy(alpha = 0.5f)
             for (i in 1..2) {
                 drawLine(
@@ -302,11 +321,27 @@ fun ImageCropView(
                     end = Offset(screenCropLeft + thirdW * i, screenCropBottom),
                     strokeWidth = 1f
                 )
-                drawLine(
-                    color = gridColor,
-                    start = Offset(screenCropLeft, screenCropTop + thirdH * i),
-                    end = Offset(screenCropRight, screenCropTop + thirdH * i),
-                    strokeWidth = 1f
+            }
+            runCatching {
+                calculateThreeWellSamplingRegions(
+                    CropBounds(cropRect.left, cropRect.top, cropRect.right, cropRect.bottom),
+                )
+            }.getOrNull()?.forEach { region ->
+                val left = region.sampleLeft * scaleX + offsetX
+                val top = region.sampleTop * scaleY + offsetY
+                val right = region.sampleRight * scaleX + offsetX
+                val bottom = region.sampleBottom * scaleY + offsetY
+                drawOval(
+                    color = Color.White,
+                    topLeft = Offset(left, top),
+                    size = Size(right - left, bottom - top),
+                    style = Stroke(width = 2f * density),
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    region.factor.shortName,
+                    (left + right) / 2f,
+                    maxOf(screenCropTop + guideLabelSizePx, top - 4f * density),
+                    guideLabelPaint,
                 )
             }
 

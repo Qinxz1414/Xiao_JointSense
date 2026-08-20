@@ -8,6 +8,7 @@ import androidx.room.Upsert
 import cloud.univ.jointsense.database.entity.TestResultEntity
 import cloud.univ.jointsense.database.entity.TestSessionEntity
 import cloud.univ.jointsense.database.entity.TestSessionWithResults
+import cloud.univ.jointsense.database.entity.MeasurementBatchEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -29,11 +30,26 @@ interface TestSessionDao {
     @Query("SELECT COUNT(*) FROM test_result WHERE draftId = :draftId")
     suspend fun resultCountForDraft(draftId: String): Int
 
+    @Query("SELECT * FROM measurement_batch WHERE draftId = :draftId LIMIT 1")
+    suspend fun measurementBatchForDraft(draftId: String): MeasurementBatchEntity?
+
+    @Query("SELECT * FROM test_result WHERE measurementBatchId = :batchId ORDER BY timestamp ASC, id ASC")
+    suspend fun resultsForMeasurementBatch(batchId: String): List<TestResultEntity>
+
+    @Query("SELECT COUNT(*) FROM test_result WHERE measurementBatchId = :batchId")
+    suspend fun resultCountForMeasurementBatch(batchId: String): Int
+
     @Insert
     suspend fun insertSession(session: TestSessionEntity)
 
     @Insert
     suspend fun insertResult(result: TestResultEntity)
+
+    @Insert
+    suspend fun insertResults(results: List<TestResultEntity>)
+
+    @Insert
+    suspend fun insertMeasurementBatch(batch: MeasurementBatchEntity)
 
     @Upsert
     suspend fun upsertSession(session: TestSessionEntity)

@@ -1,11 +1,13 @@
 package cloud.univ.jointsense.database.entity
 
 import androidx.room.Embedded
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 
 @Entity(tableName = "calibration")
@@ -16,6 +18,8 @@ data class CalibrationEntity(
     val status: CalibrationStatus,
     val kitName: String?,
     val kitLot: String?,
+    @ColumnInfo(defaultValue = "'LEGACY_MEAN_BR'")
+    val signalMethod: ColorSignalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
 )
 
 data class CalibrationWithKnots(
@@ -34,6 +38,7 @@ fun CalibrationWithKnots.toDomain(): Calibration = Calibration(
     status = calibration.status,
     kitName = calibration.kitName,
     kitLot = calibration.kitLot,
+    signalMethod = calibration.signalMethod,
     knots = knots.sortedBy(CalibrationKnotEntity::position).map(CalibrationKnotEntity::toDomain),
 )
 
@@ -44,4 +49,5 @@ fun Calibration.toEntity(): CalibrationEntity = CalibrationEntity(
     status = status,
     kitName = kitName,
     kitLot = kitLot,
+    signalMethod = signalMethod,
 )

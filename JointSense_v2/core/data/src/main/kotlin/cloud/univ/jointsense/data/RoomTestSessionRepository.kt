@@ -4,9 +4,11 @@ import cloud.univ.jointsense.database.DatabaseTransactions
 import cloud.univ.jointsense.database.JointSenseDatabase
 import cloud.univ.jointsense.database.entity.TestResultEntity
 import cloud.univ.jointsense.database.entity.TestSessionEntity
+import cloud.univ.jointsense.database.entity.MeasurementBatchEntity
 import cloud.univ.jointsense.database.entity.toDomain
 import cloud.univ.jointsense.domain.model.DataSource
 import cloud.univ.jointsense.domain.model.NewTestResult
+import cloud.univ.jointsense.domain.model.NewMeasurementBatch
 import cloud.univ.jointsense.domain.model.TestSession
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
 import java.util.UUID
@@ -52,8 +54,45 @@ class RoomTestSessionRepository(
             rStd = result.features.rStd,
             gStd = result.features.gStd,
             bStd = result.features.bStd,
+            rawSignal = result.rawSignal,
+            signalMethod = result.signalMethod,
         ),
     )
+
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: NewMeasurementBatch,
+    ): String {
+        val batchId = idFactory()
+        val batch = MeasurementBatchEntity(
+            id = batchId,
+            sessionId = sessionId,
+            draftId = draftId,
+            measuredAt = measurement.timestamp,
+        )
+        val results = measurement.results.map { result ->
+            TestResultEntity(
+                id = idFactory(),
+                sessionId = sessionId,
+                draftId = null,
+                factor = result.factor,
+                concentration = result.concentration,
+                rangeStatus = result.rangeStatus,
+                timestamp = measurement.timestamp,
+                rMean = result.features.rMean,
+                gMean = result.features.gMean,
+                bMean = result.features.bMean,
+                rStd = result.features.rStd,
+                gStd = result.features.gStd,
+                bStd = result.features.bStd,
+                measurementBatchId = batchId,
+                rawSignal = result.rawSignal,
+                signalMethod = result.signalMethod,
+            )
+        }
+        return transactions.commitMeasurement(batch, results)
+    }
 
     override suspend fun deleteSession(id: String) {
         dao.deleteSession(id)

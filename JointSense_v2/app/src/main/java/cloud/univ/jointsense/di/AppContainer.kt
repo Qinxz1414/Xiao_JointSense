@@ -8,6 +8,7 @@ import cloud.univ.jointsense.data.RoomTestSessionRepository
 import cloud.univ.jointsense.data.legacy.LegacyMigrationCoordinator
 import cloud.univ.jointsense.calibration.LegacyCalibrationRevalidator
 import cloud.univ.jointsense.database.JointSenseDatabase
+import cloud.univ.jointsense.database.DatabaseMigrations
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import cloud.univ.jointsense.domain.repository.DataManagementRepository
 import cloud.univ.jointsense.domain.repository.TestSessionRepository
@@ -45,6 +46,6 @@ class AppContainer(
                 application,
                 JointSenseDatabase::class.java,
                 DATABASE_NAME,
-            ).build()
+            ).addMigrations(DatabaseMigrations.MIGRATION_1_2).build()
     }
 }

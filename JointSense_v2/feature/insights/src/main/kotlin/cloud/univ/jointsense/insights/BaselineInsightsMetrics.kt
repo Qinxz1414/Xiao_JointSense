@@ -3,6 +3,7 @@ package cloud.univ.jointsense.insights
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.measurementBatches
 import kotlin.math.abs
 
 /** Phase-1 compatibility math retained only until the Phase-2 analysis contracts replace it. */
@@ -52,10 +53,10 @@ internal object BaselineInsightsMetrics {
     fun requireValidGrade(grade: Int): Int = validGrade(grade)
 
     fun aiSeries(sessions: List<TestSession>): List<InsightPoint> = sessions
-        .filter { it.results.isNotEmpty() }
-        .mapNotNull { session ->
-            aiFromResults(session.results)?.let { ai ->
-                InsightPoint(session.results.maxOf(TestResult::timestamp), ai)
+        .flatMap(TestSession::measurementBatches)
+        .mapNotNull { measurement ->
+            aiFromResults(measurement.results)?.let { ai ->
+                InsightPoint(measurement.timestamp, ai)
             }
         }
         .sortedBy(InsightPoint::time)
@@ -105,14 +106,12 @@ internal object BaselineInsightsMetrics {
 
     fun keyEvents(sessions: List<TestSession>, series: List<InsightPoint>): List<KeyEventItem> {
         val events = mutableListOf<KeyEventItem>()
-        val aiByTimestamp = series.associate { it.time to it.value }
-        sessions.filter { it.results.isNotEmpty() }.forEach { session ->
-            val timestamp = session.results.maxOf(TestResult::timestamp)
+        sessions.flatMap(TestSession::measurementBatches).forEach { measurement ->
             events += KeyEventItem(
-                time = timestamp,
+                time = measurement.timestamp,
                 kind = EventKind.TEST,
-                measurementCount = session.results.size,
-                aiValue = aiByTimestamp[timestamp],
+                measurementCount = 1,
+                aiValue = aiFromResults(measurement.results),
             )
         }
         for (index in 1 until series.size) {

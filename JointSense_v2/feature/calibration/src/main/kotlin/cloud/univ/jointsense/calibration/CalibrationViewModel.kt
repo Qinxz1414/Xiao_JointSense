@@ -13,6 +13,7 @@ import cloud.univ.jointsense.analysis.calibration.parseConcentration
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
@@ -272,6 +273,7 @@ class CalibrationViewModel internal constructor(
             status = CalibrationStatus.ACTIVE,
             kitName = null,
             kitLot = null,
+            signalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
             knots = valid.knots.map { knot ->
                 CalibrationKnot(
                     position = knot.wellIndex,

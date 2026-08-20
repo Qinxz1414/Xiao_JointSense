@@ -15,6 +15,7 @@ import cloud.univ.jointsense.database.entity.toDomain
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.DataSource
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.NewTestResult
@@ -189,6 +190,8 @@ class LegacyMigrationCoordinatorTest {
             concentration = 12f,
             rangeStatus = RangeStatus.IN_RANGE,
             features = RgbFeatures(1f, 2f, 3f, 4f, 5f, 6f),
+            rawSignal = 2f,
+            signalMethod = ColorSignalMethod.LEGACY_MEAN_BR,
             timestamp = 99L,
         )
 

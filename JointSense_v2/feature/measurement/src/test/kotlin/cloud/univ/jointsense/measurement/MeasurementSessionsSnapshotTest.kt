@@ -136,6 +136,12 @@ private class DelayedSessionsRepository : TestSessionRepository {
         result: NewTestResult,
     ): String = error("unused")
 
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: cloud.univ.jointsense.domain.model.NewMeasurementBatch,
+    ): String = error("unused")
+
     override suspend fun deleteSession(id: String) = error("unused")
 }
 
@@ -143,6 +149,5 @@ private object UnusedSnapshotAnalyzer : BaselinePhotoAnalysisAdapter {
     override suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ): BaselineAnalysisResult = error("unused")
+    ): List<BaselineAnalysisResult> = error("unused")
 }

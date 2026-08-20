@@ -4,16 +4,21 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import cloud.univ.jointsense.analysis.CurveKnot
 import cloud.univ.jointsense.analysis.FactoryCurves
+import cloud.univ.jointsense.analysis.FACTORY_CURVE_SIGNAL_PERCENTILE
 import cloud.univ.jointsense.analysis.QuantificationResult
 import cloud.univ.jointsense.analysis.StandardCurve
+import cloud.univ.jointsense.analysis.nearestRankPercentile
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
+import cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.sqrt
 import kotlinx.coroutines.flow.first
 
@@ -46,17 +51,19 @@ data class CropBounds(
 }
 
 data class BaselineAnalysisResult(
+    val factor: InflammationFactor,
     val concentration: Float,
     val rangeStatus: RangeStatus,
     val features: RgbFeatures,
+    val rawSignal: Float,
+    val signalMethod: ColorSignalMethod,
 )
 
 interface BaselinePhotoAnalysisAdapter {
     suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ): BaselineAnalysisResult
+    ): List<BaselineAnalysisResult>
 }
 
 /** Temporary Phase-1 photo path; Phase 2 replaces this adapter with the validated pipeline. */
@@ -66,61 +73,130 @@ class AndroidBaselinePhotoAnalysisAdapter(
     override suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ): BaselineAnalysisResult {
+    ): List<BaselineAnalysisResult> {
         val bitmap = (image as? BitmapMeasurementImage)?.bitmap
             ?: error("Android photo analysis requires a BitmapMeasurementImage")
-        val calibration = calibrations.observeCalibration(factor).first()
-        val features = extractFeatures(bitmap, cropBounds)
-        val quantification = quantifyMeasurementSignal(
+        require(cropBounds.left >= 0 && cropBounds.top >= 0)
+        require(cropBounds.right <= bitmap.width && cropBounds.bottom <= bitmap.height)
+        val calibrationByFactor = calibrations.observeCalibrations().first().associateBy(Calibration::factor)
+        return calculateThreeWellSamplingRegions(cropBounds).map { region ->
+            val statistics = extractSignalStatistics(bitmap, region)
+            val quantification = quantifyMeasurementSignal(
+                factor = region.factor,
+                rawSignal = statistics.rawSignal,
+                userCalibration = calibrationByFactor[region.factor],
+            )
+            BaselineAnalysisResult(
+                factor = region.factor,
+                concentration = quantification.concentration,
+                rangeStatus = quantification.rangeStatus,
+                features = statistics.features,
+                rawSignal = statistics.rawSignal,
+                signalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
+            )
+        }
+    }
+}
+
+internal data class WellSamplingRegion(
+    val factor: InflammationFactor,
+    val cellLeft: Int,
+    val cellRight: Int,
+    val centerX: Int,
+    val centerY: Int,
+    val radiusX: Int,
+    val radiusY: Int,
+) {
+    val sampleLeft: Int get() = centerX - radiusX
+    val sampleTop: Int get() = centerY - radiusY
+    val sampleRight: Int get() = centerX + radiusX
+    val sampleBottom: Int get() = centerY + radiusY
+}
+
+internal fun calculateThreeWellSamplingRegions(bounds: CropBounds): List<WellSamplingRegion> {
+    require(bounds.left >= 0 && bounds.top >= 0 && bounds.width >= MIN_ROW_WIDTH_PX && bounds.height >= MIN_ROW_HEIGHT_PX)
+    val aspectRatio = bounds.width.toFloat() / bounds.height.toFloat()
+    require(aspectRatio in MIN_ROW_ASPECT_RATIO..MAX_ROW_ASPECT_RATIO)
+    val centerY = bounds.top + bounds.height / 2
+    return inflammationFactorPresentationOrder.mapIndexed { index, factor ->
+        val cellLeft = bounds.left + floor(index * bounds.width / 3.0).toInt()
+        val cellRight = bounds.left + floor((index + 1) * bounds.width / 3.0).toInt()
+        val cellWidth = cellRight - cellLeft
+        val radiusX = maxOf(1, floor(cellWidth * ROI_RADIUS_FRACTION).toInt())
+        val radiusY = maxOf(1, floor(bounds.height * ROI_RADIUS_FRACTION).toInt())
+        WellSamplingRegion(
             factor = factor,
-            rawSignal = features.tealness,
-            userCalibration = calibration,
-        )
-        return BaselineAnalysisResult(
-            concentration = quantification.concentration,
-            rangeStatus = quantification.rangeStatus,
-            features = features,
+            cellLeft = cellLeft,
+            cellRight = cellRight,
+            centerX = cellLeft + cellWidth / 2,
+            centerY = centerY,
+            radiusX = radiusX,
+            radiusY = radiusY,
         )
     }
 }
 
-private fun extractFeatures(bitmap: Bitmap, bounds: CropBounds): RgbFeatures {
-    val left = bounds.left.coerceIn(0, bitmap.width - 1)
-    val top = bounds.top.coerceIn(0, bitmap.height - 1)
-    val width = bounds.width.coerceIn(1, bitmap.width - left)
-    val height = bounds.height.coerceIn(1, bitmap.height - top)
-    val pixels = IntArray(width * height)
-    bitmap.getPixels(pixels, 0, width, left, top, width, height)
-    val count = pixels.size.toDouble()
-    var red = 0.0
-    var green = 0.0
-    var blue = 0.0
-    var redSquared = 0.0
-    var greenSquared = 0.0
-    var blueSquared = 0.0
-    pixels.forEach { pixel ->
-        val r = Color.red(pixel).toDouble()
-        val g = Color.green(pixel).toDouble()
-        val b = Color.blue(pixel).toDouble()
-        red += r
-        green += g
-        blue += b
-        redSquared += r * r
-        greenSquared += g * g
-        blueSquared += b * b
+private data class WellSignalStatistics(
+    val features: RgbFeatures,
+    val rawSignal: Float,
+)
+
+private fun extractSignalStatistics(bitmap: Bitmap, region: WellSamplingRegion): WellSignalStatistics {
+    var accepted = 0L
+    var candidates = 0L
+    val red = RunningMoments()
+    val green = RunningMoments()
+    val blue = RunningMoments()
+    val tealnessSignals = IntArray((region.sampleRight - region.sampleLeft) * (region.sampleBottom - region.sampleTop))
+    for (y in region.sampleTop until region.sampleBottom) {
+        for (x in region.sampleLeft until region.sampleRight) {
+            val normalizedX = (x + 0.5 - region.centerX) / region.radiusX
+            val normalizedY = (y + 0.5 - region.centerY) / region.radiusY
+            if (normalizedX * normalizedX + normalizedY * normalizedY > 1.0) continue
+            candidates += 1
+            val pixel = bitmap.getPixel(x, y)
+            if (Color.alpha(pixel) < MIN_OPAQUE_ALPHA) continue
+            accepted += 1
+            red.add(Color.red(pixel).toDouble())
+            green.add(Color.green(pixel).toDouble())
+            blue.add(Color.blue(pixel).toDouble())
+            tealnessSignals[(accepted - 1).toInt()] = Color.blue(pixel) - Color.red(pixel)
+        }
     }
-    val rMean = (red / count).toFloat()
-    val gMean = (green / count).toFloat()
-    val bMean = (blue / count).toFloat()
-    return RgbFeatures(
-        rMean = rMean,
-        gMean = gMean,
-        bMean = bMean,
-        rStd = sqrt((redSquared / count - rMean * rMean).coerceAtLeast(0.0)).toFloat(),
-        gStd = sqrt((greenSquared / count - gMean * gMean).coerceAtLeast(0.0)).toFloat(),
-        bStd = sqrt((blueSquared / count - bMean * bMean).coerceAtLeast(0.0)).toFloat(),
+    require(candidates >= MIN_ACCEPTED_PIXELS)
+    require(accepted >= MIN_ACCEPTED_PIXELS)
+    require(accepted.toDouble() / candidates.toDouble() >= MIN_OPAQUE_COVERAGE)
+    return WellSignalStatistics(
+        features = RgbFeatures(
+            rMean = red.mean.toFloat(),
+            gMean = green.mean.toFloat(),
+            bMean = blue.mean.toFloat(),
+            rStd = red.populationStandardDeviation(),
+            gStd = green.populationStandardDeviation(),
+            bStd = blue.populationStandardDeviation(),
+        ),
+        rawSignal = nearestRankPercentile(
+            tealnessSignals.copyOf(accepted.toInt()),
+            FACTORY_CURVE_SIGNAL_PERCENTILE,
+        ),
     )
+}
+
+private class RunningMoments {
+    private var count = 0L
+    var mean = 0.0
+        private set
+    private var sumOfSquaredDeviations = 0.0
+
+    fun add(value: Double) {
+        count += 1
+        val delta = value - mean
+        mean += delta / count
+        sumOfSquaredDeviations += delta * (value - mean)
+    }
+
+    fun populationStandardDeviation(): Float =
+        sqrt((sumOfSquaredDeviations / count).coerceAtLeast(0.0)).toFloat()
 }
 
 internal fun quantifyMeasurementSignal(
@@ -144,7 +220,11 @@ private fun quantifyWithUserCalibration(
     calibration: Calibration?,
 ): QuantificationResult? {
     calibration ?: return null
-    if (calibration.status != CalibrationStatus.ACTIVE || calibration.factor != factor) return null
+    if (
+        calibration.status != CalibrationStatus.ACTIVE ||
+        calibration.factor != factor ||
+        calibration.signalMethod != ColorSignalMethod.PIXEL_BR_P90_V1
+    ) return null
     val knots = calibration.knots
     val blank = knots.singleOrNull(CalibrationKnot::isBlank) ?: return null
     if (!knots.areStructurallyValid(blank)) return null
@@ -201,3 +281,11 @@ private fun Double.toRepresentableFloatOrNull(): Float? {
 
 private const val NET_SIGNAL_ABSOLUTE_TOLERANCE = 1e-4
 private const val NET_SIGNAL_RELATIVE_TOLERANCE = 1e-5
+private const val MIN_ROW_WIDTH_PX = 144
+private const val MIN_ROW_HEIGHT_PX = 48
+private const val MIN_ROW_ASPECT_RATIO = 2.4f
+private const val MAX_ROW_ASPECT_RATIO = 4.2f
+private const val ROI_RADIUS_FRACTION = 0.30
+private const val MIN_ACCEPTED_PIXELS = 400
+private const val MIN_OPAQUE_ALPHA = 230
+private const val MIN_OPAQUE_COVERAGE = 0.90

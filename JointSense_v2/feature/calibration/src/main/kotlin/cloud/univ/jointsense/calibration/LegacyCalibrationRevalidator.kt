@@ -6,6 +6,7 @@ import cloud.univ.jointsense.analysis.calibration.CalibrationValidator
 import cloud.univ.jointsense.domain.model.Calibration
 import cloud.univ.jointsense.domain.model.CalibrationKnot
 import cloud.univ.jointsense.domain.model.CalibrationStatus
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.repository.CalibrationRepository
 import kotlinx.coroutines.CancellationException
@@ -53,6 +54,11 @@ class LegacyCalibrationRevalidator(
             .forEach { calibration ->
                 if (calibration in completedRecords) return@forEach
                 attempted += 1
+                if (calibration.signalMethod != ColorSignalMethod.PIXEL_BR_P90_V1) {
+                    completedRecords += calibration
+                    retained += 1
+                    return@forEach
+                }
                 val validation = try {
                     validate(calibration.toValidationInputs())
                 } catch (error: CancellationException) {

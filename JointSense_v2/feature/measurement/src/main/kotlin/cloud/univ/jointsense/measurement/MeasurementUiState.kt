@@ -1,8 +1,8 @@
 package cloud.univ.jointsense.measurement
 
-import cloud.univ.jointsense.domain.model.InflammationFactor
 import cloud.univ.jointsense.domain.model.TestResult
 import cloud.univ.jointsense.domain.model.TestSession
+import cloud.univ.jointsense.domain.model.measurementBatchCount
 
 enum class Stage {
     AwaitingImage,
@@ -70,7 +70,6 @@ data class MeasurementUiState(
     val draftId: String,
     val imageUri: String? = null,
     val cropRect: CropBounds? = null,
-    val factor: InflammationFactor = InflammationFactor.IL6,
     val error: MeasurementError? = null,
     val resumeStage: Stage? = null,
     val resultId: String? = null,
@@ -91,11 +90,9 @@ data class MeasurementUiState(
 ) {
     val cropBounds: CropBounds get() = cropRect ?: DEFAULT_CROP_BOUNDS
 
-    val selectedFactor: InflammationFactor get() = factor
-
     val isAnalyzing: Boolean get() = stage == Stage.Analyzing || stage == Stage.Persisting
 
-    val canAddMore: Boolean get() = (currentSession?.results?.size ?: 0) < 5
+    val canAddMore: Boolean get() = (currentSession?.measurementBatchCount() ?: 0) < 5
 
     private companion object {
         val DEFAULT_CROP_BOUNDS = CropBounds(0, 0, 200, 200)

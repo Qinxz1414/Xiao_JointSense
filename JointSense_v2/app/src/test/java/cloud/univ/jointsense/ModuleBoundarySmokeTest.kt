@@ -13,11 +13,11 @@ import cloud.univ.jointsense.insights.InsightsViewModel
 import cloud.univ.jointsense.insights.ReportRouteScreen
 import cloud.univ.jointsense.insights.TrendsRouteScreen
 import cloud.univ.jointsense.measurement.CropRouteScreen
-import cloud.univ.jointsense.measurement.FactorSelectRouteScreen
 import cloud.univ.jointsense.measurement.HistoryRouteScreen
 import cloud.univ.jointsense.measurement.ImageSelectRouteScreen
 import cloud.univ.jointsense.measurement.MeasurementViewModel
 import cloud.univ.jointsense.measurement.ResultRouteScreen
+import cloud.univ.jointsense.measurement.TriplexAnalysisRouteScreen
 import cloud.univ.jointsense.settings.SettingsRouteScreen
 import cloud.univ.jointsense.settings.SettingsViewModel
 import cloud.univ.jointsense.settings.locale.LanguageController
@@ -56,7 +56,7 @@ private fun ImportedFeatureRouteEntries(
 
     ImageSelectRouteScreen(measurement, onImageReady = {}, onBack = {})
     CropRouteScreen(measurement, onConfirm = {}, onBack = {})
-    FactorSelectRouteScreen(measurement, onResultReady = {}, onBack = {})
+    TriplexAnalysisRouteScreen(measurement, onResultReady = {}, onBack = {})
     ResultRouteScreen(
         viewModel = measurement,
         resultId = "result-id",

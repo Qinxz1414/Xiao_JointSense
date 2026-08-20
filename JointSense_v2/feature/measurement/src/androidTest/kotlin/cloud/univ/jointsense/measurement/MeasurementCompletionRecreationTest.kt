@@ -4,7 +4,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.domain.model.DataSource
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.NewMeasurementBatch
 import cloud.univ.jointsense.domain.model.NewTestResult
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
@@ -24,7 +26,7 @@ class MeasurementCompletionRecreationTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun completedCommitIsDeliveredOnceWhenFactorRouteCollectorIsRecreated() {
+    fun completedCommitIsDeliveredOnceWhenAnalysisRouteCollectorIsRecreated() {
         val repository = RecreationRepository()
         val viewModel = MeasurementViewModel(repository, RecreationAnalyzer()) { "draft-1" }
         val collectorAttached = mutableStateOf(true)
@@ -32,7 +34,7 @@ class MeasurementCompletionRecreationTest {
 
         composeRule.setContent {
             if (collectorAttached.value) {
-                FactorSelectRouteScreen(
+                TriplexAnalysisRouteScreen(
                     viewModel = viewModel,
                     onResultReady = deliveredIds::add,
                     onBack = {},
@@ -51,6 +53,7 @@ class MeasurementCompletionRecreationTest {
             val request = requireNotNull(viewModel.state.value.sessionCreationRequest)
             requireNotNull(viewModel.acceptSessionCreation(request.requestId))
             viewModel.setImage(RecreationImage(width = 800, height = 600))
+            viewModel.onAction(MeasurementAction.CropConfirmed)
             viewModel.analyze()
         }
         composeRule.waitUntil(timeoutMillis = 5_000) { repository.commitCount == 1 }
@@ -77,12 +80,16 @@ private class RecreationAnalyzer : BaselinePhotoAnalysisAdapter {
     override suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ) = BaselineAnalysisResult(
-        concentration = 42f,
-        rangeStatus = RangeStatus.UNKNOWN,
-        features = RgbFeatures(10f, 20f, 30f, 1f, 2f, 3f),
-    )
+    ) = cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder.map { factor ->
+        BaselineAnalysisResult(
+            factor = factor,
+            concentration = 42f,
+            rangeStatus = RangeStatus.UNKNOWN,
+            features = RgbFeatures(10f, 20f, 30f, 1f, 2f, 3f),
+            rawSignal = 20f,
+            signalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
+        )
+    }
 }
 
 private class RecreationRepository : TestSessionRepository {
@@ -127,6 +134,32 @@ private class RecreationRepository : TestSessionRepository {
             if (session.id == sessionId) session.copy(results = listOf(stored)) else session
         }
         return stored.id
+    }
+
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: NewMeasurementBatch,
+    ): String {
+        commitCount += 1
+        val batchId = "result-1"
+        val stored = measurement.results.mapIndexed { index, result ->
+            TestResult(
+                id = "$batchId-$index",
+                sessionId = sessionId,
+                draftId = null,
+                factor = result.factor,
+                concentration = result.concentration,
+                rangeStatus = result.rangeStatus,
+                features = result.features,
+                timestamp = measurement.timestamp,
+                measurementBatchId = batchId,
+            )
+        }
+        sessions.value = sessions.value.map { session ->
+            if (session.id == sessionId) session.copy(results = stored) else session
+        }
+        return batchId
     }
 
     override suspend fun deleteSession(id: String) {

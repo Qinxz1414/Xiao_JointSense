@@ -2,6 +2,8 @@ package cloud.univ.jointsense.calibration
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import cloud.univ.jointsense.analysis.FACTORY_CURVE_SIGNAL_PERCENTILE
+import cloud.univ.jointsense.analysis.nearestRankPercentile
 
 internal data class GridWellReading(
     val row: Int,
@@ -68,13 +70,28 @@ internal object GridSignalDetector {
             val width = window.width.coerceIn(1, crop.right - left)
             val height = window.height.coerceIn(1, crop.bottom - top)
             val pixels = source.getPixels(left, top, width, height)
+            val signals = IntArray(pixels.size)
+            var signalCount = 0
+            val radiusX = width / 2.0
+            val radiusY = height / 2.0
+            pixels.forEachIndexed { index, pixel ->
+                val x = index % width
+                val y = index / width
+                val normalizedX = (x + 0.5 - radiusX) / radiusX
+                val normalizedY = (y + 0.5 - radiusY) / radiusY
+                if (normalizedX * normalizedX + normalizedY * normalizedY <= 1.0) {
+                    signals[signalCount++] = (pixel and 0xff) - ((pixel ushr 16) and 0xff)
+                }
+            }
+            check(signalCount > 0)
             GridWellReading(
                 row = window.row,
                 col = window.col,
                 index = window.index,
-                signal = pixels.sumOf { pixel ->
-                    ((pixel and 0xff) - ((pixel ushr 16) and 0xff)).toDouble()
-                }.div(pixels.size).toFloat(),
+                signal = nearestRankPercentile(
+                    signals.copyOf(signalCount),
+                    FACTORY_CURVE_SIGNAL_PERCENTILE,
+                ),
             )
         }
     }

@@ -5,7 +5,6 @@ import android.graphics.Rect
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.SavedStateHandle
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -15,7 +14,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.univ.jointsense.designsystem.theme.JointSenseTheme
 import cloud.univ.jointsense.domain.model.DataSource
+import cloud.univ.jointsense.domain.model.ColorSignalMethod
 import cloud.univ.jointsense.domain.model.InflammationFactor
+import cloud.univ.jointsense.domain.model.NewMeasurementBatch
 import cloud.univ.jointsense.domain.model.NewTestResult
 import cloud.univ.jointsense.domain.model.RangeStatus
 import cloud.univ.jointsense.domain.model.RgbFeatures
@@ -40,7 +41,7 @@ class MeasurementFlowTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun realFactorRouteBlocksTopAndSystemBackAndSingleFlightsThroughAnalyzeAndPersist() {
+    fun realAnalysisRouteBlocksSystemBackAndSingleFlightsThroughAnalyzeAndPersist() {
         val repository = RouteRepository(blockCommit = true)
         val analyzer = RouteAnalyzer(blockAnalysis = true)
         val viewModel = readyViewModel(repository, analyzer)
@@ -48,7 +49,7 @@ class MeasurementFlowTest {
         var resultCalls = 0
         composeRule.setContent {
             JointSenseTheme {
-                FactorSelectRouteScreen(
+                TriplexAnalysisRouteScreen(
                     viewModel = viewModel,
                     onResultReady = { resultCalls += 1 },
                     onBack = { backCalls += 1 },
@@ -56,12 +57,9 @@ class MeasurementFlowTest {
             }
         }
 
-        composeRule.onNodeWithTag(ANALYZE_BUTTON_TAG).performClick()
         composeRule.waitUntil { viewModel.state.value.stage == Stage.Analyzing }
 
         composeRule.onNodeWithTag(MEASUREMENT_PROGRESS_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(ANALYZE_BUTTON_TAG).assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription("Back").assertIsNotEnabled()
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.runOnIdle {
             assertEquals(0, backCalls)
@@ -86,19 +84,16 @@ class MeasurementFlowTest {
     }
 
     @Test
-    fun realFactorRouteRetryPreservesDraftAndFactorAndCommitsOnce() {
+    fun realAnalysisRouteRetryPreservesDraftAndCropAndCommitsOnce() {
         val repository = RouteRepository()
         val analyzer = RouteAnalyzer(failuresRemaining = 1)
         val viewModel = readyViewModel(repository, analyzer)
-        composeRule.runOnIdle {
-            viewModel.onAction(MeasurementAction.FactorSelected(InflammationFactor.TNF_ALPHA))
-        }
         val draft = viewModel.state.value.draftId
         val crop = viewModel.state.value.cropRect
         var resultCalls = 0
         composeRule.setContent {
             JointSenseTheme {
-                FactorSelectRouteScreen(
+                TriplexAnalysisRouteScreen(
                     viewModel = viewModel,
                     onResultReady = { resultCalls += 1 },
                     onBack = {},
@@ -106,7 +101,6 @@ class MeasurementFlowTest {
             }
         }
 
-        composeRule.onNodeWithTag(ANALYZE_BUTTON_TAG).performClick()
         composeRule.waitUntil { viewModel.state.value.stage == Stage.RecoverableError }
         composeRule.onNodeWithTag(MEASUREMENT_ERROR_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(RETRY_BUTTON_TAG).performClick()
@@ -115,7 +109,6 @@ class MeasurementFlowTest {
         composeRule.runOnIdle {
             assertEquals(draft, viewModel.state.value.draftId)
             assertEquals(crop, viewModel.state.value.cropRect)
-            assertEquals(InflammationFactor.TNF_ALPHA, viewModel.state.value.factor)
             assertEquals(2, analyzer.calls)
             assertEquals(1, repository.commitCalls)
         }
@@ -304,8 +297,8 @@ class MeasurementFlowTest {
 }
 
 private object RouteImage : MeasurementImage {
-    override val width = 100
-    override val height = 100
+    override val width = 800
+    override val height = 600
 }
 
 private class RouteAnalyzer(
@@ -322,19 +315,23 @@ private class RouteAnalyzer(
     override suspend fun analyze(
         image: MeasurementImage,
         cropBounds: CropBounds,
-        factor: InflammationFactor,
-    ): BaselineAnalysisResult {
+    ): List<BaselineAnalysisResult> {
         calls += 1
         if (failuresRemaining > 0) {
             failuresRemaining -= 1
             error("analysis failed")
         }
         if (blockAnalysis) gate.await()
-        return BaselineAnalysisResult(
-            concentration = 12f,
-            rangeStatus = RangeStatus.IN_RANGE,
-            features = TEST_FEATURES,
-        )
+        return cloud.univ.jointsense.domain.model.inflammationFactorPresentationOrder.map { factor ->
+            BaselineAnalysisResult(
+                factor = factor,
+                concentration = 12f,
+                rangeStatus = RangeStatus.IN_RANGE,
+                features = TEST_FEATURES,
+                rawSignal = 20f,
+                signalMethod = ColorSignalMethod.PIXEL_BR_P90_V1,
+            )
+        }
     }
 }
 
@@ -384,6 +381,16 @@ private class RouteRepository(
         sessionId: String,
         draftId: String,
         result: NewTestResult,
+    ): String {
+        commitCalls += 1
+        commitGate.await()
+        return RESULT_ID
+    }
+
+    override suspend fun commitMeasurement(
+        sessionId: String,
+        draftId: String,
+        measurement: NewMeasurementBatch,
     ): String {
         commitCalls += 1
         commitGate.await()

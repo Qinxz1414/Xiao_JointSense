@@ -25,7 +25,7 @@ class GridSignalDetectorTest {
     }
 
     @Test
-    fun averagesBlueMinusRedAcrossEveryPixelInTheSamplingWindow() {
+    fun usesTheDocumentedP90BlueMinusRedSignalInsideTheCentralEllipse() {
         val image = FakeGridPixelSource(width = 10, height = 10) { x, _ ->
             if (x < 5) argb(red = 4, blue = 10) else argb(red = 8, blue = 20)
         }
@@ -38,7 +38,7 @@ class GridSignalDetectorTest {
             wellFraction = 1f,
         ).single()
 
-        assertEquals(9f, reading.signal)
+        assertEquals(12f, reading.signal)
     }
 
     @Test
