@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AndroidTest is packaged under cloud.univ.jointsense.test and owns a separate resource table. -->
+    <style name="Theme.JointSense.Test" parent="Theme.AppCompat.Light.NoActionBar" />
+</resources>

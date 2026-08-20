@@ -4,6 +4,6 @@
         <activity
             android:name="cloud.univ.jointsense.locale.LocaleMeasurementHostActivity"
             android:exported="false"
-            android:theme="@style/Theme.JointSense" />
+            android:theme="@style/Theme.JointSense.Test" />
     </application>
 </manifest>
