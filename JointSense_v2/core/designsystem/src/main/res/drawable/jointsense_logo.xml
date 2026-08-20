@@ -5,61 +5,61 @@
     android:viewportWidth="100"
     android:viewportHeight="100">
 
-    <!-- JOINT_ENDPOINT: enlarged articular endpoint, upper-left. -->
+    <!-- JOINT_SURFACE: upper articular contour. -->
     <path
         android:fillAlpha="1"
         android:fillColor="@android:color/transparent"
-        android:pathData="M21,30 C21,25.029 25.029,21 30,21 C34.971,21 39,25.029 39,30 C39,34.971 34.971,39 30,39 C25.029,39 21,34.971 21,30 Z"
+        android:pathData="M23,33 C27,25 38,22 48,25 C55,27 59,32 61,36"
         android:strokeColor="#0E2841"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeWidth="4" />
+        android:strokeWidth="7" />
 
-    <!-- JOINT_ENDPOINT: opposing articular endpoint, lower-right. -->
+    <!-- JOINT_SURFACE: opposing lower articular contour. -->
     <path
         android:fillAlpha="1"
         android:fillColor="@android:color/transparent"
-        android:pathData="M61,70 C61,65.029 65.029,61 70,61 C74.971,61 79,65.029 79,70 C79,74.971 74.971,79 70,79 C65.029,79 61,74.971 61,70 Z"
+        android:pathData="M77,67 C73,75 62,78 52,75 C45,73 41,68 39,64"
         android:strokeColor="#0E2841"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeWidth="4" />
+        android:strokeWidth="7" />
 
-    <!-- ANALYSIS_ARC: primary acquisition signal. -->
+    <!-- TRIPLEX_ASSAY: horizontal three-factor reaction strip. -->
     <path
-        android:fillAlpha="1"
-        android:fillColor="@android:color/transparent"
-        android:pathData="M37,29 C44,23 54,22 63,26 C69,28 73,32 75,36"
+        android:fillAlpha="0.20"
+        android:fillColor="#7B9694"
+        android:pathData="M27,40 C23.686,40 21,42.686 21,46 C21,48 21,52 21,54 C21,57.314 23.686,60 27,60 C40,60 60,60 73,60 C76.314,60 79,57.314 79,54 C79,52 79,48 79,46 C79,42.686 76.314,40 73,40 C60,40 40,40 27,40 Z"
         android:strokeColor="#156082"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeWidth="7" />
+        android:strokeWidth="3" />
 
-    <!-- ANALYSIS_ARC: cyan quantified-response signal. -->
+    <!-- TNF_ALPHA_DISC: left assay position. -->
     <path
         android:fillAlpha="1"
-        android:fillColor="@android:color/transparent"
-        android:pathData="M63,71 C56,77 46,78 37,74 C31,72 27,68 25,64"
-        android:strokeColor="#0F9ED5"
+        android:fillColor="#0F9ED5"
+        android:pathData="M28,50 C28,46.686 30.686,44 34,44 C37.314,44 40,46.686 40,50 C40,53.314 37.314,56 34,56 C30.686,56 28,53.314 28,50 Z"
+        android:strokeColor="#0E2841"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeWidth="7" />
+        android:strokeWidth="2" />
 
-    <!-- SYNOVIAL_TEST_WELL: translucent sample chamber. -->
-    <path
-        android:fillAlpha="0.24"
-        android:fillColor="#7B9694"
-        android:pathData="M36,50 C36,42.268 42.268,36 50,36 C57.732,36 64,42.268 64,50 C64,57.732 57.732,64 50,64 C42.268,64 36,57.732 36,50 Z"
-        android:strokeColor="@android:color/transparent"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeWidth="0" />
-
-    <!-- ASSAY_TARGET: active biomarker reading at the center of the well. -->
+    <!-- IL6_DISC: center assay position. -->
     <path
         android:fillAlpha="1"
         android:fillColor="#196B24"
-        android:pathData="M43,50 C43,46.134 46.134,43 50,43 C53.866,43 57,46.134 57,50 C57,53.866 53.866,57 50,57 C46.134,57 43,53.866 43,50 Z"
+        android:pathData="M44,50 C44,46.686 46.686,44 50,44 C53.314,44 56,46.686 56,50 C56,53.314 53.314,56 50,56 C46.686,56 44,53.314 44,50 Z"
+        android:strokeColor="#0E2841"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+
+    <!-- IL1_BETA_DISC: right assay position. -->
+    <path
+        android:fillAlpha="1"
+        android:fillColor="#156082"
+        android:pathData="M60,50 C60,46.686 62.686,44 66,44 C69.314,44 72,46.686 72,50 C72,53.314 69.314,56 66,56 C62.686,56 60,53.314 60,50 Z"
         android:strokeColor="#0E2841"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"

@@ -24,8 +24,8 @@ class BrandResourceTest {
 
     @Test
     fun coherentSameBoundsAndColorsSemanticGeometryDriftIsRejected() {
-        val approvedRing = "M21,30 C21,25.029 25.029,21 30,21 C34.971,21 39,25.029 39,30 C39,34.971 34.971,39 30,39 C25.029,39 21,34.971 21,30 Z"
-        val fakeSameBoundsRing = "M21,30 C21,21 21,21 30,21 C39,21 39,21 39,30 C39,39 39,39 30,39 C21,39 21,39 21,30 Z"
+        val approvedRing = "M23,33 C27,25 38,22 48,25 C55,27 59,32 61,36"
+        val fakeSameBoundsRing = "M23,33 C23,22 23,22 48,22 C61,22 61,22 61,36"
         val fakeFull = resource("jointsense_logo.xml").readText().replace(approvedRing, fakeSameBoundsRing)
         val fakeNight = nightResource("jointsense_logo.xml").readText().replace(approvedRing, fakeSameBoundsRing)
         val fakeMono = resource("jointsense_logo_monochrome.xml").readText().replace(approvedRing, fakeSameBoundsRing)
@@ -83,36 +83,36 @@ class BrandResourceTest {
         assertEquals(full.paths.map { it.pathData }, mono.paths.map { it.pathData })
         assertEquals(full.paths.map { it.pathData }, foreground.paths.map { it.pathData })
 
-        assertSemanticPath(full.paths[0], TRANSPARENT, INK, 4f)
-        assertSemanticPath(full.paths[1], TRANSPARENT, INK, 4f)
-        assertSemanticPath(full.paths[2], TRANSPARENT, PRIMARY, 7f)
-        assertSemanticPath(full.paths[3], TRANSPARENT, CYAN, 7f)
-        assertSemanticPath(full.paths[4], WELL_NEUTRAL, TRANSPARENT, 0f, fillAlpha = 0.24f)
-        assertSemanticPath(full.paths[5], BIO_GREEN, INK, 2f)
+        assertSemanticPath(full.paths[0], TRANSPARENT, INK, 7f)
+        assertSemanticPath(full.paths[1], TRANSPARENT, INK, 7f)
+        assertSemanticPath(full.paths[2], WELL_NEUTRAL, PRIMARY, 3f, fillAlpha = 0.20f)
+        assertSemanticPath(full.paths[3], CYAN, INK, 2f)
+        assertSemanticPath(full.paths[4], BIO_GREEN, INK, 2f)
+        assertSemanticPath(full.paths[5], PRIMARY, INK, 2f)
         assertEquals(APPROVED_BRAND_COLORS, full.pathColors)
 
-        assertSemanticPath(night.paths[0], TRANSPARENT, WHITE, 4f)
-        assertSemanticPath(night.paths[1], TRANSPARENT, WHITE, 4f)
-        assertSemanticPath(night.paths[2], TRANSPARENT, NIGHT_CYAN, 7f)
-        assertSemanticPath(night.paths[3], TRANSPARENT, WHITE, 7f)
-        assertSemanticPath(night.paths[4], WHITE, TRANSPARENT, 0f, fillAlpha = 0.20f)
-        assertSemanticPath(night.paths[5], BIO_GREEN, WHITE, 2f)
+        assertSemanticPath(night.paths[0], TRANSPARENT, WHITE, 7f)
+        assertSemanticPath(night.paths[1], TRANSPARENT, WHITE, 7f)
+        assertSemanticPath(night.paths[2], WHITE, NIGHT_CYAN, 3f, fillAlpha = 0.18f)
+        assertSemanticPath(night.paths[3], NIGHT_CYAN, WHITE, 2f)
+        assertSemanticPath(night.paths[4], BIO_GREEN, WHITE, 2f)
+        assertSemanticPath(night.paths[5], WHITE, NIGHT_CYAN, 2f)
         assertEquals(APPROVED_NIGHT_COLORS, night.pathColors)
 
-        assertSemanticPath(mono.paths[0], TRANSPARENT, MONOCHROME, 4f)
-        assertSemanticPath(mono.paths[1], TRANSPARENT, MONOCHROME, 4f)
-        assertSemanticPath(mono.paths[2], TRANSPARENT, MONOCHROME, 7f)
-        assertSemanticPath(mono.paths[3], TRANSPARENT, MONOCHROME, 7f)
-        assertSemanticPath(mono.paths[4], TRANSPARENT, MONOCHROME, 3f)
+        assertSemanticPath(mono.paths[0], TRANSPARENT, MONOCHROME, 7f)
+        assertSemanticPath(mono.paths[1], TRANSPARENT, MONOCHROME, 7f)
+        assertSemanticPath(mono.paths[2], TRANSPARENT, MONOCHROME, 3f)
+        assertSemanticPath(mono.paths[3], MONOCHROME, MONOCHROME, 2f)
+        assertSemanticPath(mono.paths[4], MONOCHROME, MONOCHROME, 2f)
         assertSemanticPath(mono.paths[5], MONOCHROME, MONOCHROME, 2f)
         assertTrue(mono.pathColors.isEmpty())
 
-        assertSemanticPath(foreground.paths[0], TRANSPARENT, WHITE, 4f)
-        assertSemanticPath(foreground.paths[1], TRANSPARENT, WHITE, 4f)
-        assertSemanticPath(foreground.paths[2], TRANSPARENT, NIGHT_CYAN, 7f)
-        assertSemanticPath(foreground.paths[3], TRANSPARENT, WHITE, 7f)
-        assertSemanticPath(foreground.paths[4], WHITE, TRANSPARENT, 0f, fillAlpha = 0.20f)
-        assertSemanticPath(foreground.paths[5], BIO_GREEN, WHITE, 2f)
+        assertSemanticPath(foreground.paths[0], TRANSPARENT, WHITE, 7f)
+        assertSemanticPath(foreground.paths[1], TRANSPARENT, WHITE, 7f)
+        assertSemanticPath(foreground.paths[2], WHITE, NIGHT_CYAN, 3f, fillAlpha = 0.18f)
+        assertSemanticPath(foreground.paths[3], NIGHT_CYAN, WHITE, 2f)
+        assertSemanticPath(foreground.paths[4], BIO_GREEN, WHITE, 2f)
+        assertSemanticPath(foreground.paths[5], WHITE, NIGHT_CYAN, 2f)
         assertEquals(APPROVED_LAUNCHER_FOREGROUND_COLORS, foreground.pathColors)
     }
 
@@ -243,16 +243,16 @@ class BrandResourceTest {
         )
         val changedViewport = valid.replace("android:viewportWidth=\"100\"", "android:viewportWidth=\"101\"")
         val trimmed = valid.replaceFirst(
-            "android:strokeWidth=\"4\"",
-            "android:strokeWidth=\"4\"\n        android:trimPathStart=\"0.5\"",
+            "android:strokeWidth=\"7\"",
+            "android:strokeWidth=\"7\"\n        android:trimPathStart=\"0.5\"",
         )
         val translucentFill = valid.replaceFirst(
             "android:fillAlpha=\"1\"",
             "android:fillAlpha=\"0\"",
         )
         val faded = valid.replaceFirst(
-            "android:strokeWidth=\"4\"",
-            "android:strokeWidth=\"4\"\n        android:strokeAlpha=\"0\"",
+            "android:strokeWidth=\"7\"",
+            "android:strokeWidth=\"7\"\n        android:strokeAlpha=\"0\"",
         )
         listOf(
             transformed,
@@ -584,12 +584,12 @@ class BrandResourceTest {
         const val NORMAL_BACKGROUND_PATH = "M0,0 H108 V108 H0 Z"
         const val ROUND_BACKGROUND_PATH = "M54,2 C82.719,2 106,25.281 106,54 C106,82.719 82.719,106 54,106 C25.281,106 2,82.719 2,54 C2,25.281 25.281,2 54,2 Z"
         val APPROVED_SEMANTIC_PATHS = listOf(
-            "M21,30 C21,25.029 25.029,21 30,21 C34.971,21 39,25.029 39,30 C39,34.971 34.971,39 30,39 C25.029,39 21,34.971 21,30 Z",
-            "M61,70 C61,65.029 65.029,61 70,61 C74.971,61 79,65.029 79,70 C79,74.971 74.971,79 70,79 C65.029,79 61,74.971 61,70 Z",
-            "M37,29 C44,23 54,22 63,26 C69,28 73,32 75,36",
-            "M63,71 C56,77 46,78 37,74 C31,72 27,68 25,64",
-            "M36,50 C36,42.268 42.268,36 50,36 C57.732,36 64,42.268 64,50 C64,57.732 57.732,64 50,64 C42.268,64 36,57.732 36,50 Z",
-            "M43,50 C43,46.134 46.134,43 50,43 C53.866,43 57,46.134 57,50 C57,53.866 53.866,57 50,57 C46.134,57 43,53.866 43,50 Z",
+            "M23,33 C27,25 38,22 48,25 C55,27 59,32 61,36",
+            "M77,67 C73,75 62,78 52,75 C45,73 41,68 39,64",
+            "M27,40 C23.686,40 21,42.686 21,46 C21,48 21,52 21,54 C21,57.314 23.686,60 27,60 C40,60 60,60 73,60 C76.314,60 79,57.314 79,54 C79,52 79,48 79,46 C79,42.686 76.314,40 73,40 C60,40 40,40 27,40 Z",
+            "M28,50 C28,46.686 30.686,44 34,44 C37.314,44 40,46.686 40,50 C40,53.314 37.314,56 34,56 C30.686,56 28,53.314 28,50 Z",
+            "M44,50 C44,46.686 46.686,44 50,44 C53.314,44 56,46.686 56,50 C56,53.314 53.314,56 50,56 C46.686,56 44,53.314 44,50 Z",
+            "M60,50 C60,46.686 62.686,44 66,44 C69.314,44 72,46.686 72,50 C72,53.314 69.314,56 66,56 C62.686,56 60,53.314 60,50 Z",
         )
         const val NUMBER_TOKEN = "-?(?:0|[1-9]\\d*)(?:\\.\\d+)?"
         const val PAIR_TOKEN = "$NUMBER_TOKEN,$NUMBER_TOKEN"
@@ -603,7 +603,7 @@ class BrandResourceTest {
         val APPROVED_BRAND_COLORS = setOf(INK, PRIMARY, CYAN, BIO_GREEN, WELL_NEUTRAL)
         val APPROVED_NIGHT_COLORS = setOf(WHITE, NIGHT_CYAN, BIO_GREEN)
         val APPROVED_LAUNCHER_FOREGROUND_COLORS = APPROVED_NIGHT_COLORS
-        val KEY_SEMANTIC_PATH_INDICES = listOf(0, 1, 2, 3, 5)
+        val KEY_SEMANTIC_PATH_INDICES = listOf(0, 1, 2, 3, 4, 5)
         val HEX_COLOR = Regex("#[0-9A-Fa-f]{6,8}")
         val NUMBER = Regex(NUMBER_TOKEN)
         val RASTER_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp")
