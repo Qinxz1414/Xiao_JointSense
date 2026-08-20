@@ -40,7 +40,7 @@
     <string name="report_concentration_format">%1$s pg/mL</string>
     <string name="report_bullet_format">• %1$s</string>
     <string name="insights_home_title">OA inflammation monitor</string>
-    <string name="insights_logo_description">JointSense logo</string>
+    <string name="insights_logo_description">JointSense joint signal mark</string>
     <string name="insights_empty_title">JointSense</string>
     <string name="insights_empty_message">No tests yet. Run your first detection to build your inflammation dashboard.</string>
     <string name="insights_start_new_measurement">Start new measurement</string>

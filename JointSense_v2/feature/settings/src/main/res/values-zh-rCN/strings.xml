@@ -2,7 +2,7 @@
 <resources>
     <string name="settings_entry_accessibility_name">%1$s。%2$s</string>
     <string name="settings_title">个人中心</string>
-    <string name="settings_logo_description">JointSense 标志</string>
+    <string name="settings_logo_description">JointSense 关节信号标志</string>
     <string name="settings_app_name">JointSense</string>
     <string name="settings_app_summary">面向 OA 科研的手机照片色度分析</string>
     <string name="settings_counts">%1$s · %2$s</string>

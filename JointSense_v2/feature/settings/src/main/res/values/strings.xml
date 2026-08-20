@@ -2,7 +2,7 @@
 <resources>
     <string name="settings_entry_accessibility_name">%1$s. %2$s</string>
     <string name="settings_title">Profile</string>
-    <string name="settings_logo_description">JointSense logo</string>
+    <string name="settings_logo_description">JointSense joint signal mark</string>
     <string name="settings_app_name">JointSense</string>
     <string name="settings_app_summary">Smartphone-photo colorimetry for OA research</string>
     <string name="settings_counts">%1$s · %2$s</string>

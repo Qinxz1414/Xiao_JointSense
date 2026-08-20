@@ -16,6 +16,7 @@ class BrandResourceTest {
     fun semanticVectorsHaveExactRootPathStructureGeometryAndColors() {
         validateSemanticVectorMatrix(
             resource("jointsense_logo.xml"),
+            nightResource("jointsense_logo.xml"),
             resource("jointsense_logo_monochrome.xml"),
             appResource("drawable/ic_launcher_joint_signal_foreground.xml"),
         )
@@ -23,15 +24,21 @@ class BrandResourceTest {
 
     @Test
     fun coherentSameBoundsAndColorsSemanticGeometryDriftIsRejected() {
-        val approvedRing = "M20,31 C20,27.686 22.686,25 26,25 C29.314,25 32,27.686 32,31 C32,34.314 29.314,37 26,37 C22.686,37 20,34.314 20,31 Z"
-        val fakeSameBoundsRing = "M20,31 C20,25 20,25 26,25 C32,25 32,25 32,31 C32,37 32,37 26,37 C20,37 20,37 20,31 Z"
+        val approvedRing = "M21,30 C21,25.029 25.029,21 30,21 C34.971,21 39,25.029 39,30 C39,34.971 34.971,39 30,39 C25.029,39 21,34.971 21,30 Z"
+        val fakeSameBoundsRing = "M21,30 C21,21 21,21 30,21 C39,21 39,21 39,30 C39,39 39,39 30,39 C21,39 21,39 21,30 Z"
         val fakeFull = resource("jointsense_logo.xml").readText().replace(approvedRing, fakeSameBoundsRing)
+        val fakeNight = nightResource("jointsense_logo.xml").readText().replace(approvedRing, fakeSameBoundsRing)
         val fakeMono = resource("jointsense_logo_monochrome.xml").readText().replace(approvedRing, fakeSameBoundsRing)
         val fakeForeground = appResource("drawable/ic_launcher_joint_signal_foreground.xml")
             .readText().replace(approvedRing, fakeSameBoundsRing)
 
         assertThrows(AssertionError::class.java) {
-            validateSemanticVectorMatrix(tempXml(fakeFull), tempXml(fakeMono), tempXml(fakeForeground))
+            validateSemanticVectorMatrix(
+                tempXml(fakeFull),
+                tempXml(fakeNight),
+                tempXml(fakeMono),
+                tempXml(fakeForeground),
+            )
         }
     }
 
@@ -39,6 +46,7 @@ class BrandResourceTest {
     fun semanticAndBackgroundPathNodesRejectNestedRenderingElements() {
         listOf(
             resource("jointsense_logo.xml"),
+            nightResource("jointsense_logo.xml"),
             resource("jointsense_logo_monochrome.xml"),
             appResource("drawable/ic_launcher_joint_signal_foreground.xml"),
         ).forEach { semantic ->
@@ -65,33 +73,46 @@ class BrandResourceTest {
         assertThrows(AssertionError::class.java) { validateNormalBackground(tempXml(fakeSquare)) }
     }
 
-    private fun validateSemanticVectorMatrix(fullFile: File, monoFile: File, foregroundFile: File) {
+    private fun validateSemanticVectorMatrix(fullFile: File, nightFile: File, monoFile: File, foregroundFile: File) {
         val full = parseSemanticVector(fullFile)
+        val night = parseSemanticVector(nightFile)
         val mono = parseSemanticVector(monoFile)
         val foreground = parseSemanticVector(foregroundFile)
 
+        assertEquals(full.paths.map { it.pathData }, night.paths.map { it.pathData })
         assertEquals(full.paths.map { it.pathData }, mono.paths.map { it.pathData })
         assertEquals(full.paths.map { it.pathData }, foreground.paths.map { it.pathData })
 
         assertSemanticPath(full.paths[0], TRANSPARENT, INK, 4f)
         assertSemanticPath(full.paths[1], TRANSPARENT, INK, 4f)
-        assertSemanticPath(full.paths[2], TRANSPARENT, PRIMARY, 8f)
-        assertSemanticPath(full.paths[3], TRANSPARENT, CYAN, 8f)
-        assertSemanticPath(full.paths[4], BIO_GREEN, INK, 2f)
+        assertSemanticPath(full.paths[2], TRANSPARENT, PRIMARY, 7f)
+        assertSemanticPath(full.paths[3], TRANSPARENT, CYAN, 7f)
+        assertSemanticPath(full.paths[4], WELL_NEUTRAL, TRANSPARENT, 0f, fillAlpha = 0.24f)
+        assertSemanticPath(full.paths[5], BIO_GREEN, INK, 2f)
         assertEquals(APPROVED_BRAND_COLORS, full.pathColors)
+
+        assertSemanticPath(night.paths[0], TRANSPARENT, WHITE, 4f)
+        assertSemanticPath(night.paths[1], TRANSPARENT, WHITE, 4f)
+        assertSemanticPath(night.paths[2], TRANSPARENT, NIGHT_CYAN, 7f)
+        assertSemanticPath(night.paths[3], TRANSPARENT, WHITE, 7f)
+        assertSemanticPath(night.paths[4], WHITE, TRANSPARENT, 0f, fillAlpha = 0.20f)
+        assertSemanticPath(night.paths[5], BIO_GREEN, WHITE, 2f)
+        assertEquals(APPROVED_NIGHT_COLORS, night.pathColors)
 
         assertSemanticPath(mono.paths[0], TRANSPARENT, MONOCHROME, 4f)
         assertSemanticPath(mono.paths[1], TRANSPARENT, MONOCHROME, 4f)
-        assertSemanticPath(mono.paths[2], TRANSPARENT, MONOCHROME, 8f)
-        assertSemanticPath(mono.paths[3], TRANSPARENT, MONOCHROME, 8f)
-        assertSemanticPath(mono.paths[4], MONOCHROME, MONOCHROME, 2f)
+        assertSemanticPath(mono.paths[2], TRANSPARENT, MONOCHROME, 7f)
+        assertSemanticPath(mono.paths[3], TRANSPARENT, MONOCHROME, 7f)
+        assertSemanticPath(mono.paths[4], TRANSPARENT, MONOCHROME, 3f)
+        assertSemanticPath(mono.paths[5], MONOCHROME, MONOCHROME, 2f)
         assertTrue(mono.pathColors.isEmpty())
 
         assertSemanticPath(foreground.paths[0], TRANSPARENT, WHITE, 4f)
         assertSemanticPath(foreground.paths[1], TRANSPARENT, WHITE, 4f)
-        assertSemanticPath(foreground.paths[2], TRANSPARENT, PRIMARY, 8f)
-        assertSemanticPath(foreground.paths[3], TRANSPARENT, CYAN, 8f)
-        assertSemanticPath(foreground.paths[4], BIO_GREEN, WHITE, 2f)
+        assertSemanticPath(foreground.paths[2], TRANSPARENT, NIGHT_CYAN, 7f)
+        assertSemanticPath(foreground.paths[3], TRANSPARENT, WHITE, 7f)
+        assertSemanticPath(foreground.paths[4], WHITE, TRANSPARENT, 0f, fillAlpha = 0.20f)
+        assertSemanticPath(foreground.paths[5], BIO_GREEN, WHITE, 2f)
         assertEquals(APPROVED_LAUNCHER_FOREGROUND_COLORS, foreground.pathColors)
     }
 
@@ -113,6 +134,7 @@ class BrandResourceTest {
     fun visibleStrokeAndRoundCapExtentsStayInsideLauncherSafeMask() {
         listOf(
             resource("jointsense_logo.xml"),
+            nightResource("jointsense_logo.xml"),
             resource("jointsense_logo_monochrome.xml"),
             appResource("drawable/ic_launcher_joint_signal_foreground.xml"),
         ).forEach { file ->
@@ -124,6 +146,26 @@ class BrandResourceTest {
                 assertTrue("${file.name} path ${index + 1} visible top edge", y.min() - radius >= SAFE_MIN)
                 assertTrue("${file.name} path ${index + 1} visible right edge", x.max() + radius <= SAFE_MAX)
                 assertTrue("${file.name} path ${index + 1} visible bottom edge", y.max() + radius <= SAFE_MAX)
+            }
+        }
+    }
+
+    @Test
+    fun darkAndLauncherKeyOutlinesMeetNonTextContrast() {
+        listOf(
+            nightResource("jointsense_logo.xml") to DARK_PRIMARY_CONTAINER,
+            appResource("drawable/ic_launcher_joint_signal_foreground.xml") to INK,
+        ).forEach { (file, background) ->
+            val paths = parseSemanticVector(file).paths
+            KEY_SEMANTIC_PATH_INDICES.forEach { index ->
+                val path = paths[index]
+                val visibleColors = listOf(path.fillColor, path.strokeColor)
+                    .filter { HEX_COLOR.matches(it) }
+                val bestContrast = visibleColors.maxOf { contrastRatio(it, background) }
+                assertTrue(
+                    "${file.path} path ${index + 1} needs a visible outline with at least 3:1 contrast",
+                    bestContrast >= MIN_GRAPHIC_CONTRAST,
+                )
             }
         }
     }
@@ -205,8 +247,8 @@ class BrandResourceTest {
             "android:strokeWidth=\"4\"\n        android:trimPathStart=\"0.5\"",
         )
         val translucentFill = valid.replaceFirst(
-            "android:strokeWidth=\"4\"",
-            "android:strokeWidth=\"4\"\n        android:fillAlpha=\"0\"",
+            "android:fillAlpha=\"1\"",
+            "android:fillAlpha=\"0\"",
         )
         val faded = valid.replaceFirst(
             "android:strokeWidth=\"4\"",
@@ -277,11 +319,16 @@ class BrandResourceTest {
         assertEquals("100", root.androidAttribute("viewportWidth"))
         assertEquals("100", root.androidAttribute("viewportHeight"))
         val children = root.directElementChildren()
-        assertEquals("semantic vector must have five direct paths", 5, children.size)
+        assertEquals("semantic vector must have six direct paths", 6, children.size)
         children.forEach { child ->
             assertEquals("path", child.tagName)
             assertExactAndroidAttributes(child, SEMANTIC_PATH_ATTRIBUTES)
             assertTrue("semantic paths must not contain element descendants", child.directElementChildren().isEmpty())
+            assertTrue(
+                "semantic paths must remain visibly filled when a fill is present",
+                child.androidAttribute("fillAlpha").toFloat() in 0f..1f &&
+                    child.androidAttribute("fillAlpha").toFloat() > 0f,
+            )
             assertTrue("Path must use absolute M/C/Z grammar", STRICT_PATH.matches(child.androidAttribute("pathData")))
         }
         assertEquals(
@@ -391,6 +438,7 @@ class BrandResourceTest {
             VectorPath(
                 pathData = element.androidAttribute("pathData"),
                 fillColor = element.androidAttribute("fillColor"),
+                fillAlpha = element.androidAttribute("fillAlpha").ifBlank { "1" }.toFloat(),
                 strokeColor = element.androidAttribute("strokeColor"),
                 strokeWidth = element.androidAttribute("strokeWidth").toFloatOrNull() ?: 0f,
                 strokeLineCap = element.androidAttribute("strokeLineCap"),
@@ -399,12 +447,33 @@ class BrandResourceTest {
         },
     )
 
-    private fun assertSemanticPath(path: VectorPath, fill: String, stroke: String, width: Float) {
+    private fun assertSemanticPath(
+        path: VectorPath,
+        fill: String,
+        stroke: String,
+        width: Float,
+        fillAlpha: Float = 1f,
+    ) {
         assertEquals(fill, path.fillColor)
+        assertEquals(fillAlpha, path.fillAlpha)
         assertEquals(stroke, path.strokeColor)
         assertEquals(width, path.strokeWidth)
         assertEquals("round", path.strokeLineCap)
         assertEquals("round", path.strokeLineJoin)
+    }
+
+    private fun contrastRatio(foreground: String, background: String): Double {
+        val lighter = maxOf(relativeLuminance(foreground), relativeLuminance(background))
+        val darker = minOf(relativeLuminance(foreground), relativeLuminance(background))
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    private fun relativeLuminance(color: String): Double {
+        val channels = listOf(1, 3, 5).map { start ->
+            val encoded = color.substring(start, start + 2).toInt(16) / 255.0
+            if (encoded <= 0.04045) encoded / 12.92 else Math.pow((encoded + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
     }
 
     private fun assertExactAndroidAttributes(
@@ -450,6 +519,7 @@ class BrandResourceTest {
     }
 
     private fun resource(name: String): File = File("src/main/res/drawable/$name").requireFile()
+    private fun nightResource(name: String): File = File("src/main/res/drawable-night/$name").requireFile()
     private fun appResource(path: String): File = File("../../app/src/main/res/$path").requireFile()
     private fun File.requireFile(): File = also { assertTrue("Missing brand resource: ${it.path}", it.isFile) }
     private fun tempXml(xml: String): File = File.createTempFile("jointsense-brand-contract", ".xml").apply {
@@ -470,6 +540,7 @@ class BrandResourceTest {
     private data class VectorPath(
         val pathData: String,
         val fillColor: String,
+        val fillAlpha: Float,
         val strokeColor: String,
         val strokeWidth: Float,
         val strokeLineCap: String,
@@ -498,7 +569,11 @@ class BrandResourceTest {
         const val PRIMARY = "#156082"
         const val CYAN = "#0F9ED5"
         const val BIO_GREEN = "#196B24"
+        const val WELL_NEUTRAL = "#7B9694"
         const val WHITE = "#FFFFFF"
+        const val NIGHT_CYAN = "#8BD8F4"
+        const val DARK_PRIMARY_CONTAINER = "#114B63"
+        const val MIN_GRAPHIC_CONTRAST = 3.0
         const val SAFE_MIN = 18f
         const val SAFE_MAX = 82f
         const val LEGACY_FOREGROUND_SIZE_DP = 88
@@ -509,10 +584,11 @@ class BrandResourceTest {
         const val NORMAL_BACKGROUND_PATH = "M0,0 H108 V108 H0 Z"
         const val ROUND_BACKGROUND_PATH = "M54,2 C82.719,2 106,25.281 106,54 C106,82.719 82.719,106 54,106 C25.281,106 2,82.719 2,54 C2,25.281 25.281,2 54,2 Z"
         val APPROVED_SEMANTIC_PATHS = listOf(
-            "M20,31 C20,27.686 22.686,25 26,25 C29.314,25 32,27.686 32,31 C32,34.314 29.314,37 26,37 C22.686,37 20,34.314 20,31 Z",
-            "M68,69 C68,65.686 70.686,63 74,63 C77.314,63 80,65.686 80,69 C80,72.314 77.314,75 74,75 C70.686,75 68,72.314 68,69 Z",
-            "M32,30 C40,23 53,22 64,29 C67,31 69,33 70,35",
-            "M68,70 C60,77 47,78 36,71 C33,69 31,67 30,65",
+            "M21,30 C21,25.029 25.029,21 30,21 C34.971,21 39,25.029 39,30 C39,34.971 34.971,39 30,39 C25.029,39 21,34.971 21,30 Z",
+            "M61,70 C61,65.029 65.029,61 70,61 C74.971,61 79,65.029 79,70 C79,74.971 74.971,79 70,79 C65.029,79 61,74.971 61,70 Z",
+            "M37,29 C44,23 54,22 63,26 C69,28 73,32 75,36",
+            "M63,71 C56,77 46,78 37,74 C31,72 27,68 25,64",
+            "M36,50 C36,42.268 42.268,36 50,36 C57.732,36 64,42.268 64,50 C64,57.732 57.732,64 50,64 C42.268,64 36,57.732 36,50 Z",
             "M43,50 C43,46.134 46.134,43 50,43 C53.866,43 57,46.134 57,50 C57,53.866 53.866,57 50,57 C46.134,57 43,53.866 43,50 Z",
         )
         const val NUMBER_TOKEN = "-?(?:0|[1-9]\\d*)(?:\\.\\d+)?"
@@ -520,12 +596,14 @@ class BrandResourceTest {
         val STRICT_PATH = Regex("^M$PAIR_TOKEN(?: C$PAIR_TOKEN $PAIR_TOKEN $PAIR_TOKEN)+(?: Z)?$")
         val VECTOR_ROOT_ATTRIBUTES = setOf("width", "height", "viewportWidth", "viewportHeight")
         val SEMANTIC_PATH_ATTRIBUTES = setOf(
-            "fillColor", "pathData", "strokeColor", "strokeLineCap", "strokeLineJoin", "strokeWidth",
+            "fillAlpha", "fillColor", "pathData", "strokeColor", "strokeLineCap", "strokeLineJoin", "strokeWidth",
         )
         val BACKGROUND_PATH_ATTRIBUTES = setOf("fillColor", "pathData")
         val LEGACY_FOREGROUND_ATTRIBUTES = setOf("width", "height", "drawable", "gravity")
-        val APPROVED_BRAND_COLORS = setOf(INK, PRIMARY, CYAN, BIO_GREEN)
-        val APPROVED_LAUNCHER_FOREGROUND_COLORS = setOf(WHITE, PRIMARY, CYAN, BIO_GREEN)
+        val APPROVED_BRAND_COLORS = setOf(INK, PRIMARY, CYAN, BIO_GREEN, WELL_NEUTRAL)
+        val APPROVED_NIGHT_COLORS = setOf(WHITE, NIGHT_CYAN, BIO_GREEN)
+        val APPROVED_LAUNCHER_FOREGROUND_COLORS = APPROVED_NIGHT_COLORS
+        val KEY_SEMANTIC_PATH_INDICES = listOf(0, 1, 2, 3, 5)
         val HEX_COLOR = Regex("#[0-9A-Fa-f]{6,8}")
         val NUMBER = Regex(NUMBER_TOKEN)
         val RASTER_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp")

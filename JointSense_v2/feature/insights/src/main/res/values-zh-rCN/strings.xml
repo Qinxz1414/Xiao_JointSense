@@ -40,7 +40,7 @@
     <string name="report_concentration_format">%1$s pg/mL</string>
     <string name="report_bullet_format">• %1$s</string>
     <string name="insights_home_title">OA 炎症监测</string>
-    <string name="insights_logo_description">JointSense 标志</string>
+    <string name="insights_logo_description">JointSense 关节信号标志</string>
     <string name="insights_empty_title">JointSense</string>
     <string name="insights_empty_message">暂无检测数据。完成首次检测后即可建立炎症监测面板。</string>
     <string name="insights_start_new_measurement">开始新检测</string>
